@@ -36,6 +36,38 @@ code {
   min-height: 100vh;
   place-items: center;
   padding: 32px;
+  position: relative;
+}
+
+.nav {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  position: absolute;
+  right: 32px;
+  top: 24px;
+}
+
+.button {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.button.primary {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.button.secondary {
+  background: transparent;
+  border-color: #cad3df;
+  color: var(--foreground);
 }
 
 .intro {
@@ -62,4 +94,17 @@ p {
   font-size: 1.1rem;
   line-height: 1.6;
   margin: 0;
+}
+
+@media (max-width: 560px) {
+  .page {
+    place-items: start;
+    padding: 96px 24px 32px;
+  }
+
+  .nav {
+    left: 24px;
+    right: 24px;
+    top: 24px;
+  }
 }

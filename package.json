@@ -9,6 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.6.1",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
@@ -17,6 +18,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "clerk": "^2.3.0",
     "eslint": "latest",
     "eslint-config-next": "latest",
     "typescript": "latest"
