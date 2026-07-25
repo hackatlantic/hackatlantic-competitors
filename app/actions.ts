@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { randomUUID } from "crypto";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 const MAX_RESUME_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -31,6 +31,7 @@ export async function submitApplication(formData: FormData) {
 
   const resumePath = `${userId}/${randomUUID()}-${sanitizeFileName(resume.name)}`;
   const uploadBody = Buffer.from(await resume.arrayBuffer());
+  const supabaseAdmin = getSupabaseAdmin();
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from("resumes")

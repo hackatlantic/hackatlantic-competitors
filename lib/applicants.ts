@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "crypto";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export type Applicant = {
   user_id: string;
@@ -16,6 +16,7 @@ export type Applicant = {
 };
 
 export async function getOrCreateApplicant(userId: string) {
+  const supabaseAdmin = getSupabaseAdmin();
   const { data: existingApplicant, error: selectError } = await supabaseAdmin
     .from("applicants")
     .select("*")
@@ -53,6 +54,7 @@ export async function ensureQrCodeId(applicant: Applicant) {
   }
 
   const qrCodeId = `ha_${randomUUID()}`;
+  const supabaseAdmin = getSupabaseAdmin();
 
   const { data, error } = await supabaseAdmin
     .from("applicants")
