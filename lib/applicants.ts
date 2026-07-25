@@ -13,7 +13,23 @@ export type Applicant = {
   goals: string | null;
   resume_path: string | null;
   applied_at: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
+
+export async function listApplicants() {
+  const supabaseAdmin = getSupabaseAdmin();
+  const { data, error } = await supabaseAdmin
+    .from("applicants")
+    .select("*")
+    .order("applied_at", { ascending: false, nullsFirst: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return data as Applicant[];
+}
 
 export async function getOrCreateApplicant(userId: string) {
   const supabaseAdmin = getSupabaseAdmin();
