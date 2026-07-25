@@ -74,6 +74,79 @@ code {
   max-width: 680px;
 }
 
+.panel {
+  background: var(--panel);
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  box-shadow: 0 16px 40px rgb(24 32 47 / 8%);
+  max-width: 760px;
+  padding: 32px;
+  width: min(100%, 760px);
+}
+
+.application {
+  margin-top: 64px;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+  margin-top: 28px;
+}
+
+label {
+  color: var(--foreground);
+  display: grid;
+  font-size: 0.95rem;
+  font-weight: 700;
+  gap: 8px;
+}
+
+input,
+textarea {
+  border: 1px solid #c9d3df;
+  border-radius: 6px;
+  color: var(--foreground);
+  font: inherit;
+  padding: 12px;
+  width: 100%;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.submit {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.status {
+  display: grid;
+  gap: 16px;
+}
+
+.accepted {
+  align-items: center;
+  display: grid;
+  gap: 32px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.qr {
+  align-items: center;
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+}
+
+.qr img {
+  border: 1px solid #d9e0e8;
+  border-radius: 8px;
+  height: 220px;
+  width: 220px;
+}
+
 .eyebrow {
   color: var(--accent);
   font-size: 0.85rem;
@@ -87,6 +160,10 @@ h1 {
   font-size: clamp(2.4rem, 8vw, 5rem);
   line-height: 1;
   margin: 0 0 20px;
+}
+
+.panel h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
 }
 
 p {
@@ -106,5 +183,13 @@ p {
     left: 24px;
     right: 24px;
     top: 24px;
+  }
+
+  .panel {
+    padding: 24px;
+  }
+
+  .accepted {
+    grid-template-columns: 1fr;
   }
 }

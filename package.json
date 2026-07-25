@@ -10,12 +10,15 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.6.1",
+    "@supabase/supabase-js": "^2.110.8",
     "next": "latest",
+    "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "clerk": "^2.3.0",
