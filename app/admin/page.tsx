@@ -32,6 +32,10 @@ export default async function AdminPage() {
   }
 
   const applicants = await listApplicants();
+  const submittedCount = applicants.filter((applicant) => applicant.applied_at)
+    .length;
+  const acceptedCount = applicants.filter((applicant) => applicant.accepted)
+    .length;
 
   return (
     <main className="admin-page">
@@ -39,6 +43,9 @@ export default async function AdminPage() {
         <div>
           <p className="eyebrow">Admin</p>
           <h1>Applications</h1>
+          <p>
+            {submittedCount} submitted, {acceptedCount} accepted
+          </p>
         </div>
         <UserButton />
       </header>
@@ -58,10 +65,15 @@ export default async function AdminPage() {
           <tbody>
             {applicants.map((applicant) => (
               <tr key={applicant.user_id}>
-                <td>{applicant.full_name ?? "Not submitted"}</td>
-                <td>{applicant.email ?? "Not submitted"}</td>
-                <td>{applicant.school ?? "Not submitted"}</td>
                 <td>
+                  <div className="primary-cell">
+                    <span>{applicant.full_name ?? "Not submitted"}</span>
+                    <small>{formatDate(applicant.applied_at)}</small>
+                  </div>
+                </td>
+                <td className="truncate-cell">{applicant.email ?? "Not submitted"}</td>
+                <td className="truncate-cell">{applicant.school ?? "Not submitted"}</td>
+                <td className="center-cell">
                   <span
                     className={
                       applicant.accepted ? "status-pill accepted-pill" : "status-pill"
@@ -70,10 +82,10 @@ export default async function AdminPage() {
                     {applicant.accepted ? "Accepted" : "Pending"}
                   </span>
                 </td>
-                <td>
-                  {applicant.qr_code_id ? <code>{applicant.qr_code_id}</code> : "-"}
+                <td className="mono-cell">
+                  {applicant.qr_code_id ? <code>{applicant.qr_code_id}</code> : "—"}
                 </td>
-                <td>
+                <td className="action-cell">
                   {applicant.resume_path ? (
                     <Link
                       className="text-link"
@@ -85,7 +97,7 @@ export default async function AdminPage() {
                       Open resume
                     </Link>
                   ) : (
-                    "-"
+                    "—"
                   )}
                 </td>
               </tr>
@@ -99,4 +111,15 @@ export default async function AdminPage() {
 
 function encodeResumePath(path: string) {
   return path.split("/").map(encodeURIComponent).join("/");
+}
+
+function formatDate(date: string | null) {
+  if (!date) {
+    return "Not submitted";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(date));
 }
