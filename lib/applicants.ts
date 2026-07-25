@@ -9,8 +9,6 @@ export type Applicant = {
   full_name: string | null;
   email: string | null;
   school: string | null;
-  experience: string | null;
-  goals: string | null;
   resume_path: string | null;
   applied_at: string | null;
   created_at?: string;

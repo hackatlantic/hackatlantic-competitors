@@ -17,8 +17,6 @@ export async function submitApplication(formData: FormData) {
   const fullName = getRequiredString(formData, "fullName");
   const email = getRequiredString(formData, "email");
   const school = getRequiredString(formData, "school");
-  const experience = getRequiredString(formData, "experience");
-  const goals = getRequiredString(formData, "goals");
   const resume = formData.get("resume");
 
   if (!(resume instanceof File) || resume.size === 0) {
@@ -50,8 +48,6 @@ export async function submitApplication(formData: FormData) {
     full_name: fullName,
     email,
     school,
-    experience,
-    goals,
     resume_path: resumePath,
     applied_at: new Date().toISOString()
   });

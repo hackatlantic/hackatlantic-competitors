@@ -85,16 +85,6 @@ function ApplicationForm() {
         </label>
 
         <label>
-          What is your hackathon or building experience?
-          <textarea name="experience" required rows={5} />
-        </label>
-
-        <label>
-          What do you want to build or learn at HackAtlantic?
-          <textarea name="goals" required rows={5} />
-        </label>
-
-        <label>
           Resume
           <input
             accept=".pdf,.doc,.docx"

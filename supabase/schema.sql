@@ -5,8 +5,6 @@ create table if not exists public.applicants (
   full_name text,
   email text,
   school text,
-  experience text,
-  goals text,
   resume_path text,
   applied_at timestamptz,
   created_at timestamptz not null default now(),
