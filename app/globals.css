@@ -2644,6 +2644,18 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
+.application-error-panel {
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: clamp(1.25rem, 5vw, 3.5rem);
+}
+
+.application-error-panel h1 {
+  max-width: 100%;
+  font-size: clamp(2rem, 10vw, 5rem);
+  overflow-wrap: anywhere;
+}
+
 .status-pill {
   padding: 0.45rem 0.65rem;
   border: 2px solid var(--ink);
@@ -3363,6 +3375,10 @@ textarea:focus-visible {
 
   .application-panel h1 {
     font-size: clamp(2.8rem, 15vw, 4.8rem);
+  }
+
+  .application-error-panel h1 {
+    font-size: clamp(2rem, 12vw, 3.8rem);
   }
 
   .staff-sidebar {

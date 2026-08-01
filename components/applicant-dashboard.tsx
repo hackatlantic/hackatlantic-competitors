@@ -423,7 +423,10 @@ export function ApplicantDashboard() {
 
   if (loadError || !application) {
     return (
-      <section className="application-panel" aria-live="polite">
+      <section
+        className="application-panel application-error-panel"
+        aria-live="polite"
+      >
         <h1>Application unavailable</h1>
         <p className="error-message" role="alert">
           {loadError || "Your application could not be loaded."}
