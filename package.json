@@ -4,21 +4,27 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:windows": "pwsh -NoProfile -File scripts/dev-windows.ps1",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "api:dev": "go -C api run ./cmd/server",
+    "api:migrate": "go -C api run ./cmd/migrate",
+    "api:bootstrap-organizer": "go -C api run ./cmd/bootstrap-organizer",
+    "api:seed-intake": "go -C api run ./cmd/seed-intake",
+    "api:test": "go -C api test -p 1 ./...",
+    "api:test:integration": "docker compose -f docker-compose.integration.yml down --volumes --remove-orphans && docker compose -f docker-compose.integration.yml up --build --abort-on-container-exit --exit-code-from api-integration"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.6.1",
-    "@supabase/supabase-js": "^2.110.8",
+    "@zxing/browser": "0.1.5",
+    "framer-motion": "^12.43.0",
     "next": "latest",
-    "qrcode": "^1.5.4",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
-    "@types/qrcode": "^1.5.6",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "clerk": "^2.3.0",

@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+.cache
+.env
+.env.*
+!.env.example
+!.env.production.example
+api
+docs
+openapi
+docker-compose*.yml
+npm-debug.log*

@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { MotionSystem } from "@/components/motion-system";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HackAtlantic Competitors",
-  description: "A Next.js starter app."
+  title: "Apply · HackAtlantic",
+  description: "Your route into Atlantic Canada's largest student-run hackathon."
 };
 
 export default function RootLayout({
@@ -13,9 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        <ClerkProvider>{children}</ClerkProvider>
+        <ClerkProvider>
+          <MotionSystem>{children}</MotionSystem>
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -1,0 +1,2571 @@
+openapi: 3.1.0
+info:
+  title: HackAtlantic ATS API
+  version: 0.1.0
+  description: Authoritative HTTP interface. Only implemented endpoints belong here.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: System
+  - name: Identity
+  - name: Applications
+  - name: Organizer
+  - name: Reviewer
+  - name: Passes
+  - name: Scanner
+  - name: Operations
+paths:
+  /:
+    get:
+      operationId: getService
+      summary: Describe the running service
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: Service metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Report whether the API process is alive
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: The process is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Report whether the API can receive traffic
+      description: Readiness verifies PostgreSQL connectivity.
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: The API is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/me:
+    get:
+      operationId: getCurrentUser
+      summary: Resolve the authenticated Clerk user and local authorization roles
+      tags: [Identity]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Current local user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUser"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/application-forms/current:
+    get:
+      operationId: getCurrentApplicationForm
+      summary: Get the active open published application form
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: The current form that can receive a new application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentApplicationForm"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/CurrentFormNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/applications:
+    post:
+      operationId: createApplication
+      summary: Start an empty draft application for the current form
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Existing or newly created draft application for the current cycle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/CurrentFormNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/applications/mine:
+    get:
+      operationId: listMyApplications
+      summary: List applications owned by the authenticated applicant
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Applications owned by the applicant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/applications/{applicationId}/draft:
+    put:
+      operationId: saveApplicationDraft
+      summary: Replace every answer in an owned draft application
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveApplicationDraftRequest"
+      responses:
+        "200":
+          description: Updated application draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "409":
+          $ref: "#/components/responses/ApplicationConflict"
+        "422":
+          $ref: "#/components/responses/InvalidAnswers"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/applications/{applicationId}/submit:
+    post:
+      operationId: submitApplication
+      summary: Submit a complete owned draft and queue its confirmation
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitApplicationRequest"
+      responses:
+        "200":
+          description: Submitted application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "409":
+          $ref: "#/components/responses/ApplicationSubmissionConflict"
+        "422":
+          $ref: "#/components/responses/IncompleteApplication"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/applications/{applicationId}/resume:
+    get:
+      operationId: getApplicationResume
+      summary: Get metadata for the authenticated applicant's resume
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      responses:
+        "200":
+          description: Resume metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResume"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+    put:
+      operationId: uploadApplicationResume
+      summary: Upload or replace a PDF resume on an owned draft application
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+        - name: X-File-Name
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Stored resume metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationResume"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "413":
+          description: Resume exceeds the 5 MiB limit
+        "422":
+          description: Body is not a valid PDF resume
+  /v1/applications/{applicationId}/decision:
+    get:
+      operationId: getApplicantDecision
+      summary: Get the caller's current released decision
+      description: This applicant-safe response is absent until the current decision has been released. It never includes internal reasons or review content.
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      responses:
+        "200":
+          description: The applicant's released decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicantDecision"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/DecisionNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/applications:
+    get:
+      operationId: listOrganizerApplications
+      summary: Search and filter internal application projections
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [submitted, accepted, waitlisted, rejected]
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Server-filtered organizer application queue
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerApplicationList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "422":
+          $ref: "#/components/responses/InvalidFilter"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/applications/{applicationId}:
+    get:
+      operationId: getOrganizerApplication
+      summary: Get an internal organizer application projection
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      responses:
+        "200":
+          description: Internal application detail for organizers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerApplication"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/applications/{applicationId}/resume:
+    get:
+      operationId: getAdminApplicationResume
+      summary: Stream an application resume inline to an authorized admin
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      responses:
+        "200":
+          description: Applicant resume PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+  /v1/admin/applications/{applicationId}/assignments:
+    post:
+      operationId: assignReviewer
+      summary: Add auditable reviewer queue metadata to a submitted application
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignReviewerRequest"
+      responses:
+        "200":
+          description: Reviewer assignment is recorded or already existed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewerAssignmentResult"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "409":
+          $ref: "#/components/responses/ApplicationNotSubmitted"
+        "422":
+          $ref: "#/components/responses/InvalidReviewer"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/applications/{applicationId}/decisions:
+    post:
+      operationId: recordDecision
+      summary: Append an internal decision for a submitted application
+      description: The application cache is updated atomically. A newer decision supersedes the previous current decision without mutating its history.
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordDecisionRequest"
+      responses:
+        "201":
+          description: Appended internal decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerDecision"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "409":
+          $ref: "#/components/responses/ApplicationNotSubmitted"
+        "422":
+          $ref: "#/components/responses/InvalidDecision"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/decisions/{decisionId}/release:
+    post:
+      operationId: releaseDecision
+      summary: Release the current decision to its applicant
+      description: Release is retry-safe and transactionally queues one decision email without internal decision or review data.
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/DecisionID"
+      responses:
+        "200":
+          description: Released decision or an idempotent release result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerDecision"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/DecisionNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/users/{userId}/roles/reviewer:
+    put:
+      operationId: grantReviewerRole
+      summary: Grant reviewer access and audit the role mutation
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "204":
+          description: Reviewer role is granted or already existed
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/users/{userId}/roles/scanner:
+    put:
+      operationId: grantScannerRole
+      summary: Grant scanner access and audit the role mutation
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "204":
+          description: Scanner role is granted or already existed
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+    delete:
+      operationId: revokeScannerRole
+      summary: Revoke scanner access and audit the role mutation
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/UserID"
+      responses:
+        "204":
+          description: Scanner role is revoked or already absent
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/reviewer/assignments:
+    get:
+      operationId: listReviewerApplications
+      summary: List every submitted application with caller-specific queue metadata
+      description: Every local reviewer can inspect every submitted application. Assignment metadata marks organizer-assigned queue work only.
+      tags: [Reviewer]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Submitted applications and only the caller's review drafts or submissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewerApplicationList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ReviewerRequired"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/reviewer/applications/{applicationId}:
+    get:
+      operationId: getReviewerApplication
+      summary: Get a submitted application and the caller's internal review
+      tags: [Reviewer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      responses:
+        "200":
+          description: Submitted reviewer application detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewerApplication"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ReviewerRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/reviewer/applications/{applicationId}/review:
+    put:
+      operationId: saveReviewDraft
+      summary: Save a complete internal review draft
+      tags: [Reviewer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveReviewDraftRequest"
+      responses:
+        "200":
+          description: Updated submitted application and caller review draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewerApplication"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ReviewerRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "409":
+          $ref: "#/components/responses/ReviewConflict"
+        "422":
+          $ref: "#/components/responses/InvalidReview"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/reviewer/applications/{applicationId}/review/submit:
+    post:
+      operationId: submitReview
+      summary: Submit and lock a complete internal review draft
+      tags: [Reviewer]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitReviewRequest"
+      responses:
+        "200":
+          description: Submitted immutable review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewerApplication"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ReviewerRequired"
+        "404":
+          $ref: "#/components/responses/ApplicationNotFound"
+        "409":
+          $ref: "#/components/responses/ReviewSubmissionConflict"
+        "422":
+          $ref: "#/components/responses/InvalidReview"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/attendees/{attendeeId}/passes:
+    post:
+      operationId: issuePass
+      summary: Issue a pass for an accepted attendee
+      description: Creates the attendee's only active pass. The QR and claim credentials are returned in this response only and are never persisted in raw form.
+      tags: [Passes]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/AttendeeID"
+      responses:
+        "201":
+          description: Newly issued pass and its one-time credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PassIssuance"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/PassNotFound"
+        "409":
+          $ref: "#/components/responses/PassActive"
+        "503":
+          $ref: "#/components/responses/PassDependencyUnavailable"
+  /v1/admin/passes/{passId}/reissue:
+    post:
+      operationId: reissuePass
+      summary: Atomically replace an active attendee pass
+      description: Revokes and supersedes the active pass while issuing a distinct pair of one-time credentials.
+      tags: [Passes]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/PassID"
+      responses:
+        "201":
+          description: Replacement pass and its one-time credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PassIssuance"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/PassNotFound"
+        "503":
+          $ref: "#/components/responses/PassDependencyUnavailable"
+  /v1/admin/passes/{passId}/revoke:
+    post:
+      operationId: revokePass
+      summary: Revoke an active attendee pass
+      tags: [Passes]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/PassID"
+      responses:
+        "200":
+          description: Revoked pass metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pass"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/PassNotFound"
+        "503":
+          $ref: "#/components/responses/PassDependencyUnavailable"
+  /v1/attendee/pass:
+    get:
+      operationId: getAttendeePass
+      summary: Get the authenticated attendee's active web pass and QR credential
+      description: Returns the active accepted attendee's derived QR credential. It never returns a claim credential.
+      tags: [Passes]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Active attendee pass metadata and derived QR credential
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebPass"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/PassNotFound"
+        "503":
+          $ref: "#/components/responses/PassDependencyUnavailable"
+  /v1/claim/{claimToken}:
+    get:
+      operationId: resolveClaimPass
+      summary: Resolve a public claim credential
+      description: Resolves only an active claim credential. QR credentials never resolve this route. Attempts are rate limited by client address.
+      tags: [Passes]
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ClaimToken"
+      responses:
+        "200":
+          description: Safe public pass metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimPass"
+        "404":
+          $ref: "#/components/responses/PassNotFound"
+        "429":
+          $ref: "#/components/responses/ClaimRateLimited"
+        "503":
+          $ref: "#/components/responses/PassDependencyUnavailable"
+  /v1/checkpoints:
+    get:
+      operationId: listScannerCheckpoints
+      summary: List every active checkpoint available to the application-global scanner role
+      tags: [Scanner]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Active scanner checkpoint choices
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerCheckpointList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ScannerRequired"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/scans/lookup:
+    post:
+      operationId: lookupScannerPass
+      summary: Resolve an active or revoked pass QR credential for a scanner
+      description: QR credentials are purpose-separated from claim credentials. Revoked credentials return minimal revoked state; replaced and unknown credentials return not found. This response excludes application, review, decision, contact, and credential data.
+      tags: [Scanner]
+      security:
+        - clerkBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScannerLookupRequest"
+      responses:
+        "200":
+          description: Minimal active or revoked pass and attendee verification state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerLookup"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ScannerRequired"
+        "404":
+          $ref: "#/components/responses/PassNotFound"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/redemptions:
+    post:
+      operationId: redeemScannerPass
+      summary: Atomically record or replay one checkpoint redemption
+      description: A scanner supplies a client UUID idempotency key. Every valid scan returns a structured outcome; repeating the same QR/checkpoint operation returns its immutable original result.
+      tags: [Scanner]
+      security:
+        - clerkBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScannerRedemptionRequest"
+      responses:
+        "200":
+          description: Authoritative redemption outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerRedemptionResult"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ScannerRequired"
+        "404":
+          $ref: "#/components/responses/CheckpointNotFound"
+        "409":
+          $ref: "#/components/responses/IdempotencyConflict"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/activities:
+    get:
+      operationId: listOrganizerActivities
+      summary: List organizer-managed schedule activities
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Activity metadata for every event cycle
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerActivityList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+    post:
+      operationId: createOrganizerActivity
+      summary: Create optional schedule metadata
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizerActivityRequest"
+      responses:
+        "201":
+          description: Created activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerActivity"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "409":
+          $ref: "#/components/responses/OperationsConflict"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/activities/{activityId}:
+    patch:
+      operationId: updateOrganizerActivity
+      summary: Replace mutable schedule activity metadata
+      description: The mutable activity fields are replaced. Send null to clear either optional timestamp.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizerActivityRequest"
+      responses:
+        "200":
+          description: Updated activity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerActivity"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "409":
+          $ref: "#/components/responses/OperationsConflict"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+    delete:
+      operationId: deleteOrganizerActivity
+      summary: Delete an unreferenced schedule activity
+      description: Referenced activities cannot be deleted; checkpoint links are never silently rewritten.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+      responses:
+        "204":
+          description: Activity deleted
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "409":
+          $ref: "#/components/responses/OperationsInUse"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/checkpoints:
+    get:
+      operationId: listOrganizerCheckpoints
+      summary: List full organizer checkpoint configuration
+      description: This organizer projection is intentionally distinct from the scanner's id/name-only checkpoint list.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Configured checkpoints
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerCheckpointList"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+    post:
+      operationId: createOrganizerCheckpoint
+      summary: Create a checkpoint policy
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizerCheckpointRequest"
+      responses:
+        "201":
+          description: Created checkpoint configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerCheckpoint"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "409":
+          $ref: "#/components/responses/OperationsConflict"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/checkpoints/{checkpointId}:
+    patch:
+      operationId: updateOrganizerCheckpoint
+      summary: Replace mutable checkpoint policy configuration
+      description: The mutable checkpoint fields are replaced. Send null to unlink an activity or clear either optional window boundary.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/CheckpointID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizerCheckpointRequest"
+      responses:
+        "200":
+          description: Updated checkpoint configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerCheckpoint"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "409":
+          $ref: "#/components/responses/OperationsConflict"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+    delete:
+      operationId: deleteOrganizerCheckpoint
+      summary: Delete a checkpoint without attendance or override history
+      description: Checkpoints with redemption or entitlement history cannot be deleted, preserving operational and redemption integrity.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/CheckpointID"
+      responses:
+        "204":
+          description: Checkpoint deleted
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "409":
+          $ref: "#/components/responses/OperationsInUse"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/attendees/{attendeeId}/entitlements/{checkpointId}:
+    get:
+      operationId: getOrganizerEntitlement
+      summary: Get an attendee's checkpoint override
+      description: A null override means checkpoint defaults apply; explicit allowed=false is preserved as an override.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/AttendeeID"
+        - $ref: "#/components/parameters/CheckpointID"
+      responses:
+        "200":
+          description: Current stored override, if any
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerEntitlementResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+    put:
+      operationId: putOrganizerEntitlement
+      summary: Replace one attendee's complete checkpoint override
+      description: The stored rule replaces both checkpoint defaults and is constrained to an accepted attendee with a released acceptance in the checkpoint's cycle.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/AttendeeID"
+        - $ref: "#/components/parameters/CheckpointID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizerEntitlementRequest"
+      responses:
+        "200":
+          description: Persisted complete override
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerEntitlement"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+    delete:
+      operationId: deleteOrganizerEntitlement
+      summary: Remove an attendee override and restore checkpoint defaults
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/AttendeeID"
+        - $ref: "#/components/parameters/CheckpointID"
+      responses:
+        "204":
+          description: Override absent after the operation
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/redemptions/counts:
+    get:
+      operationId: listOrganizerRedemptionCounts
+      summary: Count successful immutable redemptions per checkpoint
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Successful redemption counts; rejected scan outcomes are not attendance.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerCheckpointCounts"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/redemptions:
+    get:
+      operationId: listOrganizerRedemptions
+      summary: List recent successful redemption facts
+      description: This operational projection excludes emails, credential material, application answers, reviews, and decisions.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - name: checkpointId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: Privacy-minimized successful redemption facts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerRedemptionList"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/exports/attendance.csv:
+    get:
+      operationId: exportAttendanceCSV
+      summary: Export attendance CSV with the minimum attendee identity needed for event operations
+      description: The CSV contains redemption timestamp, checkpoint identifiers, attendee ID, and attendee display name. It never contains email, credential material, application answers, reviews, or decisions.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - name: checkpointId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Attendance CSV. Successful generation is audited.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/exports/reconciliation.csv:
+    get:
+      operationId: exportReconciliationCSV
+      summary: Export pseudonymous redemption reconciliation CSV
+      description: The CSV contains redemption, checkpoint, attendee, pass, scanner, and ordinal identifiers without attendee display name, email, credentials, application answers, reviews, or decisions.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      parameters:
+        - name: checkpointId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Reconciliation CSV. Successful generation is audited.
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+components:
+  securitySchemes:
+    clerkBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ApplicationID:
+      name: applicationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserID:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DecisionID:
+      name: decisionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AttendeeID:
+      name: attendeeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PassID:
+      name: passId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ActivityID:
+      name: activityId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CheckpointID:
+      name: checkpointId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ClaimToken:
+      name: claimToken
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    Unauthenticated:
+      description: Authentication was missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ApplicantRequired:
+      description: The authenticated identity does not have applicant access.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    CurrentFormNotFound:
+      description: There is no active, open, published application form.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ApplicationNotFound:
+      description: The application does not exist or is not visible to the authenticated caller.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ApplicationConflict:
+      description: The submitted lock version is stale or the application is no longer a draft. Stale responses include the current lockVersion in details.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApplicationConflictError"
+    ApplicationSubmissionConflict:
+      description: The submitted lock version is stale, the application is no longer a draft, or its cycle is no longer accepting submissions. `application_window_closed` responses have no lockVersion details.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/ApplicationConflictError"
+              - $ref: "#/components/schemas/ApplicationWindowClosedError"
+    InvalidRequest:
+      description: The JSON request body is malformed or missing required request fields.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidAnswers:
+      description: Answer keys or scalar value types do not match the published form.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    IncompleteApplication:
+      description: One or more required form answers are missing or blank.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    DependencyUnavailable:
+      description: A required dependency is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    IdentityUnavailable:
+      description: Verified identity reconciliation is temporarily unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    OrganizerRequired:
+      description: The authenticated identity does not have organizer access.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ReviewerRequired:
+      description: The authenticated identity does not have reviewer access.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UserNotFound:
+      description: The target local user does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidFilter:
+      description: The requested server-side application filter is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidReviewer:
+      description: The target local user does not have reviewer access.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidReview:
+      description: A review must contain a score from 1 through 5 and a valid recommendation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ApplicationNotSubmitted:
+      description: Applications that were never submitted cannot receive assignments, reviews, or decisions.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    DecisionNotFound:
+      description: The decision does not exist, is no longer current, or is not released to the authenticated applicant.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidDecision:
+      description: The requested decision outcome is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ReviewConflict:
+      description: The review lockVersion is stale or the review is no longer a draft.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ReviewConflictError"
+    ReviewSubmissionConflict:
+      description: The review lockVersion is stale, no draft exists, or the review is no longer a draft.
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/ReviewConflictError"
+              - $ref: "#/components/schemas/Error"
+    PassNotFound:
+      description: The pass or credential does not resolve to an active visible pass.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PassActive:
+      description: The attendee already has an active pass; use reissue to replace it.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PassDependencyUnavailable:
+      description: Identity reconciliation or the pass service is temporarily unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ClaimRateLimited:
+      description: Too many public claim attempts were received from this client address.
+      headers:
+        Retry-After:
+          description: Integer number of seconds before another public claim attempt from this client address.
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ScannerRequired:
+      description: The authenticated identity does not have scanner access.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    CheckpointNotFound:
+      description: The checkpoint does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    IdempotencyConflict:
+      description: The idempotency key was previously used with a different QR credential or checkpoint.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    OperationsNotFound:
+      description: The requested event operations resource does not exist, is not visible, or is from another event cycle.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    OperationsConflict:
+      description: A unique event operations value already exists.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    OperationsInUse:
+      description: The resource is referenced by checkpoint, entitlement, or immutable redemption history and cannot be deleted.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    InvalidOperationsInput:
+      description: An event operations value is semantically invalid, including invalid UUIDs, negative redemption maxima, or invalid time windows.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    Service:
+      type: object
+      additionalProperties: false
+      required: [service, version]
+      properties:
+        service:
+          type: string
+          examples: [hackatlantic-ats-api]
+        version:
+          type: string
+          examples: [dev]
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          examples: [ok]
+    CurrentUser:
+      type: object
+      additionalProperties: false
+      required: [id, email, displayName, roles]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: [string, "null"]
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [applicant, admin, scanner]
+    FormQuestion:
+      type: object
+      additionalProperties: false
+      required: [key, label, type, required]
+      properties:
+        key:
+          type: string
+          minLength: 1
+        label:
+          type: string
+          minLength: 1
+        type:
+          type: string
+          enum: [string, number, boolean]
+        required:
+          type: boolean
+        help:
+          type: string
+    ScalarAnswer:
+      oneOf:
+        - type: string
+        - type: number
+        - type: boolean
+    Answers:
+      type: object
+      additionalProperties:
+        $ref: "#/components/schemas/ScalarAnswer"
+    CurrentApplicationForm:
+      type: object
+      additionalProperties: false
+      required: [id, cycleId, version, resumeRequired, questions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        cycleId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        resumeRequired:
+          type: boolean
+        questions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/FormQuestion"
+    ApplicationResume:
+      type: object
+      additionalProperties: false
+      required: [applicationId, originalFilename, mediaType, byteSize, uploadedAt, updatedAt]
+      properties:
+        applicationId:
+          type: string
+          format: uuid
+        originalFilename:
+          type: string
+        mediaType:
+          type: string
+          const: application/pdf
+        byteSize:
+          type: integer
+          minimum: 1
+          maximum: 5242880
+        uploadedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Application:
+      type: object
+      additionalProperties: false
+      required: [id, cycleId, formId, formVersion, status, answers, lockVersion, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        cycleId:
+          type: string
+          format: uuid
+        formId:
+          type: string
+          format: uuid
+        formVersion:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [draft, submitted]
+        answers:
+          $ref: "#/components/schemas/Answers"
+        lockVersion:
+          type: integer
+          minimum: 0
+        submittedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ApplicationList:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Application"
+        nextCursor:
+          type: [string, "null"]
+    SaveApplicationDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [lockVersion, answers]
+      properties:
+        lockVersion:
+          type: integer
+          minimum: 0
+        answers:
+          $ref: "#/components/schemas/Answers"
+    SubmitApplicationRequest:
+      type: object
+      additionalProperties: false
+      required: [lockVersion]
+      properties:
+        lockVersion:
+          type: integer
+          minimum: 0
+    ApplicationConflictError:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          required: [details]
+          properties:
+            details:
+              type: object
+              additionalProperties: false
+              required: [lockVersion]
+              properties:
+                lockVersion:
+                  type: integer
+                  minimum: 0
+    ApplicationWindowClosedError:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          properties:
+            code:
+              type: string
+              enum: [application_window_closed]
+    RecordDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome:
+          type: string
+          enum: [accepted, waitlisted, rejected]
+        internalReason:
+          type: string
+    OrganizerDecision:
+      type: object
+      description: Internal organizer decision projection. It is never referenced by applicant or reviewer responses.
+      additionalProperties: false
+      required: [id, applicationId, outcome, decidedBy, decidedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        applicationId:
+          type: string
+          format: uuid
+        outcome:
+          type: string
+          enum: [accepted, waitlisted, rejected]
+        internalReason:
+          type: string
+        decidedBy:
+          type: string
+          format: uuid
+        decidedAt:
+          type: string
+          format: date-time
+        supersedesId:
+          type: string
+          format: uuid
+        releasedBy:
+          type: string
+          format: uuid
+        releasedAt:
+          type: string
+          format: date-time
+    ApplicantDecision:
+      type: object
+      description: Applicant-safe released outcome. Internal reasons, review scores, recommendations, and notes are intentionally absent.
+      additionalProperties: false
+      required: [applicationId, outcome, releasedAt]
+      properties:
+        applicationId:
+          type: string
+          format: uuid
+        outcome:
+          type: string
+          enum: [accepted, waitlisted, rejected]
+        releasedAt:
+          type: string
+          format: date-time
+    StaffApplicant:
+      type: object
+      description: Internal application owner projection. Never returned by applicant or scanner operations.
+      additionalProperties: false
+      required: [id, email, displayName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: [string, "null"]
+    OrganizerApplication:
+      type: object
+      description: Internal organizer application projection. It intentionally contains no review content.
+      additionalProperties: false
+      required: [id, cycleId, formId, formVersion, status, applicant, answers, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        cycleId:
+          type: string
+          format: uuid
+        formId:
+          type: string
+          format: uuid
+        formVersion:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [submitted, accepted, waitlisted, rejected]
+        submittedAt:
+          type: string
+          format: date-time
+        currentDecision:
+          $ref: "#/components/schemas/OrganizerDecision"
+        attendeePass:
+          anyOf:
+            - $ref: "#/components/schemas/OrganizerPassSummary"
+            - type: "null"
+        applicant:
+          $ref: "#/components/schemas/StaffApplicant"
+        answers:
+          $ref: "#/components/schemas/Answers"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrganizerApplicationList:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizerApplication"
+        nextCursor:
+          type: [string, "null"]
+    ReviewerAssignment:
+      type: object
+      description: Internal organizer queue metadata; it does not determine reviewer visibility.
+      additionalProperties: false
+      required: [assignedBy, assignedAt]
+      properties:
+        assignedBy:
+          type: string
+          format: uuid
+        assignedAt:
+          type: string
+          format: date-time
+    Review:
+      type: object
+      description: The authenticated reviewer's internal review. This schema is never referenced by applicant or scanner responses.
+      additionalProperties: false
+      required: [id, status, score, recommendation, lockVersion, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [draft, submitted]
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        recommendation:
+          type: string
+          enum: [strong_yes, yes, neutral, no, strong_no]
+        internalNotes:
+          type: string
+        lockVersion:
+          type: integer
+          minimum: 0
+        submittedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReviewerApplication:
+      type: object
+      description: A submitted application plus only the caller's internal review and queue metadata.
+      additionalProperties: false
+      required: [id, cycleId, formId, formVersion, status, submittedAt, applicant, answers, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        cycleId:
+          type: string
+          format: uuid
+        formId:
+          type: string
+          format: uuid
+        formVersion:
+          type: integer
+          minimum: 1
+        status:
+          type: string
+          enum: [submitted]
+        submittedAt:
+          type: string
+          format: date-time
+        applicant:
+          $ref: "#/components/schemas/StaffApplicant"
+        answers:
+          $ref: "#/components/schemas/Answers"
+        assignment:
+          anyOf:
+            - $ref: "#/components/schemas/ReviewerAssignment"
+            - type: "null"
+        review:
+          anyOf:
+            - $ref: "#/components/schemas/Review"
+            - type: "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReviewerApplicationList:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewerApplication"
+        nextCursor:
+          type: [string, "null"]
+    AssignReviewerRequest:
+      type: object
+      additionalProperties: false
+      required: [reviewerUserId]
+      properties:
+        reviewerUserId:
+          type: string
+          format: uuid
+    ReviewerAssignmentResult:
+      type: object
+      additionalProperties: false
+      required: [applicationId, reviewerUserId]
+      properties:
+        applicationId:
+          type: string
+          format: uuid
+        reviewerUserId:
+          type: string
+          format: uuid
+    SaveReviewDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [lockVersion, score, recommendation]
+      properties:
+        lockVersion:
+          type: integer
+          minimum: 0
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        recommendation:
+          type: string
+          enum: [strong_yes, yes, neutral, no, strong_no]
+        internalNotes:
+          type: string
+    SubmitReviewRequest:
+      type: object
+      additionalProperties: false
+      required: [lockVersion]
+      properties:
+        lockVersion:
+          type: integer
+          minimum: 0
+    ReviewConflictError:
+      allOf:
+        - $ref: "#/components/schemas/Error"
+        - type: object
+          required: [details]
+          properties:
+            details:
+              type: object
+              additionalProperties: false
+              required: [lockVersion]
+              properties:
+                lockVersion:
+                  type: integer
+                  minimum: 0
+    Pass:
+      type: object
+      description: Safe pass metadata. It deliberately never contains a bearer credential or stored credential hash.
+      additionalProperties: false
+      required: [id, attendeeId, displayName, status, issuedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        attendeeId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        status:
+          type: string
+          enum: [active, revoked, replaced]
+        issuedAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+    WebPass:
+      type: object
+      description: Active attendee pass metadata with a QR credential derived from its pass ID and a server-only pepper. It never contains a claim credential or stored hash.
+      additionalProperties: false
+      required: [id, attendeeId, displayName, status, issuedAt, qrToken]
+      properties:
+        id:
+          type: string
+          format: uuid
+        attendeeId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        status:
+          type: string
+          enum: [active]
+        issuedAt:
+          type: string
+          format: date-time
+        qrToken:
+          type: string
+          description: Opaque durable QR bearer credential. It is never stored raw and is unavailable after revocation or replacement.
+    PassIssuance:
+      type: object
+      description: A newly issued pass. The claim bearer exists only in this response; its QR bearer is also recoverable only by the authenticated active attendee.
+      additionalProperties: false
+      required: [id, attendeeId, displayName, status, issuedAt, qrToken, claimToken]
+      properties:
+        id:
+          type: string
+          format: uuid
+        attendeeId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        status:
+          type: string
+          enum: [active]
+        issuedAt:
+          type: string
+          format: date-time
+        qrToken:
+          type: string
+          description: Opaque QR bearer credential deterministically derived for this active pass. Never stored raw.
+        claimToken:
+          type: string
+          description: Opaque public claim bearer credential. Never stored raw or returned by read routes.
+        claimUrl:
+          type: string
+          format: uri
+          description: Claim URL containing the claim credential; never persisted in outbox data.
+    ClaimPass:
+      type: object
+      description: Minimal public pass projection resolved only by a claim credential.
+      additionalProperties: false
+      required: [id, displayName, status, issuedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        status:
+          type: string
+          enum: [active]
+        issuedAt:
+          type: string
+          format: date-time
+    OrganizerPassSummary:
+      type: object
+      description: Organizer-only attendee targeting and active-pass summary without bearer credentials.
+      additionalProperties: false
+      required: [attendeeId, pass]
+      properties:
+        attendeeId:
+          type: string
+          format: uuid
+        pass:
+          anyOf:
+            - $ref: "#/components/schemas/Pass"
+            - type: "null"
+    ScannerCheckpoint:
+      type: object
+      description: Minimal active checkpoint choice for application-global scanners.
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    ScannerCheckpointList:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScannerCheckpoint"
+        nextCursor:
+          type: "null"
+    ScannerLookupRequest:
+      type: object
+      additionalProperties: false
+      required: [qrToken]
+      properties:
+        qrToken:
+          type: string
+          minLength: 1
+          description: Opaque qr_v1 credential. Claim credentials never resolve this operation.
+    ScannerRedemptionRequest:
+      type: object
+      additionalProperties: false
+      required: [qrToken, checkpointId, idempotencyKey]
+      properties:
+        qrToken:
+          type: string
+          minLength: 1
+          description: Opaque qr_v1 credential. Claim credentials produce an invalid_pass outcome.
+        checkpointId:
+          type: string
+          format: uuid
+        idempotencyKey:
+          type: string
+          format: uuid
+    ScannerAttendee:
+      type: object
+      description: Scanner-safe attendee verification state with no contact or application data.
+      additionalProperties: false
+      required: [displayName]
+      properties:
+        displayName:
+          type: string
+    ScannerLookupPass:
+      type: object
+      description: Scanner-safe active or revoked pass state with no credential or identifier.
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, revoked]
+    ScannerRedemptionPass:
+      type: object
+      description: Scanner-safe pass verification state with no credential or identifier.
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, revoked]
+    ScannerLookup:
+      type: object
+      description: Minimal active or revoked QR lookup projection. It never references application, review, decision, or organizer schemas.
+      additionalProperties: false
+      required: [attendee, pass]
+      properties:
+        attendee:
+          $ref: "#/components/schemas/ScannerAttendee"
+        pass:
+          $ref: "#/components/schemas/ScannerLookupPass"
+    ScannerRedemptionResult:
+      type: object
+      description: Immutable structured scanner outcome. It never references application, review, decision, or organizer schemas.
+      additionalProperties: false
+      required: [outcome, checkpoint]
+      properties:
+        outcome:
+          type: string
+          enum: [redeemed, already_exhausted, not_entitled, outside_window, invalid_pass, revoked_pass]
+        attendee:
+          $ref: "#/components/schemas/ScannerAttendee"
+        pass:
+          $ref: "#/components/schemas/ScannerRedemptionPass"
+        checkpoint:
+          $ref: "#/components/schemas/ScannerCheckpoint"
+        redemptionId:
+          type: string
+          format: uuid
+    OrganizerActivity:
+      type: object
+      description: Organizer-only optional schedule metadata. Activities are not inherently redeemable.
+      additionalProperties: false
+      required: [id, cycleId, slug, name, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        cycleId:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrganizerActivityList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizerActivity"
+    CreateOrganizerActivityRequest:
+      type: object
+      additionalProperties: false
+      required: [cycleId, slug, name]
+      properties:
+        cycleId:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        startsAt:
+          type: [string, "null"]
+          format: date-time
+        endsAt:
+          type: [string, "null"]
+          format: date-time
+    UpdateOrganizerActivityRequest:
+      type: object
+      additionalProperties: false
+      required: [slug, name, startsAt, endsAt]
+      properties:
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        startsAt:
+          type: [string, "null"]
+          format: date-time
+        endsAt:
+          type: [string, "null"]
+          format: date-time
+    OrganizerCheckpoint:
+      type: object
+      description: Organizer checkpoint policy configuration. It is never returned by scanner endpoints.
+      additionalProperties: false
+      required: [id, cycleId, slug, name, defaultAllowed, defaultMaxRedemptions, active, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        cycleId:
+          type: string
+          format: uuid
+        activityId:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        opensAt:
+          type: string
+          format: date-time
+        closesAt:
+          type: string
+          format: date-time
+        defaultAllowed:
+          type: boolean
+        defaultMaxRedemptions:
+          type: integer
+          minimum: 0
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrganizerCheckpointList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizerCheckpoint"
+    CreateOrganizerCheckpointRequest:
+      type: object
+      additionalProperties: false
+      required: [cycleId, slug, name, defaultAllowed, defaultMaxRedemptions, active]
+      properties:
+        cycleId:
+          type: string
+          format: uuid
+        activityId:
+          type: [string, "null"]
+          format: uuid
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        opensAt:
+          type: [string, "null"]
+          format: date-time
+        closesAt:
+          type: [string, "null"]
+          format: date-time
+        defaultAllowed:
+          type: boolean
+        defaultMaxRedemptions:
+          type: integer
+          minimum: 0
+        active:
+          type: boolean
+    UpdateOrganizerCheckpointRequest:
+      type: object
+      additionalProperties: false
+      required: [activityId, slug, name, opensAt, closesAt, defaultAllowed, defaultMaxRedemptions, active]
+      properties:
+        activityId:
+          type: [string, "null"]
+          format: uuid
+        slug:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        opensAt:
+          type: [string, "null"]
+          format: date-time
+        closesAt:
+          type: [string, "null"]
+          format: date-time
+        defaultAllowed:
+          type: boolean
+        defaultMaxRedemptions:
+          type: integer
+          minimum: 0
+        active:
+          type: boolean
+    OrganizerEntitlement:
+      type: object
+      description: Complete attendee override rule. It replaces both checkpoint defaults.
+      additionalProperties: false
+      required: [attendeeId, checkpointId, allowed, maxRedemptions, createdAt, updatedAt]
+      properties:
+        attendeeId:
+          type: string
+          format: uuid
+        checkpointId:
+          type: string
+          format: uuid
+        allowed:
+          type: boolean
+        maxRedemptions:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrganizerEntitlementResponse:
+      type: object
+      additionalProperties: false
+      required: [override]
+      properties:
+        override:
+          anyOf:
+            - $ref: "#/components/schemas/OrganizerEntitlement"
+            - type: "null"
+    OrganizerEntitlementRequest:
+      type: object
+      additionalProperties: false
+      required: [allowed, maxRedemptions]
+      properties:
+        allowed:
+          type: boolean
+        maxRedemptions:
+          type: integer
+          minimum: 0
+    OrganizerCheckpointCount:
+      type: object
+      description: Count of successful immutable redemption records at one checkpoint.
+      additionalProperties: false
+      required: [checkpointId, checkpointName, totalRedemptions]
+      properties:
+        checkpointId:
+          type: string
+          format: uuid
+        checkpointName:
+          type: string
+        totalRedemptions:
+          type: integer
+          minimum: 0
+        lastRedeemedAt:
+          type: string
+          format: date-time
+    OrganizerCheckpointCounts:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizerCheckpointCount"
+    OrganizerRedemptionCheckpoint:
+      type: object
+      additionalProperties: false
+      required: [id, slug, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+    OrganizerRedemptionAttendee:
+      type: object
+      description: The minimal attendee identity required for attendance operations; email and application information are absent.
+      additionalProperties: false
+      required: [id, displayName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+    OrganizerRedemptionPass:
+      type: object
+      description: Reconciliation pass metadata without bearer or stored credential material.
+      additionalProperties: false
+      required: [id, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, revoked, replaced]
+    OrganizerRedemption:
+      type: object
+      description: Successful operational redemption fact. It has no email, credential, application, review, or decision fields.
+      additionalProperties: false
+      required: [id, redeemedAt, ordinal, checkpoint, attendee, pass, scannerUserId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        redeemedAt:
+          type: string
+          format: date-time
+        ordinal:
+          type: integer
+          minimum: 1
+        checkpoint:
+          $ref: "#/components/schemas/OrganizerRedemptionCheckpoint"
+        attendee:
+          $ref: "#/components/schemas/OrganizerRedemptionAttendee"
+        pass:
+          $ref: "#/components/schemas/OrganizerRedemptionPass"
+        scannerUserId:
+          type: string
+          format: uuid
+    OrganizerRedemptionList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizerRedemption"
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
