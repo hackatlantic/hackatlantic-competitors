@@ -113,6 +113,15 @@ On managed hosts, deploy the `web` and `api` build contexts separately and run
 the `migrate` image command as the release phase. Never run the development
 seed against production.
 
+## Publish the initial application cycle
+
+Database migrations create the ATS schema but do not insert local development
+fixtures into production. After migrations have succeeded, run
+`api/scripts/publish-2026-intake.sql` once with a migration-owner connection.
+The script is idempotent, refuses to replace a different active cycle, publishes
+version 1 of the required-resume form, and closes applications at 11:59 PM
+Atlantic time on September 30, 2026.
+
 ## First production release
 
 1. Create restricted database and migration-owner credentials.
