@@ -48,6 +48,7 @@ func main() {
 	defer cancel()
 	pool, err := database.Open(configureCtx, database.Config{
 		URL:                os.Getenv("DATABASE_URL"),
+		Role:               os.Getenv("DATABASE_ROLE"),
 		MaxConns:           int32Env("DATABASE_MAX_CONNS", 10),
 		QueryTimeout:       durationEnv("DATABASE_QUERY_TIMEOUT", 5*time.Second),
 		TransactionTimeout: durationEnv("DATABASE_TRANSACTION_TIMEOUT", 15*time.Second),

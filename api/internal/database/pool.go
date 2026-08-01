@@ -4,8 +4,10 @@ package database
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,6 +20,7 @@ const (
 // Config contains bounded PostgreSQL connection and operation settings.
 type Config struct {
 	URL                string
+	Role               string
 	MaxConns           int32
 	QueryTimeout       time.Duration
 	TransactionTimeout time.Duration
@@ -63,6 +66,21 @@ func Open(ctx context.Context, config Config) (*Pool, error) {
 	poolConfig.HealthCheckPeriod = time.Minute
 	poolConfig.ConnConfig.RuntimeParams["statement_timeout"] = fmt.Sprintf("%d", config.QueryTimeout.Milliseconds())
 	poolConfig.ConnConfig.RuntimeParams["lock_timeout"] = fmt.Sprintf("%d", config.QueryTimeout.Milliseconds())
+	if role := strings.TrimSpace(config.Role); role != "" {
+		poolConfig.AfterConnect = func(ctx context.Context, connection *pgx.Conn) error {
+			if _, err := connection.Exec(ctx, "SET ROLE "+pgx.Identifier{role}.Sanitize()); err != nil {
+				return fmt.Errorf("assume database role %q: %w", role, err)
+			}
+			var currentUser string
+			if err := connection.QueryRow(ctx, "SELECT current_user").Scan(&currentUser); err != nil {
+				return fmt.Errorf("verify database role %q: %w", role, err)
+			}
+			if currentUser != role {
+				return fmt.Errorf("database role mismatch: expected %q, got %q", role, currentUser)
+			}
+			return nil
+		}
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {

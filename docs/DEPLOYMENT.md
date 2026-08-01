@@ -20,6 +20,12 @@ Use two database credentials:
 1. `MIGRATION_DATABASE_URL` is the migration-owner direct connection.
 2. `DATABASE_URL` is the restricted runtime application role.
 
+When an IPv4-only host must authenticate to Supabase through the shared
+session pooler with the project `postgres` credential, set
+`DATABASE_ROLE=hackatlantic_app`. The API executes and verifies `SET ROLE` on
+every newly opened connection before it enters the pool. Grant that role only
+the `ats` schema privileges required by the API.
+
 For Supabase, prefer its direct connection for migrations and for a persistent
 Go service when the host supports IPv6. On an IPv4-only host, use Supavisor
 session mode on port 5432 for the Go API. Do not use transaction mode unless
