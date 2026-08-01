@@ -1,0 +1,4 @@
+# The Go API is deployed separately on DigitalOcean. Without this exclusion,
+# Vercel treats the root-level api directory as Vercel Functions and attempts
+# to compile the Go service after the Next.js build completes.
+api/
