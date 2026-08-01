@@ -5,6 +5,7 @@ dist/
 bin/
 coverage/
 .cache/
+.tmp/
 *.test
 *.out
 .env*

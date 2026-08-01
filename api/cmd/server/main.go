@@ -165,11 +165,13 @@ func main() {
 }
 
 func loadResumeStore(getenv func(string) string) (resumes.Store, error) {
-	supabaseURL := strings.TrimSpace(getenv("SUPABASE_URL"))
-	serviceKey := strings.TrimSpace(getenv("SUPABASE_SERVICE_ROLE_KEY"))
-	bucket := strings.TrimSpace(getenv("RESUME_STORAGE_BUCKET"))
-	if supabaseURL != "" || serviceKey != "" || bucket != "" {
-		return resumes.NewSupabaseStore(supabaseURL, serviceKey, bucket)
+	endpoint := strings.TrimSpace(getenv("SPACES_ENDPOINT"))
+	region := strings.TrimSpace(getenv("SPACES_REGION"))
+	bucket := strings.TrimSpace(getenv("SPACES_BUCKET"))
+	accessKeyID := strings.TrimSpace(getenv("SPACES_ACCESS_KEY_ID"))
+	secretAccessKey := strings.TrimSpace(getenv("SPACES_SECRET_ACCESS_KEY"))
+	if endpoint != "" || region != "" || bucket != "" || accessKeyID != "" || secretAccessKey != "" {
+		return resumes.NewSpacesStore(context.Background(), endpoint, region, bucket, accessKeyID, secretAccessKey)
 	}
 	directory := strings.TrimSpace(getenv("RESUME_STORAGE_DIRECTORY"))
 	if directory == "" {

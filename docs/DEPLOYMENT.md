@@ -31,12 +31,18 @@ private and accessible only to the migration owner and restricted API role.
 
 ## Resume storage
 
-Create a private Supabase Storage bucket named `application-resumes` (or set a
-different `RESUME_STORAGE_BUCKET`). Limit the bucket to `application/pdf` and
-5 MiB objects as defense in depth. The API also enforces those rules before
-uploading. Configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and
-`RESUME_STORAGE_BUCKET` only on the Go service; never expose the service-role
-key as a `NEXT_PUBLIC_*` value or send it to the browser.
+Create a private DigitalOcean Space using Standard Storage with its CDN
+disabled. Create a limited access key scoped only to that Space with
+read/write/delete access. Configure `SPACES_ENDPOINT`, `SPACES_REGION`,
+`SPACES_BUCKET`, `SPACES_ACCESS_KEY_ID`, and `SPACES_SECRET_ACCESS_KEY` only on
+the Go service. Never expose either Spaces credential as a `NEXT_PUBLIC_*`
+value or send it to the browser. Objects are uploaded with a private ACL and
+admins view PDFs through the authorized API stream.
+
+The API validates the `.pdf` extension, PDF signature and trailer, and the 5
+MiB size limit before upload. The Space is defense-in-depth object storage, not
+an authorization boundary; keep its file listing and every stored object
+private.
 
 Local Docker development uses the persistent `hackatlantic-resumes` volume and
 does not require a Supabase Storage bucket. Production admins view PDFs through
@@ -105,7 +111,7 @@ seed against production.
 
 1. Create restricted database and migration-owner credentials.
 2. Configure production Clerk and DNS.
-3. Create the private resume bucket and store every value from
+3. Create the private resume Space and store every value from
    `.env.production.example` in provider secrets.
 4. Build the frontend with the final public API URL and Clerk publishable key.
 5. Run migrations once and verify `/readyz` against Supabase.

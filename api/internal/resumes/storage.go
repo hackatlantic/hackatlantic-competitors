@@ -5,12 +5,15 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type FileStore struct{ root string }
@@ -70,51 +73,62 @@ func (s *FileStore) path(key string) (string, error) {
 	return filepath.Join(s.root, clean), nil
 }
 
-type SupabaseStore struct {
-	baseURL, serviceKey, bucket string
-	client                      *http.Client
+type SpacesStore struct {
+	bucket string
+	client *s3.Client
 }
 
-func NewSupabaseStore(baseURL, serviceKey, bucket string) (*SupabaseStore, error) {
-	if strings.TrimSpace(baseURL) == "" || strings.TrimSpace(serviceKey) == "" || strings.TrimSpace(bucket) == "" {
-		return nil, fmt.Errorf("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and RESUME_STORAGE_BUCKET are required together")
+func NewSpacesStore(ctx context.Context, endpoint, region, bucket, accessKeyID, secretAccessKey string) (*SpacesStore, error) {
+	endpoint = strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	region = strings.TrimSpace(region)
+	bucket = strings.TrimSpace(bucket)
+	accessKeyID = strings.TrimSpace(accessKeyID)
+	secretAccessKey = strings.TrimSpace(secretAccessKey)
+	if endpoint == "" || region == "" || bucket == "" || accessKeyID == "" || secretAccessKey == "" {
+		return nil, fmt.Errorf("SPACES_ENDPOINT, SPACES_REGION, SPACES_BUCKET, SPACES_ACCESS_KEY_ID, and SPACES_SECRET_ACCESS_KEY are required together")
 	}
-	return &SupabaseStore{baseURL: strings.TrimRight(baseURL, "/"), serviceKey: serviceKey, bucket: bucket, client: &http.Client{Timeout: 20 * time.Second}}, nil
+	if !strings.HasPrefix(endpoint, "https://") {
+		return nil, fmt.Errorf("SPACES_ENDPOINT must use HTTPS")
+	}
+	configuration, err := awsconfig.LoadDefaultConfig(
+		ctx,
+		awsconfig.WithRegion(region),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKeyID, secretAccessKey, "")),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("configure Spaces client: %w", err)
+	}
+	client := s3.NewFromConfig(configuration, func(options *s3.Options) {
+		options.BaseEndpoint = aws.String(endpoint)
+		options.UsePathStyle = false
+	})
+	return &SpacesStore{bucket: bucket, client: client}, nil
 }
 
-func (s *SupabaseStore) Put(ctx context.Context, key string, content []byte) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, s.objectURL(key), bytes.NewReader(content))
+func (s *SpacesStore) Put(ctx context.Context, key string, content []byte) error {
+	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(key),
+		Body:          bytes.NewReader(content),
+		ContentLength: aws.Int64(int64(len(content))),
+		ContentType:   aws.String("application/pdf"),
+		ACL:           types.ObjectCannedACLPrivate,
+	})
 	if err != nil {
-		return err
-	}
-	s.authorize(request)
-	request.Header.Set("Content-Type", "application/pdf")
-	response, err := s.client.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
-		return fmt.Errorf("Supabase Storage upload returned %d", response.StatusCode)
+		return fmt.Errorf("upload resume to Spaces: %w", err)
 	}
 	return nil
 }
 
-func (s *SupabaseStore) Get(ctx context.Context, key string) ([]byte, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, s.objectURL(key), nil)
+func (s *SpacesStore) Get(ctx context.Context, key string) ([]byte, error) {
+	response, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
 	if err != nil {
-		return nil, err
-	}
-	s.authorize(request)
-	response, err := s.client.Do(request)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("download resume from Spaces: %w", err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Supabase Storage download returned %d", response.StatusCode)
-	}
 	content, err := io.ReadAll(io.LimitReader(response.Body, MaxPDFBytes+1))
 	if err != nil {
 		return nil, err
@@ -123,17 +137,4 @@ func (s *SupabaseStore) Get(ctx context.Context, key string) ([]byte, error) {
 		return nil, fmt.Errorf("stored resume exceeds maximum size")
 	}
 	return content, nil
-}
-
-func (s *SupabaseStore) authorize(request *http.Request) {
-	request.Header.Set("Authorization", "Bearer "+s.serviceKey)
-	request.Header.Set("apikey", s.serviceKey)
-}
-
-func (s *SupabaseStore) objectURL(key string) string {
-	segments := strings.Split(key, "/")
-	for index := range segments {
-		segments[index] = url.PathEscape(segments[index])
-	}
-	return s.baseURL + "/storage/v1/object/" + url.PathEscape(s.bucket) + "/" + strings.Join(segments, "/")
 }
