@@ -2281,10 +2281,8 @@ textarea:focus-visible {
 .portal-ticker {
   display: flex;
   align-items: center;
-  justify-content: space-around;
-  gap: 1rem;
   min-height: 38px;
-  padding: 0.45rem 1rem;
+  padding: 0.45rem 0;
   overflow: hidden;
   border-bottom: 2px solid var(--ink);
   color: var(--paper-bright);
@@ -2297,8 +2295,37 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.portal-ticker-track {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 1rem;
+  padding: 0 1rem;
+  animation: portal-ticker-scroll 16s linear infinite;
+}
+
+.portal-ticker:hover .portal-ticker-track,
+.portal-ticker:focus-within .portal-ticker-track {
+  animation-play-state: paused;
+}
+
 .portal-ticker span:nth-child(even) {
   color: var(--yellow);
+}
+
+@keyframes portal-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-ticker-track {
+    animation: none;
+  }
 }
 
 .portal-hero {
@@ -3295,13 +3322,7 @@ textarea:focus-visible {
     display: none;
   }
 
-  .portal-ticker {
-    justify-content: flex-start;
-  }
-
-  .portal-ticker span:nth-child(n + 5) {
-    display: none;
-  }
+  
 
   .intro {
     min-height: 570px;
