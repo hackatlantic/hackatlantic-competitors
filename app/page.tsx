@@ -36,16 +36,24 @@ export default function Home() {
       </nav>
       </header>
 
-      <div className="portal-ticker" aria-label="HackAtlantic applications are open">
+          <div className="portal-ticker" aria-label="HackAtlantic applications are open">
+      <div className="portal-ticker-track">
         <span>Applications 2026</span>
         <span aria-hidden="true">✦</span>
         <span>Atlantic Canada</span>
         <span aria-hidden="true">✦</span>
         <span>Build something real</span>
         <span aria-hidden="true">✦</span>
-        <span>Applications 2026</span>
       </div>
-
+      <div className="portal-ticker-track" aria-hidden="true">
+        <span>Applications 2026</span>
+        <span aria-hidden="true">✦</span>
+        <span>Atlantic Canada</span>
+        <span aria-hidden="true">✦</span>
+        <span>Build something real</span>
+        <span aria-hidden="true">✦</span>
+      </div>
+    </div>
       <Show when="signed-out">
         <section className="portal-hero">
           <div className="intro">
@@ -59,7 +67,7 @@ export default function Home() {
             <div className="portal-facts" aria-label="Event facts">
               <div><strong>100+</strong><span>hackers</span></div>
               <div><strong>01</strong><span>weekend</span></div>
-              <div><strong>∞</strong><span>directions</span></div>
+              <div><strong>∞</strong><span>ideas</span></div>
             </div>
           </div>
 
