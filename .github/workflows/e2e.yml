@@ -1,0 +1,45 @@
+name: Staging E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Git SHA expected from /versionz
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  journeys:
+    name: Applicant, admin, pass, and scanner journeys
+    runs-on: ubuntu-24.04
+    environment:
+      name: staging
+    env:
+      API_BASE_URL: ${{ vars.STAGING_API_URL }}
+      WEB_BASE_URL: ${{ vars.STAGING_WEB_URL }}
+      EXPECTED_GIT_SHA: ${{ inputs.expected_sha }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      E2E_APPLICANT_EMAIL: ${{ vars.E2E_APPLICANT_EMAIL }}
+      E2E_ADMIN_EMAIL: ${{ vars.E2E_ADMIN_EMAIL }}
+      E2E_SCANNER_EMAIL: ${{ vars.E2E_SCANNER_EMAIL }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: staging-playwright-report
+          path: |
+            playwright-report
+            test-results/playwright
+          retention-days: 14

@@ -1,0 +1,254 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: hackatlantic/hackatlantic-api
+
+jobs:
+  image:
+    name: Build immutable API image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: metadata
+        shell: bash
+        run: echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./api
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_NAME }}:release-${{ github.run_number }}
+          build-args: |
+            APP_VERSION=sha-${{ github.sha }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ steps.metadata.outputs.build_time }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=release-api
+          cache-to: type=gha,mode=max,scope=release-api
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+          version: v0.70.0
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ghcr.io/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: api-sbom.spdx.json
+          artifact-name: api-sbom
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ghcr.io/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  frontend-stage:
+    name: Build staged Vercel production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+    outputs:
+      deployment_url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npx --yes vercel@58.1.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - run: npx --yes vercel@58.1.0 build --prod --token="$VERCEL_TOKEN"
+      - id: deploy
+        shell: bash
+        run: |
+          url="$(npx --yes vercel@58.1.0 deploy --prebuilt --prod --skip-domain --yes --token="$VERCEL_TOKEN" | tail -n 1)"
+          echo "url=${url}" >> "$GITHUB_OUTPUT"
+
+  staging:
+    name: Deploy staging
+    needs: image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: staging
+      url: https://staging-api.hackatlantic.ca
+    env:
+      TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
+      TF_IN_AUTOMATION: "true"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - name: Verify build provenance
+        run: gh attestation verify "oci://ghcr.io/${IMAGE_NAME}@${{ needs.image.outputs.digest }}" --repo "$GITHUB_REPOSITORY"
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: { terraform_version: 1.14.3 }
+      - run: terraform init -input=false -backend-config=backend.hcl.example
+        working-directory: infra/environments/staging
+      - run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
+        working-directory: infra/environments/staging
+      - name: Verify staging deployment
+        run: bash scripts/smoke-deployment.sh
+        env:
+          API_BASE_URL: https://staging-api.hackatlantic.ca
+          EXPECTED_GIT_SHA: ${{ github.sha }}
+      - uses: grafana/setup-k6-action@c00053c996b4061198c9c24a00474b748abdf8b7 # v1
+      - uses: grafana/run-k6-action@fb5a163607c1bd1984f629f322f580e63899bd36 # v1
+        with:
+          path: tests/load/smoke.js
+        env:
+          API_BASE_URL: https://staging-api.hackatlantic.ca
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify authenticated staging journeys
+        run: npm run test:e2e
+        env:
+          API_BASE_URL: https://staging-api.hackatlantic.ca
+          WEB_BASE_URL: ${{ vars.STAGING_WEB_URL }}
+          EXPECTED_GIT_SHA: ${{ github.sha }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_APPLICANT_EMAIL: ${{ vars.E2E_APPLICANT_EMAIL }}
+          E2E_ADMIN_EMAIL: ${{ vars.E2E_ADMIN_EMAIL }}
+          E2E_SCANNER_EMAIL: ${{ vars.E2E_SCANNER_EMAIL }}
+          E2E_FULL_LIFECYCLE: "true"
+      - name: Enforce scanner concurrency and latency objectives
+        uses: grafana/run-k6-action@fb5a163607c1bd1984f629f322f580e63899bd36 # v1
+        with:
+          path: tests/load/scanner.js
+        env:
+          API_BASE_URL: https://staging-api.hackatlantic.ca
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          SCANNER_USER_ID: ${{ vars.K6_SCANNER_USER_ID }}
+          CLERK_JWT_TEMPLATE: ${{ vars.K6_CLERK_JWT_TEMPLATE }}
+          QR_TOKEN: ${{ secrets.K6_QR_TOKEN }}
+          CHECKPOINT_ID: ${{ vars.K6_CHECKPOINT_ID }}
+          K6_SCANNER_VUS: "25"
+          K6_SCANNER_DURATION: 5m
+
+  production:
+    name: Promote production
+    needs: [image, frontend-stage, staging]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: production
+      url: https://apply.hackatlantic.ca
+    env:
+      TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
+      TF_IN_AUTOMATION: "true"
+      DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - name: Start deployment timer
+        shell: bash
+        run: echo "DEPLOYMENT_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: { terraform_version: 1.14.3 }
+      - run: terraform init -input=false -backend-config=backend.hcl.example
+        working-directory: infra/environments/production
+      - id: current
+        shell: bash
+        working-directory: infra/environments/production
+        run: |
+          app_id="$(terraform output -raw api_app_id 2>/dev/null || true)"
+          echo "app_id=${app_id}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${app_id}" ]]; then
+            deployment_id="$(curl --fail --silent -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" "https://api.digitalocean.com/v2/apps/${app_id}/deployments" | jq -r '.deployments[] | select(.phase == "ACTIVE") | .id' | head -n 1)"
+            echo "deployment_id=${deployment_id}" >> "$GITHUB_OUTPUT"
+          fi
+      - run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
+        working-directory: infra/environments/production
+      - id: smoke
+        continue-on-error: true
+        run: bash scripts/smoke-deployment.sh
+        env:
+          API_BASE_URL: https://api.hackatlantic.ca
+          EXPECTED_GIT_SHA: ${{ github.sha }}
+      - if: steps.smoke.outcome == 'failure' && steps.current.outputs.app_id != '' && steps.current.outputs.deployment_id != ''
+        name: Roll back API
+        run: |
+          curl --fail-with-body -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" -d '{"deployment_id":"${{ steps.current.outputs.deployment_id }}"}' "https://api.digitalocean.com/v2/apps/${{ steps.current.outputs.app_id }}/rollback"
+      - if: steps.smoke.outcome == 'failure'
+        run: exit 1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 20 }
+      - name: Promote staged frontend without rebuilding
+        run: npx --yes vercel@58.1.0 promote "${{ needs.frontend-stage.outputs.deployment_url }}" --yes --token="$VERCEL_TOKEN"
+      - name: Release summary
+        shell: bash
+        run: |
+          duration_seconds="$(( $(date +%s) - DEPLOYMENT_STARTED_AT ))"
+          {
+            echo "### Production release"
+            echo "- Git SHA: \`${GITHUB_SHA}\`"
+            echo "- API digest: \`${{ needs.image.outputs.digest }}\`"
+            echo "- API version: \`sha-${GITHUB_SHA}\`"
+            echo "- Frontend: ${{ needs.frontend-stage.outputs.deployment_url }}"
+            echo "- Production promotion duration: ${duration_seconds}s"
+            echo "- Outcome: succeeded"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify-failure:
+    name: Notify release failure
+    if: ${{ always() && (needs.image.result == 'failure' || needs.frontend-stage.result == 'failure' || needs.staging.result == 'failure' || needs.production.result == 'failure') }}
+    needs: [image, frontend-stage, staging, production]
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL_FROM: ${{ vars.ALERT_EMAIL_FROM }}
+      ADMIN_ALERT_EMAILS: ${{ vars.ADMIN_ALERT_EMAILS }}
+      ALERT_MESSAGE: HackAtlantic release failed for ${{ github.sha }}. Review the release workflow immediately.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - run: bash scripts/notify-incident.sh

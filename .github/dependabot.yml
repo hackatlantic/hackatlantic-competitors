@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      frontend-dependencies: { patterns: ["*"] }
+  - package-ecosystem: gomod
+    directory: /api
+    schedule: { interval: weekly }
+    groups:
+      go-dependencies: { patterns: ["*"] }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: terraform
+    directory: /infra/environments/staging
+    schedule: { interval: weekly }
+  - package-ecosystem: terraform
+    directory: /infra/environments/production
+    schedule: { interval: weekly }
+  - package-ecosystem: terraform
+    directory: /infra/global
+    schedule: { interval: weekly }
+

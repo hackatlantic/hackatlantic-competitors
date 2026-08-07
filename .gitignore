@@ -21,3 +21,18 @@ pnpm-debug.log*
 # clerk configuration (can include secrets)
 /.clerk/
 .vercel
+
+# Terraform local state and provider material. Authoritative state is in HCP Terraform.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+*.tsbuildinfo
+
+# End-to-end and security reports
+/playwright-report/
+/test-results/
+/reports/
+/playwright/.clerk/
