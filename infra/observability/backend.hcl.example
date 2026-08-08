@@ -1,2 +1,2 @@
-organization = "hackatlantic"
-workspaces { name = "hackatlantic-observability" }
+organization = "HackAtlantic"
+workspaces { name = "hackatlantic-ats-observability" }

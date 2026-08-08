@@ -1,3 +1,2 @@
-organization = "hackatlantic"
+organization = "HackAtlantic"
 workspaces { name = "hackatlantic-ats-staging" }
-
