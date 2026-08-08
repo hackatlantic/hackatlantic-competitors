@@ -116,6 +116,17 @@ resource "github_repository_environment" "staging" {
   }
 }
 
+resource "github_repository_environment" "terraform_plan" {
+  repository          = local.repository
+  environment         = "terraform-plan"
+  prevent_self_review = false
+  can_admins_bypass   = false
+
+  reviewers {
+    users = [for reviewer in data.github_user.reviewer : reviewer.id]
+  }
+}
+
 resource "github_repository_environment" "backup" {
   repository  = local.repository
   environment = "backup"
