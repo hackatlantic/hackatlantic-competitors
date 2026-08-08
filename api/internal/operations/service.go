@@ -30,7 +30,7 @@ const (
 	defaultTransactionTimeout = 15 * time.Second
 	defaultReportLimit        = 100
 	maximumReportLimit        = 500
-	maximumRedemptionValue = 1<<31 - 1
+	maximumRedemptionValue    = 1<<31 - 1
 )
 
 // Service separates organizer administration and reporting from the scanner
@@ -80,18 +80,18 @@ type ActivityInput struct {
 // Checkpoint is an organizer projection. The scanner retains its deliberately
 // smaller id/name projection in the checkpoints package.
 type Checkpoint struct {
-	ID                     string     `json:"id"`
-	CycleID                string     `json:"cycleId"`
-	ActivityID             *string    `json:"activityId,omitempty"`
-	Slug                   string     `json:"slug"`
-	Name                   string     `json:"name"`
-	OpensAt                *time.Time `json:"opensAt,omitempty"`
-	ClosesAt               *time.Time `json:"closesAt,omitempty"`
-	DefaultAllowed         bool       `json:"defaultAllowed"`
-	DefaultMaxRedemptions  int        `json:"defaultMaxRedemptions"`
-	Active                 bool       `json:"active"`
-	CreatedAt              time.Time  `json:"createdAt"`
-	UpdatedAt              time.Time  `json:"updatedAt"`
+	ID                    string     `json:"id"`
+	CycleID               string     `json:"cycleId"`
+	ActivityID            *string    `json:"activityId,omitempty"`
+	Slug                  string     `json:"slug"`
+	Name                  string     `json:"name"`
+	OpensAt               *time.Time `json:"opensAt,omitempty"`
+	ClosesAt              *time.Time `json:"closesAt,omitempty"`
+	DefaultAllowed        bool       `json:"defaultAllowed"`
+	DefaultMaxRedemptions int        `json:"defaultMaxRedemptions"`
+	Active                bool       `json:"active"`
+	CreatedAt             time.Time  `json:"createdAt"`
+	UpdatedAt             time.Time  `json:"updatedAt"`
 }
 
 // CheckpointInput replaces the administrative fields of a checkpoint. CycleID
@@ -129,23 +129,23 @@ type EntitlementInput struct {
 
 // CheckpointCount is a count of successful immutable redemptions only.
 type CheckpointCount struct {
-	CheckpointID       string     `json:"checkpointId"`
-	CheckpointName     string     `json:"checkpointName"`
-	TotalRedemptions   int64      `json:"totalRedemptions"`
-	LastRedeemedAt     *time.Time `json:"lastRedeemedAt,omitempty"`
+	CheckpointID     string     `json:"checkpointId"`
+	CheckpointName   string     `json:"checkpointName"`
+	TotalRedemptions int64      `json:"totalRedemptions"`
+	LastRedeemedAt   *time.Time `json:"lastRedeemedAt,omitempty"`
 }
 
 // Redemption is an operational, privacy-minimized redemption projection. It
 // intentionally excludes contact details, credentials, application answers,
 // reviews, and decisions.
 type Redemption struct {
-	ID            string `json:"id"`
-	RedeemedAt    time.Time `json:"redeemedAt"`
-	Ordinal       int `json:"ordinal"`
+	ID            string               `json:"id"`
+	RedeemedAt    time.Time            `json:"redeemedAt"`
+	Ordinal       int                  `json:"ordinal"`
 	Checkpoint    RedemptionCheckpoint `json:"checkpoint"`
-	Attendee      RedemptionAttendee `json:"attendee"`
-	Pass          RedemptionPass `json:"pass"`
-	ScannerUserID string `json:"scannerUserId"`
+	Attendee      RedemptionAttendee   `json:"attendee"`
+	Pass          RedemptionPass       `json:"pass"`
+	ScannerUserID string               `json:"scannerUserId"`
 }
 
 type RedemptionCheckpoint struct {
@@ -827,17 +827,17 @@ func (s *Service) ExportRedemptions(ctx context.Context, actor users.User, kind 
 }
 
 type activityFields struct {
-	slug, name      string
+	slug, name       string
 	startsAt, endsAt *time.Time
 }
 
 type checkpointFields struct {
-	activityID             pgtype.UUID
-	slug, name             string
-	opensAt, closesAt      *time.Time
-	defaultAllowed         bool
-	defaultMaxRedemptions  int
-	active                 bool
+	activityID            pgtype.UUID
+	slug, name            string
+	opensAt, closesAt     *time.Time
+	defaultAllowed        bool
+	defaultMaxRedemptions int
+	active                bool
 }
 
 type rowScanner interface {
