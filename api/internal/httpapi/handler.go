@@ -18,6 +18,14 @@ type serviceResponse struct {
 	Version string `json:"version"`
 }
 
+// BuildInfo is safe deployment metadata compiled into the API image.
+type BuildInfo struct {
+	Version     string `json:"version"`
+	GitSHA      string `json:"gitSha"`
+	BuiltAt     string `json:"builtAt"`
+	Environment string `json:"environment"`
+}
+
 type healthResponse struct {
 	Status string `json:"status"`
 }
@@ -53,6 +61,7 @@ type staffRoleService interface {
 
 // Dependencies are explicit runtime dependencies for API transport handlers.
 type Dependencies struct {
+	Build            BuildInfo
 	Readiness        Readiness
 	Verifier         auth.Verifier
 	Users            UserResolver
@@ -83,6 +92,18 @@ func NewHandler(version string) http.Handler {
 
 // NewHandlerWithDependencies returns the API's root HTTP handler.
 func NewHandlerWithDependencies(version string, dependencies Dependencies) http.Handler {
+	if strings.TrimSpace(dependencies.Build.Version) == "" {
+		dependencies.Build.Version = version
+	}
+	if strings.TrimSpace(dependencies.Build.GitSHA) == "" {
+		dependencies.Build.GitSHA = "unknown"
+	}
+	if strings.TrimSpace(dependencies.Build.BuiltAt) == "" {
+		dependencies.Build.BuiltAt = "unknown"
+	}
+	if strings.TrimSpace(dependencies.Build.Environment) == "" {
+		dependencies.Build.Environment = "development"
+	}
 	if dependencies.Readiness == nil {
 		dependencies.Readiness = unavailableReadiness{}
 	}
@@ -108,6 +129,9 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, healthResponse{Status: "ok"})
+	})
+	mux.HandleFunc("GET /versionz", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, dependencies.Build)
 	})
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, request *http.Request) {
 		if err := dependencies.Readiness.Ping(request.Context()); err != nil {

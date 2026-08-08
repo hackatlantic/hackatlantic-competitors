@@ -1,0 +1,53 @@
+name: Encrypted ATS Backup
+
+on:
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ats-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: backup
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      SPACES_ENDPOINT: ${{ vars.SPACES_ENDPOINT }}
+      SPACES_REGION: ${{ vars.SPACES_REGION }}
+      BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.BACKUP_SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_SPACES_SECRET_ACCESS_KEY }}
+      AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL_FROM: ${{ vars.ALERT_EMAIL_FROM }}
+      ADMIN_ALERT_EMAILS: ${{ vars.ADMIN_ALERT_EMAILS }}
+      GRAFANA_OTLP_ENDPOINT: ${{ vars.GRAFANA_OTLP_ENDPOINT }}
+      GRAFANA_OTLP_AUTHORIZATION: ${{ secrets.GRAFANA_OTLP_AUTHORIZATION }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - name: Install PostgreSQL and age
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client age
+      - id: backup
+        continue-on-error: true
+        run: bash scripts/backup-ats.sh
+      - name: Publish backup freshness metric
+        if: steps.backup.outcome == 'success'
+        continue-on-error: true
+        run: bash scripts/push-otlp-gauge.sh hackatlantic.backup.last_success_unixtime "$(date +%s)" s
+      - if: steps.backup.outcome == 'failure'
+        run: bash scripts/notify-incident.sh
+        env:
+          ALERT_MESSAGE: HackAtlantic nightly ATS backup failed. Review GitHub Actions immediately.
+      - if: steps.backup.outcome == 'failure'
+        run: exit 1

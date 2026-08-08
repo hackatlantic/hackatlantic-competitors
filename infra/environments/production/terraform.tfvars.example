@@ -1,0 +1,32 @@
+api_image_digest           = "sha256:replace-with-64-hex-characters"
+supabase_organization_id   = "replace-me"
+supabase_project_name      = "hackatlantic-competitors"
+supabase_database_password = "existing-password-is-ignored-after-import"
+migration_database_url     = "postgresql://migration-owner:replace-me@host:5432/postgres?sslmode=require"
+alert_emails               = ["adebowale.ca@gmail.com", "swe@daxmanuel.com"]
+
+api_env = {
+  DATABASE_URL                     = "postgresql://runtime:replace-me@host:5432/postgres?sslmode=require"
+  DATABASE_ROLE                    = "hackatlantic_app"
+  DATABASE_MAX_CONNS               = "10"
+  DATABASE_QUERY_TIMEOUT           = "5s"
+  DATABASE_TRANSACTION_TIMEOUT     = "15s"
+  APP_BASE_URL                     = "https://apply.hackatlantic.ca"
+  CORS_ALLOWED_ORIGINS             = "https://apply.hackatlantic.ca"
+  CLERK_SECRET_KEY                 = "replace-me"
+  CLERK_ISSUER_URL                 = "replace-me"
+  CLERK_AUTHORIZED_PARTIES         = "https://apply.hackatlantic.ca"
+  QR_TOKEN_PEPPER                  = "replace-me"
+  CLAIM_TOKEN_PEPPER               = "replace-me"
+  SPACES_ENDPOINT                  = "https://tor1.digitaloceanspaces.com"
+  SPACES_REGION                    = "tor1"
+  SPACES_BUCKET                    = "hackatlantic-resumes"
+  SPACES_ACCESS_KEY_ID             = "replace-me"
+  SPACES_SECRET_ACCESS_KEY         = "replace-me"
+  APP_VERSION                      = "production"
+  DEPLOYMENT_ENVIRONMENT           = "production"
+  OTEL_EXPORTER_OTLP_ENDPOINT      = "replace-me"
+  OTEL_EXPORTER_OTLP_HEADERS       = "Authorization=Basic replace-me"
+  OTEL_EXPORTER_OTLP_PROTOCOL      = "http/protobuf"
+}
+

@@ -21,6 +21,7 @@ import (
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/database"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/decisions"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/httpapi"
+	"github.com/hackatlantic/hackatlantic-competitors/api/internal/observability"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/operations"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/passes"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/redemptions"
@@ -34,6 +35,12 @@ const (
 	shutdownTimeout = 10 * time.Second
 )
 
+var (
+	version = "dev"
+	gitSHA  = "unknown"
+	builtAt = "unknown"
+)
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	lifecycleCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -43,9 +50,35 @@ func main() {
 	if address == "" {
 		address = defaultAddress
 	}
+	deploymentEnvironment := strings.TrimSpace(os.Getenv("DEPLOYMENT_ENVIRONMENT"))
+	if deploymentEnvironment == "" {
+		deploymentEnvironment = "development"
+	}
+	if configuredVersion := strings.TrimSpace(os.Getenv("APP_VERSION")); configuredVersion != "" {
+		version = configuredVersion
+	}
+	if configuredSHA := strings.TrimSpace(os.Getenv("GIT_SHA")); configuredSHA != "" {
+		gitSHA = configuredSHA
+	}
 
 	configureCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	telemetry, err := observability.New(configureCtx, observability.Config{
+		Version: version, GitSHA: gitSHA, Environment: deploymentEnvironment,
+	})
+	if err != nil {
+		logger.Error("configure observability", "error", err)
+		os.Exit(1)
+	}
+	logger = telemetry.Logger(logger)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := telemetry.Shutdown(ctx); err != nil {
+			logger.Error("flush observability", "error", err)
+		}
+	}()
+
 	pool, err := database.Open(configureCtx, database.Config{
 		URL:                os.Getenv("DATABASE_URL"),
 		Role:               os.Getenv("DATABASE_ROLE"),
@@ -58,6 +91,10 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
+	if err := telemetry.RegisterPoolMetrics(pool.Pool); err != nil {
+		logger.Error("configure database metrics", "error", err)
+		os.Exit(1)
+	}
 
 	passSettings, err := loadPassSettings(os.Getenv)
 	if err != nil {
@@ -96,6 +133,9 @@ func main() {
 	}
 
 	dependencies := httpapi.Dependencies{
+		Build: httpapi.BuildInfo{
+			Version: version, GitSHA: gitSHA, BuiltAt: builtAt, Environment: deploymentEnvironment,
+		},
 		Readiness: pool,
 		Applications: applications.NewService(
 			pool.Pool,
@@ -137,7 +177,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              address,
-		Handler:           httpapi.NewHandlerWithDependencies("dev", dependencies),
+		Handler:           telemetry.HTTPMiddleware(logger, httpapi.NewHandlerWithDependencies(version, dependencies)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
@@ -145,7 +185,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("api listening", "address", address)
+		logger.Info("api listening", "address", address, "version", version, "git_sha", gitSHA, "environment", deploymentEnvironment)
 		if err := server.ListenAndServe(); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
 			logger.Error("api stopped unexpectedly", "error", err)

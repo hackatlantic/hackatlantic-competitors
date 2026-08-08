@@ -1,8 +1,11 @@
+# syntax=docker/dockerfile:1.7
 FROM node:20-alpine AS dependencies
 
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=secret,id=custom_ca,required=false \
+    if [ -f /run/secrets/custom_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/custom_ca; fi; \
+    npm ci
 
 FROM node:20-alpine AS build
 
@@ -16,19 +19,18 @@ COPY package.json package-lock.json ./
 COPY app ./app
 COPY components ./components
 COPY lib ./lib
+COPY instrumentation.ts ./instrumentation.ts
 COPY eslint.config.mjs next-env.d.ts next.config.ts proxy.ts tsconfig.json ./
 RUN npm run build
 
-FROM node:20-alpine AS runtime
+FROM cgr.dev/chainguard/node@sha256:d8d2883b26d4fde4e524d0068cd78abbb23c7c2113a22e67a02cc73a9182552d AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
-RUN addgroup --system --gid 1001 nodejs \
-    && adduser --system --uid 1001 nextjs
-COPY --from=build --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
-USER nextjs
+COPY --from=build --chown=65532:65532 /app/.next/standalone ./
+COPY --from=build --chown=65532:65532 /app/.next/static ./.next/static
+USER 65532:65532
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["server.js"]

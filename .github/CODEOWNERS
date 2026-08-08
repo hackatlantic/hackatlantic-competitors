@@ -1,0 +1,11 @@
+# Application code
+* @10xDeVv @DaxManuel27
+
+# Changes that affect production delivery or stored data require explicit review.
+/.github/workflows/ @10xDeVv @DaxManuel27
+/infra/ @10xDeVv @DaxManuel27
+/policy/ @10xDeVv @DaxManuel27
+/api/migrations/ @10xDeVv @DaxManuel27
+/scripts/backup-ats.sh @10xDeVv @DaxManuel27
+/scripts/restore-drill.sh @10xDeVv @DaxManuel27
+

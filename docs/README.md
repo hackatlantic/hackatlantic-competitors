@@ -11,6 +11,11 @@ Read these files before making changes:
 6. [MILESTONES.md](MILESTONES.md)
 7. [AGENT_HANDOFF.md](AGENT_HANDOFF.md)
 8. [DEPLOYMENT.md](DEPLOYMENT.md)
+9. [PLATFORM_ENGINEERING.md](PLATFORM_ENGINEERING.md)
+10. [SLO.md](SLO.md)
+11. [PORTFOLIO_EVIDENCE.md](PORTFOLIO_EVIDENCE.md)
+12. [SECRETS_AND_ENVIRONMENTS.md](SECRETS_AND_ENVIRONMENTS.md)
+13. [runbooks/load-test.md](runbooks/load-test.md)
 
 ## Authority
 

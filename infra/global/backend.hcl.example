@@ -1,0 +1,3 @@
+organization = "hackatlantic"
+workspaces { name = "hackatlantic-ats-global" }
+

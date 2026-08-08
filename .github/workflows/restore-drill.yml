@@ -1,0 +1,68 @@
+name: ATS Restore Drill
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "13 14 1 * *"
+
+permissions:
+  contents: read
+
+jobs:
+  restore:
+    name: Restore Drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: disaster-recovery
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: restore
+          POSTGRES_PASSWORD: restore
+          POSTGRES_DB: restore
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U restore -d restore"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RESTORE_DATABASE_URL: postgresql://restore:restore@localhost:5432/restore?sslmode=disable
+      SPACES_ENDPOINT: ${{ vars.SPACES_ENDPOINT }}
+      SPACES_REGION: ${{ vars.SPACES_REGION }}
+      BACKUP_BUCKET: ${{ vars.BACKUP_BUCKET }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.BACKUP_SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_SPACES_SECRET_ACCESS_KEY }}
+      AGE_IDENTITY: ${{ secrets.BACKUP_AGE_IDENTITY }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL_FROM: ${{ vars.ALERT_EMAIL_FROM }}
+      ADMIN_ALERT_EMAILS: ${{ vars.ADMIN_ALERT_EMAILS }}
+      GRAFANA_OTLP_ENDPOINT: ${{ vars.GRAFANA_OTLP_ENDPOINT }}
+      GRAFANA_OTLP_AUTHORIZATION: ${{ secrets.GRAFANA_OTLP_AUTHORIZATION }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - name: Install PostgreSQL and age
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client age
+      - id: restore
+        continue-on-error: true
+        run: bash scripts/restore-drill.sh
+      - if: always()
+        run: echo "rto_seconds=${{ steps.restore.outputs.rto_seconds || 'see logs' }}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish tested RTO metric
+        if: steps.restore.outcome == 'success'
+        continue-on-error: true
+        run: bash scripts/push-otlp-gauge.sh hackatlantic.restore_drill.duration "${{ steps.restore.outputs.rto_seconds }}" s
+      - if: steps.restore.outcome == 'failure'
+        run: bash scripts/notify-incident.sh
+        env:
+          ALERT_MESSAGE: HackAtlantic monthly ATS restore drill failed. Review GitHub Actions immediately.
+      - if: steps.restore.outcome == 'failure'
+        run: exit 1

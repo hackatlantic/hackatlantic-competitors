@@ -1,0 +1,55 @@
+name: Infrastructure Plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "policy/**"
+      - ".github/workflows/infra-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Terraform Plan (${{ matrix.environment }})
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ matrix.github_environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: global
+            directory: infra/global
+            github_environment: staging
+          - environment: staging
+            directory: infra/environments/staging
+            github_environment: staging
+          - environment: production
+            directory: infra/environments/production
+            github_environment: production
+          - environment: observability
+            directory: infra/observability
+            github_environment: staging
+    env:
+      TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: { terraform_version: 1.14.3 }
+      - name: Require configured HCP credentials
+        run: test -n "$TF_TOKEN_app_terraform_io"
+      - run: terraform init -input=false -backend-config=backend.hcl.example
+        working-directory: ${{ matrix.directory }}
+      - run: terraform plan -input=false -out=tfplan
+        working-directory: ${{ matrix.directory }}
+      - run: terraform show -json tfplan > tfplan.json
+        working-directory: ${{ matrix.directory }}
+      - name: Enforce infrastructure policy
+        run: docker run --rm -v "$PWD:/project" openpolicyagent/conftest:v0.62.0 test "/project/${{ matrix.directory }}/tfplan.json" --policy /project/policy
