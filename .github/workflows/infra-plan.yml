@@ -18,23 +18,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
-      name: ${{ matrix.github_environment }}
+      name: terraform-plan
     strategy:
       fail-fast: false
       matrix:
         include:
           - environment: global
             directory: infra/global
-            github_environment: staging
           - environment: staging
             directory: infra/environments/staging
-            github_environment: staging
           - environment: production
             directory: infra/environments/production
-            github_environment: production
           - environment: observability
             directory: infra/observability
-            github_environment: staging
     env:
       TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
       TF_IN_AUTOMATION: "true"

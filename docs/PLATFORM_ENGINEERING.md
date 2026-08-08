@@ -50,6 +50,7 @@ Database changes use expand/contract compatibility. Application rollback is auto
 - Every third-party action is pinned to a complete commit SHA.
 - Workflows use explicit minimal permissions and deployment environments.
 - Forked pull requests never execute Terraform plans that require protected credentials.
+- Same-repository Terraform plans require a separate `terraform-plan` environment approval and cannot access deployment credentials.
 - Rego rejects public storage, floating images, plaintext secret configuration, missing readiness checks, and protected-resource deletion.
 
 ## Telemetry and privacy
