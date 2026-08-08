@@ -38,7 +38,7 @@ resource "cloudflare_zone_dnssec" "hackatlantic" {
 }
 
 resource "vercel_project" "ats" {
-  name                                              = "hackatlantic-competitors"
+  name                                              = "hackatlantic-ats"
   framework                                         = "nextjs"
   auto_assign_custom_domains                        = false
   automatically_expose_system_environment_variables = true
