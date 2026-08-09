@@ -125,9 +125,12 @@ data "github_repository" "ats" {
 resource "github_branch_protection" "main" {
   # The provider stores the repository GraphQL node ID after import. Using the
   # immutable node ID here adopts the existing rule without a forced replacement.
-  repository_id                   = data.github_repository.ats.node_id
-  pattern                         = "main"
-  enforce_admins                  = true
+  repository_id = data.github_repository.ats.node_id
+  pattern       = "main"
+  # Repository administrators retain emergency ownership of the release path
+  # and may merge without a second review. All non-admin contributors remain
+  # subject to the required checks and CODEOWNER approval below.
+  enforce_admins                  = false
   allows_deletions                = false
   allows_force_pushes             = false
   require_signed_commits          = true
