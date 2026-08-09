@@ -1,0 +1,79 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "expr": "sum by (event_name) (increase(ats_lifecycle_events_total{deployment_environment_name=~\"$environment\"}[$__rate_interval]))", "legendFormat": "{{event_name}}", "refId": "A" }],
+      "title": "ATS lifecycle throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "ms", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 500 }, { "color": "red", "value": 750 }] } }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 6, "x": 12, "y": 0 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\",http_route=\"POST /v1/redemptions\"}[5m])))", "refId": "A" }],
+      "title": "Redemption p95",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "ms", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 350 }, { "color": "red", "value": 500 }] } }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 6, "x": 18, "y": 0 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\",http_route=\"POST /v1/scans/lookup\"}[5m])))", "refId": "A" }],
+      "title": "Scanner lookup p95",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 7 },
+      "id": 4,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [{ "expr": "sum by (http_response_status_class) (rate(http_server_requests_total{deployment_environment_name=~\"$environment\",http_route=~\".*(redemptions|passes).*\"}[2m]))", "legendFormat": "{{http_response_status_class}}", "refId": "A" }],
+      "title": "Scanner traffic and outcomes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "dtdurations", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 0 }] } }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "time() - hackatlantic_backup_last_success_unixtime{deployment_environment_name=\"production\"}", "refId": "A" }],
+      "title": "Encrypted backup age",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 1200 }, { "color": "red", "value": 1800 }] } }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "values": false }, "textMode": "auto" },
+      "targets": [{ "expr": "hackatlantic_restore_drill_duration{deployment_environment_name=\"production\"}", "refId": "A" }],
+      "title": "Last tested restore time (RTO)",
+      "type": "stat"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 40,
+  "tags": ["hackatlantic", "ats", "scanner"],
+  "templating": { "list": [
+    { "current": { "selected": true, "text": "production", "value": "production" }, "includeAll": false, "label": "Environment", "name": "environment", "options": [{ "text": "staging", "value": "staging" }, { "selected": true, "text": "production", "value": "production" }], "query": "staging,production", "type": "custom" },
+    { "name": "DS_PROMETHEUS", "query": "prometheus", "type": "datasource" }
+  ] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "title": "HackAtlantic ATS & Event Operations",
+  "uid": "hackatlantic-operations",
+  "version": 1
+}

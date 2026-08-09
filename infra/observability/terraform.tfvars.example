@@ -1,0 +1,8 @@
+grafana_url                   = "https://hackatlantic.grafana.net/"
+prometheus_data_source_uid    = "grafanacloud-prom"
+discord_webhook_url           = "set-as-sensitive-workspace-variable"
+admin_alert_emails            = ["admin-alerts@hackatlantic.ca"]
+grafana_service_account_token = "set-as-sensitive-workspace-variable"
+grafana_sm_access_token        = "set-as-sensitive-workspace-variable"
+grafana_sm_url                 = "https://synthetic-monitoring-api-us-east.grafana.net"
+synthetic_probe_ids            = [1, 2]

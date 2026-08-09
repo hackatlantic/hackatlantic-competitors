@@ -1,0 +1,21 @@
+manage_cloudflare     = false
+cloudflare_account_id = null
+enable_dnssec         = false
+
+# This must be expanded to the COMPLETE current GoDaddy zone before the first
+# apply. Mail and verification records are intentionally not guessed.
+dns_records = {
+  apply = { name = "apply.hackatlantic.ca", type = "CNAME", content = "cname.vercel-dns.com", ttl = 300, proxied = false }
+  api   = { name = "api.hackatlantic.ca", type = "CNAME", content = "replace.ondigitalocean.app", ttl = 1, proxied = true }
+}
+
+vercel_production_env = {
+  NEXT_PUBLIC_API_BASE_URL          = "https://api.hackatlantic.ca"
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "replace-me"
+  CLERK_SECRET_KEY                  = "replace-me"
+}
+vercel_staging_env = {
+  NEXT_PUBLIC_API_BASE_URL          = "https://staging-api.hackatlantic.ca"
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "replace-me"
+  CLERK_SECRET_KEY                  = "replace-me"
+}

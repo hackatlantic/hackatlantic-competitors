@@ -102,6 +102,29 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+func TestVersionReportsOnlySafeBuildMetadata(t *testing.T) {
+	want := BuildInfo{
+		Version: "v1.2.3", GitSHA: "8d35c4218ffab39d15ff8136abedfcaf6f5bb49f",
+		BuiltAt: "2026-08-07T16:24:00Z", Environment: "staging",
+	}
+	handler := NewHandlerWithDependencies("test", Dependencies{Build: want})
+	request := httptest.NewRequest(http.MethodGet, "/versionz", nil)
+	response := httptest.NewRecorder()
+
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, response.Code)
+	}
+	var body BuildInfo
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body != want {
+		t.Fatalf("unexpected version metadata: got %+v want %+v", body, want)
+	}
+}
+
 func TestReadinessReportsUnavailableDependency(t *testing.T) {
 	handler := NewHandlerWithDependencies("test", Dependencies{Readiness: fakeReadiness{err: errors.New("down")}})
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)

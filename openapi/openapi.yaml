@@ -42,6 +42,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+  /versionz:
+    get:
+      operationId: getVersion
+      summary: Identify the immutable build currently serving traffic
+      description: Returns deployment metadata only. It never includes configuration or secrets.
+      tags: [System]
+      security: []
+      responses:
+        "200":
+          description: Public build metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuildInfo"
   /readyz:
     get:
       operationId: getReadiness
@@ -1579,6 +1593,24 @@ components:
         status:
           type: string
           examples: [ok]
+    BuildInfo:
+      type: object
+      additionalProperties: false
+      required: [version, gitSha, builtAt, environment]
+      properties:
+        version:
+          type: string
+          examples: [sha-8d35c42]
+        gitSha:
+          type: string
+          examples: [8d35c4218ffab39d15ff8136abedfcaf6f5bb49f]
+        builtAt:
+          type: string
+          description: RFC 3339 build timestamp or unknown for local builds.
+          examples: [2026-08-07T16:24:00Z]
+        environment:
+          type: string
+          enum: [development, test, staging, production]
     CurrentUser:
       type: object
       additionalProperties: false

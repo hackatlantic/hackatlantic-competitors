@@ -7,6 +7,9 @@ This repository is a small monorepo:
 - `app/`, `components/`, and `lib/` contain the Next.js frontend.
 - `api/` contains the Go API and database migrations.
 - `openapi/` contains the HTTP contract.
+- `infra/` contains environment-isolated Terraform and import guidance.
+- `observability/` contains versioned Grafana dashboards.
+- `.github/workflows/` contains CI, immutable release, drift, backup, and restore automation.
 - `docs/` contains the architecture and implementation handoff.
 
 Clerk authenticates applicants, admins, and scanners. The
