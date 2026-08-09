@@ -13,16 +13,49 @@ locals {
   ]
 }
 
+# Existing control-plane resources are adopted declaratively. These imports run
+# only until the objects are recorded in the HCP-backed state.
+import {
+  to = vercel_project.ats
+  id = "prj_QrGSA0JeVhyCnar90c5MkoHIWnWC"
+}
+
+import {
+  to = github_branch_protection.main
+  id = "hackatlantic-competitors:main"
+}
+
+import {
+  to = github_repository_environment.staging
+  id = "hackatlantic-competitors:staging"
+}
+
+import {
+  to = github_repository_environment.terraform_plan
+  id = "hackatlantic-competitors:terraform-plan"
+}
+
+import {
+  to = github_repository_environment.production
+  id = "hackatlantic-competitors:Production"
+}
+
+import {
+  to = github_repository_environment.disaster_recovery
+  id = "hackatlantic-competitors:disaster-recovery"
+}
+
 resource "cloudflare_zone" "hackatlantic" {
+  count   = var.manage_cloudflare ? 1 : 0
   account = { id = var.cloudflare_account_id }
   name    = "hackatlantic.ca"
   type    = "full"
 }
 
 resource "cloudflare_dns_record" "managed" {
-  for_each = var.dns_records
+  for_each = var.manage_cloudflare ? var.dns_records : {}
 
-  zone_id  = cloudflare_zone.hackatlantic.id
+  zone_id  = cloudflare_zone.hackatlantic[0].id
   name     = each.value.name
   type     = each.value.type
   content  = each.value.content
@@ -33,7 +66,8 @@ resource "cloudflare_dns_record" "managed" {
 }
 
 resource "cloudflare_zone_dnssec" "hackatlantic" {
-  zone_id = cloudflare_zone.hackatlantic.id
+  count   = var.manage_cloudflare ? 1 : 0
+  zone_id = cloudflare_zone.hackatlantic[0].id
   status  = var.enable_dnssec ? "active" : "disabled"
 }
 
@@ -124,6 +158,16 @@ resource "github_repository_environment" "terraform_plan" {
 
   reviewers {
     users = [for reviewer in data.github_user.reviewer : reviewer.id]
+  }
+}
+
+resource "github_repository_environment" "terraform_drift" {
+  repository  = local.repository
+  environment = "terraform-drift"
+
+  deployment_branch_policy {
+    protected_branches     = true
+    custom_branch_policies = false
   }
 }
 

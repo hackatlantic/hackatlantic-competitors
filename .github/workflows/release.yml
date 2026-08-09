@@ -116,6 +116,11 @@ jobs:
       TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
       TF_IN_AUTOMATION: "true"
       GH_TOKEN: ${{ github.token }}
+      TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { persist-credentials: false }
@@ -123,10 +128,21 @@ jobs:
         run: gh attestation verify "oci://ghcr.io/${IMAGE_NAME}@${{ needs.image.outputs.digest }}" --repo "$GITHUB_REPOSITORY"
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with: { terraform_version: 1.14.3 }
+      - name: Materialize protected Terraform inputs
+        shell: bash
+        working-directory: infra/environments/staging
+        run: |
+          test -n "${TF_VARS_JSON}"
+          umask 077
+          printf '%s' "${TF_VARS_JSON}" > ci.auto.tfvars.json
       - run: terraform init -input=false -backend-config=backend.hcl.example
         working-directory: infra/environments/staging
       - run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
         working-directory: infra/environments/staging
+      - if: always()
+        name: Remove protected Terraform inputs
+        working-directory: infra/environments/staging
+        run: rm -f ci.auto.tfvars.json
       - name: Verify staging deployment
         run: bash scripts/smoke-deployment.sh
         env:
@@ -183,6 +199,11 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      TF_VARS_JSON: ${{ secrets.TFVARS_PRODUCTION_JSON }}
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { persist-credentials: false }
@@ -191,6 +212,13 @@ jobs:
         run: echo "DEPLOYMENT_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with: { terraform_version: 1.14.3 }
+      - name: Materialize protected Terraform inputs
+        shell: bash
+        working-directory: infra/environments/production
+        run: |
+          test -n "${TF_VARS_JSON}"
+          umask 077
+          printf '%s' "${TF_VARS_JSON}" > ci.auto.tfvars.json
       - run: terraform init -input=false -backend-config=backend.hcl.example
         working-directory: infra/environments/production
       - id: current
@@ -205,6 +233,10 @@ jobs:
           fi
       - run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
         working-directory: infra/environments/production
+      - if: always()
+        name: Remove protected Terraform inputs
+        working-directory: infra/environments/production
+        run: rm -f ci.auto.tfvars.json
       - id: smoke
         continue-on-error: true
         run: bash scripts/smoke-deployment.sh

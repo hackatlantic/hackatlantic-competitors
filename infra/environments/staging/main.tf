@@ -1,9 +1,17 @@
+locals {
+  database_url = "postgresql://postgres.${supabase_project.database.id}:${var.supabase_database_password}@aws-0-${var.supabase_region}.pooler.supabase.com:5432/postgres?sslmode=require"
+  api_env = merge(var.api_env, {
+    DATABASE_URL  = local.database_url
+    DATABASE_ROLE = "hackatlantic_app"
+  })
+}
+
 resource "supabase_project" "database" {
   organization_id   = var.supabase_organization_id
   name              = "hackatlantic-ats-staging"
   database_password = var.supabase_database_password
   region            = var.supabase_region
-  instance_size     = "micro"
+  instance_size     = "nano"
   lifecycle { prevent_destroy = true }
 }
 
@@ -27,7 +35,7 @@ module "platform" {
   instance_size_slug     = "apps-s-1vcpu-0.5gb"
   resume_bucket_name     = "hackatlantic-resumes-staging"
   spaces_region          = var.spaces_region
-  api_env                = var.api_env
-  migration_database_url = var.migration_database_url
+  api_env                = local.api_env
+  migration_database_url = local.database_url
   alert_emails           = var.alert_emails
 }

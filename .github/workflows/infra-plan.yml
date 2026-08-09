@@ -25,15 +25,27 @@ jobs:
         include:
           - environment: global
             directory: infra/global
+            tfvars_secret: TFVARS_GLOBAL_JSON
           - environment: staging
             directory: infra/environments/staging
+            tfvars_secret: TFVARS_STAGING_JSON
           - environment: production
             directory: infra/environments/production
+            tfvars_secret: TFVARS_PRODUCTION_JSON
           - environment: observability
             directory: infra/observability
+            tfvars_secret: TFVARS_OBSERVABILITY_JSON
     env:
       TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
       TF_IN_AUTOMATION: "true"
+      TF_VARS_JSON: ${{ secrets[matrix.tfvars_secret] }}
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.TERRAFORM_GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { persist-credentials: false }
@@ -41,11 +53,32 @@ jobs:
         with: { terraform_version: 1.14.3 }
       - name: Require configured HCP credentials
         run: test -n "$TF_TOKEN_app_terraform_io"
-      - run: terraform init -input=false -backend-config=backend.hcl.example
+      - id: inputs
+        name: Materialize protected Terraform inputs
+        shell: bash
         working-directory: ${{ matrix.directory }}
-      - run: terraform plan -input=false -out=tfplan
+        run: |
+          if [[ -z "${TF_VARS_JSON}" ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ matrix.environment }} is not activated; configure ${{ matrix.tfvars_secret }} to enable its plan"
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          umask 077
+          printf '%s' "${TF_VARS_JSON}" > ci.auto.tfvars.json
+      - if: steps.inputs.outputs.configured == 'true'
+        run: terraform init -input=false -backend-config=backend.hcl.example
         working-directory: ${{ matrix.directory }}
-      - run: terraform show -json tfplan > tfplan.json
+      - if: steps.inputs.outputs.configured == 'true'
+        run: terraform plan -input=false -out=tfplan
         working-directory: ${{ matrix.directory }}
-      - name: Enforce infrastructure policy
+      - if: steps.inputs.outputs.configured == 'true'
+        run: terraform show -json tfplan > tfplan.json
+        working-directory: ${{ matrix.directory }}
+      - if: steps.inputs.outputs.configured == 'true'
+        name: Enforce infrastructure policy
         run: docker run --rm -v "$PWD:/project" openpolicyagent/conftest:v0.62.0 test "/project/${{ matrix.directory }}/tfplan.json" --policy /project/policy
+      - if: always()
+        name: Remove protected Terraform inputs
+        working-directory: ${{ matrix.directory }}
+        run: rm -f ci.auto.tfvars.json

@@ -29,6 +29,22 @@ resource "digitalocean_spaces_bucket" "backups" {
   }
 }
 
+resource "digitalocean_spaces_key" "api_resumes" {
+  name = "${var.app_name}-resumes"
+
+  grant {
+    bucket     = digitalocean_spaces_bucket.resumes.name
+    permission = "readwrite"
+  }
+}
+
+locals {
+  api_env = merge(var.api_env, {
+    SPACES_ACCESS_KEY_ID     = digitalocean_spaces_key.api_resumes.access_key
+    SPACES_SECRET_ACCESS_KEY = digitalocean_spaces_key.api_resumes.secret_key
+  })
+}
+
 resource "digitalocean_app" "api" {
   spec {
     name                            = var.app_name
@@ -75,10 +91,10 @@ resource "digitalocean_app" "api" {
       }
 
       dynamic "env" {
-        for_each = nonsensitive(toset(keys(var.api_env)))
+        for_each = nonsensitive(toset(keys(local.api_env)))
         content {
           key   = env.value
-          value = var.api_env[env.value]
+          value = local.api_env[env.value]
           scope = "RUN_TIME"
           type  = "SECRET"
         }

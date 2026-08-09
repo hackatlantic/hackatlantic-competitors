@@ -1,5 +1,6 @@
-cloudflare_account_id = "replace-me"
-enable_dnssec          = false
+manage_cloudflare     = false
+cloudflare_account_id = null
+enable_dnssec         = false
 
 # This must be expanded to the COMPLETE current GoDaddy zone before the first
 # apply. Mail and verification records are intentionally not guessed.
@@ -18,4 +19,3 @@ vercel_staging_env = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "replace-me"
   CLERK_SECRET_KEY                  = "replace-me"
 }
-

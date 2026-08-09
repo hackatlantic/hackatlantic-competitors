@@ -1,4 +1,18 @@
-variable "cloudflare_account_id" { type = string }
+variable "manage_cloudflare" {
+  description = "Enable only after the complete authoritative DNS inventory has passed parity review."
+  type        = bool
+  default     = false
+}
+variable "cloudflare_account_id" {
+  type     = string
+  default  = null
+  nullable = true
+
+  validation {
+    condition     = !var.manage_cloudflare || var.cloudflare_account_id != null
+    error_message = "cloudflare_account_id is required when manage_cloudflare is true."
+  }
+}
 variable "enable_dnssec" {
   type    = bool
   default = false
@@ -21,16 +35,19 @@ variable "dns_records" {
     proxied  = bool
     priority = optional(number)
   }))
+  default = {}
 }
 variable "vercel_production_env" {
   type      = map(string)
   sensitive = true
+  default   = {}
 }
 variable "vercel_staging_env" {
   type      = map(string)
   sensitive = true
+  default   = {}
 }
 
-output "cloudflare_nameservers" { value = cloudflare_zone.hackatlantic.name_servers }
-output "cloudflare_dnssec_ds" { value = try(cloudflare_zone_dnssec.hackatlantic.ds, null) }
+output "cloudflare_nameservers" { value = try(cloudflare_zone.hackatlantic[0].name_servers, []) }
+output "cloudflare_dnssec_ds" { value = try(cloudflare_zone_dnssec.hackatlantic[0].ds, null) }
 output "vercel_project_id" { value = vercel_project.ats.id }

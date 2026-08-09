@@ -16,10 +16,6 @@ variable "supabase_database_password" {
   type      = string
   sensitive = true
 }
-variable "migration_database_url" {
-  type      = string
-  sensitive = true
-}
 variable "api_env" {
   type      = map(string)
   sensitive = true

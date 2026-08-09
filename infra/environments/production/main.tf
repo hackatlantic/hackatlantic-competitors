@@ -1,3 +1,18 @@
+import {
+  to = supabase_project.database
+  id = "oizbfvfcownivwsrzlml"
+}
+
+import {
+  to = module.platform.digitalocean_app.api
+  id = "852abc0e-75a9-45a8-ba13-57a5bbe50017"
+}
+
+import {
+  to = module.platform.digitalocean_spaces_bucket.resumes
+  id = "tor1,hackatlantic-resumes-2026"
+}
+
 resource "supabase_project" "database" {
   organization_id   = var.supabase_organization_id
   name              = var.supabase_project_name
@@ -28,7 +43,7 @@ module "platform" {
   api_domain             = "api.hackatlantic.ca"
   image_digest           = var.api_image_digest
   instance_size_slug     = var.api_instance_size_slug
-  resume_bucket_name     = "hackatlantic-resumes"
+  resume_bucket_name     = "hackatlantic-resumes-2026"
   backup_bucket_name     = "hackatlantic-ats-backups"
   spaces_region          = var.spaces_region
   api_env                = var.api_env

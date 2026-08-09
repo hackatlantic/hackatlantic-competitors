@@ -15,36 +15,59 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
-      name: ${{ matrix.github_environment }}
+      name: terraform-drift
     strategy:
       fail-fast: false
       matrix:
         include:
           - environment: global
             directory: infra/global
-            github_environment: staging
+            tfvars_secret: TFVARS_GLOBAL_JSON
           - environment: staging
             directory: infra/environments/staging
-            github_environment: staging
+            tfvars_secret: TFVARS_STAGING_JSON
           - environment: production
             directory: infra/environments/production
-            github_environment: production
+            tfvars_secret: TFVARS_PRODUCTION_JSON
           - environment: observability
             directory: infra/observability
-            github_environment: staging
+            tfvars_secret: TFVARS_OBSERVABILITY_JSON
     env:
       TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
       TF_IN_AUTOMATION: "true"
       GH_TOKEN: ${{ github.token }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      TF_VARS_JSON: ${{ secrets[matrix.tfvars_secret] }}
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.TERRAFORM_GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { persist-credentials: false }
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
         with: { terraform_version: 1.14.3 }
-      - run: terraform init -input=false -backend-config=backend.hcl.example
+      - id: inputs
+        name: Materialize protected Terraform inputs
+        shell: bash
+        working-directory: ${{ matrix.directory }}
+        run: |
+          if [[ -z "${TF_VARS_JSON}" ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ matrix.environment }} is not activated; configure ${{ matrix.tfvars_secret }} to enable drift detection"
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          umask 077
+          printf '%s' "${TF_VARS_JSON}" > ci.auto.tfvars.json
+      - if: steps.inputs.outputs.configured == 'true'
+        run: terraform init -input=false -backend-config=backend.hcl.example
         working-directory: ${{ matrix.directory }}
       - id: plan
+        if: steps.inputs.outputs.configured == 'true'
         shell: bash
         working-directory: ${{ matrix.directory }}
         run: |
@@ -53,18 +76,22 @@ jobs:
           code=$?
           echo "exit_code=${code}" >> "$GITHUB_OUTPUT"
           [[ "$code" -ne 1 ]]
-      - if: steps.plan.outputs.exit_code == '2'
+      - if: steps.inputs.outputs.configured == 'true' && steps.plan.outputs.exit_code == '2'
         name: Open drift issue
         run: >-
           gh issue create
           --title "Infrastructure drift detected: ${{ matrix.environment }}"
           --body "The scheduled Terraform plan detected out-of-band changes. Review workflow run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID."
-      - if: steps.plan.outputs.exit_code == '2' && env.DISCORD_WEBHOOK_URL != ''
+      - if: steps.inputs.outputs.configured == 'true' && steps.plan.outputs.exit_code == '2' && env.DISCORD_WEBHOOK_URL != ''
         name: Notify Discord
         run: >-
           curl --fail-with-body
           -H 'Content-Type: application/json'
           -d '{"content":"HackAtlantic infrastructure drift detected in ${{ matrix.environment }}. Review GitHub Actions."}'
           "$DISCORD_WEBHOOK_URL"
-      - if: steps.plan.outputs.exit_code == '2'
+      - if: steps.inputs.outputs.configured == 'true' && steps.plan.outputs.exit_code == '2'
         run: exit 1
+      - if: always()
+        name: Remove protected Terraform inputs
+        working-directory: ${{ matrix.directory }}
+        run: rm -f ci.auto.tfvars.json
