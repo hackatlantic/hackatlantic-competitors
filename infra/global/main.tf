@@ -118,8 +118,14 @@ data "github_user" "reviewer" {
   username = each.value
 }
 
+data "github_repository" "ats" {
+  full_name = "hackatlantic/hackatlantic-competitors"
+}
+
 resource "github_branch_protection" "main" {
-  repository_id                   = local.repository
+  # The provider stores the repository GraphQL node ID after import. Using the
+  # immutable node ID here adopts the existing rule without a forced replacement.
+  repository_id                   = data.github_repository.ats.node_id
   pattern                         = "main"
   enforce_admins                  = true
   allows_deletions                = false
@@ -181,8 +187,10 @@ resource "github_repository_environment" "backup" {
 }
 
 resource "github_repository_environment" "production" {
-  repository          = local.repository
-  environment         = "production"
+  repository = local.repository
+  # GitHub environment names retain their original case in provider state.
+  # Preserve the existing environment so its secrets and approvals are adopted.
+  environment         = "Production"
   prevent_self_review = true
   can_admins_bypass   = false
   reviewers { users = [for reviewer in data.github_user.reviewer : reviewer.id] }
