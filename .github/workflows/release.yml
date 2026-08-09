@@ -109,6 +109,10 @@ jobs:
     needs: [image, frontend-stage]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
     environment:
       name: staging
       url: ${{ needs.frontend-stage.outputs.deployment_url }}
@@ -124,6 +128,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: { persist-credentials: false }
+      - name: Authenticate to GHCR for provenance verification
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
       - name: Verify build provenance
         run: gh attestation verify "oci://ghcr.io/${IMAGE_NAME}@${{ needs.image.outputs.digest }}" --repo "$GITHUB_REPOSITORY"
       - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
