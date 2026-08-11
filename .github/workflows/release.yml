@@ -266,7 +266,10 @@ jobs:
           fi
       - id: apply
         continue-on-error: true
-        run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
+        # Application releases must not reconcile unrelated production controls
+        # such as database sizing or alert recipients. Full infrastructure
+        # reconciliation remains a separately reviewed operator action.
+        run: terraform apply -input=false -auto-approve -target=module.platform.digitalocean_app.api -var="api_image_digest=${{ needs.image.outputs.digest }}"
         working-directory: infra/environments/production
       - if: always()
         name: Remove protected Terraform inputs
