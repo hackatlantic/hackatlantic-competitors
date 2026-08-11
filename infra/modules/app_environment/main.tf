@@ -50,7 +50,7 @@ resource "digitalocean_app" "api" {
     name                            = var.app_name
     region                          = var.region
     disable_edge_cache              = true
-    enhanced_threat_control_enabled = true
+    enhanced_threat_control_enabled = var.enhanced_threat_control_enabled
 
     domain {
       name = var.api_domain
