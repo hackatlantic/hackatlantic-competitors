@@ -264,12 +264,20 @@ jobs:
             deployment_id="$(curl --fail --silent -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" "https://api.digitalocean.com/v2/apps/${app_id}/deployments" | jq -r '.deployments[] | select(.phase == "ACTIVE") | .id' | head -n 1)"
             echo "deployment_id=${deployment_id}" >> "$GITHUB_OUTPUT"
           fi
-      - run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
+      - id: apply
+        continue-on-error: true
+        run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
         working-directory: infra/environments/production
       - if: always()
         name: Remove protected Terraform inputs
         working-directory: infra/environments/production
         run: rm -f ci.auto.tfvars.json
+      - if: steps.apply.outcome == 'failure' && steps.current.outputs.app_id != '' && steps.current.outputs.deployment_id != ''
+        name: Roll back API after failed infrastructure apply
+        run: |
+          curl --fail-with-body -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" -d '{"deployment_id":"${{ steps.current.outputs.deployment_id }}"}' "https://api.digitalocean.com/v2/apps/${{ steps.current.outputs.app_id }}/rollback"
+      - if: steps.apply.outcome == 'failure'
+        run: exit 1
       - id: smoke
         name: Verify exact production deployment
         continue-on-error: true
