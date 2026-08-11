@@ -37,16 +37,17 @@ resource "supabase_settings" "private_api" {
 module "platform" {
   source = "../../modules/app_environment"
 
-  environment            = "production"
-  app_name               = "hackatlantic-api"
-  region                 = var.digitalocean_region
-  api_domain             = "api.hackatlantic.ca"
-  image_digest           = var.api_image_digest
-  instance_size_slug     = var.api_instance_size_slug
-  resume_bucket_name     = "hackatlantic-resumes-2026"
-  backup_bucket_name     = "hackatlantic-ats-backups"
-  spaces_region          = var.spaces_region
-  api_env                = var.api_env
-  migration_database_url = var.migration_database_url
-  alert_emails           = var.alert_emails
+  environment                     = "production"
+  app_name                        = "hackatlantic-api"
+  region                          = var.digitalocean_region
+  api_domain                      = "api.hackatlantic.ca"
+  enhanced_threat_control_enabled = true
+  image_digest                    = var.api_image_digest
+  instance_size_slug              = var.api_instance_size_slug
+  resume_bucket_name              = "hackatlantic-resumes-2026"
+  backup_bucket_name              = "hackatlantic-ats-backups"
+  spaces_region                   = var.spaces_region
+  api_env                         = var.api_env
+  migration_database_url          = var.migration_database_url
+  alert_emails                    = var.alert_emails
 }

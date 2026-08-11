@@ -10,6 +10,11 @@ variable "environment" {
 variable "app_name" { type = string }
 variable "region" { type = string }
 variable "api_domain" { type = string }
+variable "enhanced_threat_control_enabled" {
+  description = "Enable DigitalOcean's browser-oriented Layer 7 threat challenge. Disable only for synthetic staging traffic."
+  type        = bool
+  default     = true
+}
 variable "image_digest" {
   type = string
   validation {
@@ -37,4 +42,3 @@ variable "alert_emails" {
   type    = list(string)
   default = []
 }
-

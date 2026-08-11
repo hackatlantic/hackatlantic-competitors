@@ -48,15 +48,16 @@ resource "supabase_settings" "private_api" {
 module "platform" {
   source = "../../modules/app_environment"
 
-  environment            = "staging"
-  app_name               = "hackatlantic-api-staging"
-  region                 = var.digitalocean_region
-  api_domain             = "staging-api.hackatlantic.ca"
-  image_digest           = var.api_image_digest
-  instance_size_slug     = "apps-s-1vcpu-0.5gb"
-  resume_bucket_name     = "hackatlantic-resumes-staging"
-  spaces_region          = var.spaces_region
-  api_env                = local.api_env
-  migration_database_url = local.database_url
-  alert_emails           = length(var.digitalocean_alert_emails) > 0 ? var.digitalocean_alert_emails : var.alert_emails
+  environment                     = "staging"
+  app_name                        = "hackatlantic-api-staging"
+  region                          = var.digitalocean_region
+  api_domain                      = "staging-api.hackatlantic.ca"
+  enhanced_threat_control_enabled = false
+  image_digest                    = var.api_image_digest
+  instance_size_slug              = "apps-s-1vcpu-0.5gb"
+  resume_bucket_name              = "hackatlantic-resumes-staging"
+  spaces_region                   = var.spaces_region
+  api_env                         = local.api_env
+  migration_database_url          = local.database_url
+  alert_emails                    = length(var.digitalocean_alert_emails) > 0 ? var.digitalocean_alert_emails : var.alert_emails
 }

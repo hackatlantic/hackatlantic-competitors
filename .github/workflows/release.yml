@@ -270,31 +270,34 @@ jobs:
           fi
       - run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
         working-directory: infra/environments/production
-      - name: Resolve production API endpoint
+      - if: always()
+        name: Remove protected Terraform inputs
+        working-directory: infra/environments/production
+        run: rm -f ci.auto.tfvars.json
+      - id: smoke
+        name: Verify exact production deployment
+        continue-on-error: true
         shell: bash
         run: |
           app_id="${{ steps.current.outputs.app_id }}"
           if [[ -z "${app_id}" ]]; then
             app_id="$(terraform -chdir=infra/environments/production output -raw api_app_id)"
           fi
-          api_url="$(
-            curl --fail --silent --show-error \
+          expected_digest="${{ needs.image.outputs.digest }}"
+          for attempt in {1..30}; do
+            app="$(curl --fail --silent --show-error \
               -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
-              "https://api.digitalocean.com/v2/apps/${app_id}" \
-              | jq -r '.app.live_url_base // empty'
-          )"
-          [[ "${api_url}" == https://* ]]
-          echo "PRODUCTION_API_URL=${api_url}" >> "$GITHUB_ENV"
-      - if: always()
-        name: Remove protected Terraform inputs
-        working-directory: infra/environments/production
-        run: rm -f ci.auto.tfvars.json
-      - id: smoke
-        continue-on-error: true
-        run: bash scripts/smoke-deployment.sh
-        env:
-          API_BASE_URL: ${{ env.PRODUCTION_API_URL }}
-          EXPECTED_GIT_SHA: ${{ github.sha }}
+              "https://api.digitalocean.com/v2/apps/${app_id}")"
+            phase="$(jq -r '.app.active_deployment.phase // empty' <<<"${app}")"
+            active_digest="$(jq -r '.app.active_deployment.spec.services[] | select(.name == "api") | .image.digest // empty' <<<"${app}")"
+            if [[ "${phase}" == "ACTIVE" && "${active_digest}" == "${expected_digest}" ]]; then
+              echo "Production is healthy on the exact staging-tested digest."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Production did not activate the expected digest within five minutes." >&2
+          exit 1
       - if: steps.smoke.outcome == 'failure' && steps.current.outputs.app_id != '' && steps.current.outputs.deployment_id != ''
         name: Roll back API
         run: |
