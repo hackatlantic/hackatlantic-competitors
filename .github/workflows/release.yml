@@ -255,7 +255,9 @@ jobs:
         shell: bash
         working-directory: infra/environments/production
         run: |
-          app_id="$(terraform output -raw api_app_id 2>/dev/null || true)"
+          app_id="$(terraform state show -no-color module.platform.digitalocean_app.api 2>/dev/null \
+            | sed -n 's/^[[:space:]]*id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
+            | head -n 1)"
           echo "app_id=${app_id}" >> "$GITHUB_OUTPUT"
           if [[ -n "${app_id}" ]]; then
             deployment_id="$(curl --fail --silent -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" "https://api.digitalocean.com/v2/apps/${app_id}/deployments" | jq -r '.deployments[] | select(.phase == "ACTIVE") | .id' | head -n 1)"
