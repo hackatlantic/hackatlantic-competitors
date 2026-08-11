@@ -153,12 +153,19 @@ jobs:
         shell: bash
         working-directory: infra/environments/staging
         run: |
-          # DigitalOcean leaves live_url empty until the first successful app
-          # deployment has fully propagated. The custom domain is declarative,
-          # stable, and is the endpoint the smoke and load gates must exercise.
-          api_url="$(terraform output -raw api_live_url 2>/dev/null || true)"
+          # Resolve the provider-owned ingress directly from DigitalOcean. It
+          # isolates release verification from custom-domain DNS propagation
+          # while still exercising the deployed App Platform service.
+          app_id="$(terraform output -raw api_app_id)"
+          api_url="$(
+            curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${DIGITALOCEAN_TOKEN}" \
+              "https://api.digitalocean.com/v2/apps/${app_id}" \
+              | jq -r '.app.live_url // empty'
+          )"
           if [[ -z "${api_url}" ]]; then
-            api_url="$(terraform output -raw api_url)"
+            echo "DigitalOcean did not return an app ingress URL" >&2
+            exit 1
           fi
           [[ "${api_url}" == https://* ]]
           echo "STAGING_API_URL=${api_url}" >> "$GITHUB_ENV"
@@ -263,6 +270,21 @@ jobs:
           fi
       - run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
         working-directory: infra/environments/production
+      - name: Resolve production API endpoint
+        shell: bash
+        run: |
+          app_id="${{ steps.current.outputs.app_id }}"
+          if [[ -z "${app_id}" ]]; then
+            app_id="$(terraform -chdir=infra/environments/production output -raw api_app_id)"
+          fi
+          api_url="$(
+            curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
+              "https://api.digitalocean.com/v2/apps/${app_id}" \
+              | jq -r '.app.live_url // empty'
+          )"
+          [[ "${api_url}" == https://* ]]
+          echo "PRODUCTION_API_URL=${api_url}" >> "$GITHUB_ENV"
       - if: always()
         name: Remove protected Terraform inputs
         working-directory: infra/environments/production
@@ -271,7 +293,7 @@ jobs:
         continue-on-error: true
         run: bash scripts/smoke-deployment.sh
         env:
-          API_BASE_URL: https://api.hackatlantic.ca
+          API_BASE_URL: ${{ env.PRODUCTION_API_URL }}
           EXPECTED_GIT_SHA: ${{ github.sha }}
       - if: steps.smoke.outcome == 'failure' && steps.current.outputs.app_id != '' && steps.current.outputs.deployment_id != ''
         name: Roll back API
