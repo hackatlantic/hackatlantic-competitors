@@ -52,6 +52,7 @@ func TestMilestoneOneFoundation(t *testing.T) {
 	}
 
 	assertSchemaBoundary(t, ctx, pool)
+	assertRuntimeDatabaseRole(t, ctx, pool)
 	creatorID := createUser(t, ctx, pool, "clerk-creator")
 	cycleID, _ := assertCycleAndFormInvariants(t, ctx, pool, creatorID)
 	assertAnswerAndPublishedFormImmutability(t, ctx, pool, creatorID, cycleID)
@@ -102,6 +103,16 @@ func disposableDatabase(t *testing.T, ctx context.Context) (*pgxpool.Pool, func(
 			createdRoles = append(createdRoles, role)
 		}
 	}
+	var runtimeRoleExists bool
+	if err := admin.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'hackatlantic_app')`).Scan(&runtimeRoleExists); err != nil {
+		admin.Close(ctx)
+		t.Fatalf("inspect runtime database role fixture: %v", err)
+	}
+	if !runtimeRoleExists {
+		// The migration creates this cluster-scoped role. Record ownership here
+		// so cleanup never removes a role that predates the disposable database.
+		createdRoles = append(createdRoles, "hackatlantic_app")
+	}
 	parsed.Path = "/" + databaseName
 	pool, err := pgxpool.New(ctx, parsed.String())
 	if err != nil {
@@ -135,7 +146,7 @@ func assertSchemaBoundary(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM ats.schema_migrations WHERE checksum IS NOT NULL`).Scan(&ledgerCount); err != nil {
 		t.Fatalf("inspect migration ledger: %v", err)
 	}
-	if atsCount != len(tables) || publicCount != 0 || ledgerCount != 11 {
+	if atsCount != len(tables) || publicCount != 0 || ledgerCount != 12 {
 		t.Fatalf("unexpected schema boundary: ats=%d public=%d checksummed=%d", atsCount, publicCount, ledgerCount)
 	}
 
@@ -186,6 +197,46 @@ func assertSchemaBoundary(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 	}
 	if err := rows.Err(); err != nil {
 		t.Fatalf("iterate Supabase roles: %v", err)
+	}
+}
+
+func assertRuntimeDatabaseRole(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	var exists, canLogin bool
+	if err := pool.QueryRow(ctx, `
+        SELECT true, rolcanlogin
+        FROM pg_catalog.pg_roles
+        WHERE rolname = 'hackatlantic_app'
+    `).Scan(&exists, &canLogin); err != nil {
+		t.Fatalf("inspect runtime database role: %v", err)
+	}
+	if !exists || canLogin {
+		t.Fatalf("unexpected runtime database role: exists=%t can_login=%t", exists, canLogin)
+	}
+
+	connection, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire runtime role test connection: %v", err)
+	}
+	defer connection.Release()
+	transaction, err := connection.Begin(ctx)
+	if err != nil {
+		t.Fatalf("begin runtime role test transaction: %v", err)
+	}
+	defer transaction.Rollback(ctx)
+	if _, err := transaction.Exec(ctx, `SET LOCAL ROLE hackatlantic_app`); err != nil {
+		t.Fatalf("assume runtime database role: %v", err)
+	}
+	var currentUser string
+	if err := transaction.QueryRow(ctx, `SELECT current_user`).Scan(&currentUser); err != nil {
+		t.Fatalf("read assumed runtime database role: %v", err)
+	}
+	if currentUser != "hackatlantic_app" {
+		t.Fatalf("unexpected assumed runtime database role %q", currentUser)
+	}
+	var userCount int
+	if err := transaction.QueryRow(ctx, `SELECT count(*) FROM ats.users`).Scan(&userCount); err != nil {
+		t.Fatalf("runtime role cannot read ATS tables: %v", err)
 	}
 }
 
