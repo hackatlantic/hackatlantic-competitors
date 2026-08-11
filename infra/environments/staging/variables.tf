@@ -21,8 +21,14 @@ variable "api_env" {
   sensitive = true
 }
 variable "alert_emails" {
-  type    = list(string)
-  default = []
+  description = "Deprecated compatibility input retained while protected TFVARS are rotated. DigitalOcean uptime alerts use digitalocean_alert_emails."
+  type        = list(string)
+  default     = []
+}
+variable "digitalocean_alert_emails" {
+  description = "Email addresses verified on the DigitalOcean account and eligible for uptime notifications."
+  type        = list(string)
+  default     = ["dacodegen@gmail.com"]
 }
 
 output "api_app_id" { value = module.platform.app_id }

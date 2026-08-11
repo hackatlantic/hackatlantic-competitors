@@ -37,5 +37,5 @@ module "platform" {
   spaces_region          = var.spaces_region
   api_env                = local.api_env
   migration_database_url = local.database_url
-  alert_emails           = var.alert_emails
+  alert_emails           = length(var.digitalocean_alert_emails) > 0 ? var.digitalocean_alert_emails : var.alert_emails
 }
