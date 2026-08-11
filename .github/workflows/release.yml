@@ -172,7 +172,7 @@ jobs:
           API_BASE_URL: ${{ env.STAGING_API_URL }}
           EXPECTED_GIT_SHA: ${{ github.sha }}
       - uses: grafana/setup-k6-action@c00053c996b4061198c9c24a00474b748abdf8b7 # v1
-      - uses: grafana/run-k6-action@fb5a163607c1bd1984f629f322f580e63899bd36 # v1
+      - uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1
         with:
           path: tests/load/smoke.js
         env:
@@ -201,7 +201,7 @@ jobs:
           echo "Scanner concurrency testing requires K6_SCANNER_USER_ID, K6_CHECKPOINT_ID, and K6_CLERK_JWT_TEMPLATE." >> "$GITHUB_STEP_SUMMARY"
       - name: Enforce scanner concurrency and latency objectives
         if: ${{ vars.K6_SCANNER_USER_ID != '' && vars.K6_CHECKPOINT_ID != '' && vars.K6_CLERK_JWT_TEMPLATE != '' }}
-        uses: grafana/run-k6-action@fb5a163607c1bd1984f629f322f580e63899bd36 # v1
+        uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1
         with:
           path: tests/load/scanner.js
         env:
