@@ -1,9 +1,23 @@
 locals {
   database_url = "postgresql://postgres.${supabase_project.database.id}:${var.supabase_database_password}@aws-0-${var.supabase_region}.pooler.supabase.com:5432/postgres?sslmode=require"
   api_env = merge(var.api_env, {
-    DATABASE_URL  = local.database_url
-    DATABASE_ROLE = "hackatlantic_app"
+    DATABASE_URL       = local.database_url
+    DATABASE_ROLE      = "hackatlantic_app"
+    QR_TOKEN_PEPPER    = random_id.qr_token_pepper.b64_std
+    CLAIM_TOKEN_PEPPER = random_id.claim_token_pepper.b64_std
   })
+}
+
+// Pass credentials must be independent standard-base64 values containing at
+// least 32 random bytes. Terraform owns the staging values so placeholder
+// tfvars cannot reach the API, while HCP Terraform keeps the values encrypted
+// and stable across deployments.
+resource "random_id" "qr_token_pepper" {
+  byte_length = 32
+}
+
+resource "random_id" "claim_token_pepper" {
+  byte_length = 32
 }
 
 // The provider created this project during the initial apply but returned an

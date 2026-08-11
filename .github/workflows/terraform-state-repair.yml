@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: "Type UNTAINT-STAGING-SUPABASE to repair the staging project state"
+        description: "Type UNTAINT-STAGING-SUPABASE or UNTAINT-STAGING-APP"
         required: true
         type: string
 
@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  untaint-staging-supabase:
-    name: Untaint staging Supabase project
+  repair-staging-taint:
+    name: Repair guarded staging taint
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
@@ -38,7 +38,15 @@ jobs:
       - name: Require explicit repair confirmation
         env:
           REPAIR_CONFIRMATION: ${{ inputs.confirmation }}
-        run: test "${REPAIR_CONFIRMATION}" = "UNTAINT-STAGING-SUPABASE"
+        shell: bash
+        run: |
+          case "${REPAIR_CONFIRMATION}" in
+            UNTAINT-STAGING-SUPABASE|UNTAINT-STAGING-APP) ;;
+            *)
+              echo "::error::Unsupported state repair confirmation"
+              exit 1
+              ;;
+          esac
       - name: Materialize protected Terraform inputs
         shell: bash
         working-directory: infra/environments/staging
@@ -51,16 +59,28 @@ jobs:
         run: terraform init -input=false -backend-config=backend.hcl.example
         working-directory: infra/environments/staging
       - name: Verify exact imported project
+        if: inputs.confirmation == 'UNTAINT-STAGING-SUPABASE'
         shell: bash
         working-directory: infra/environments/staging
         run: |
-          terraform state show -no-color supabase_project.database > project-state.txt
-          grep -Eq 'id[[:space:]]*=[[:space:]]*"ovzrhurmiwqthfgycamx"' project-state.txt
-          rm -f project-state.txt
-      - name: Remove stale taint marker
+          terraform state show -no-color supabase_project.database > resource-state.txt
+          grep -Eq 'id[[:space:]]*=[[:space:]]*"ovzrhurmiwqthfgycamx"' resource-state.txt
+      - name: Verify exact staging application
+        if: inputs.confirmation == 'UNTAINT-STAGING-APP'
+        shell: bash
+        working-directory: infra/environments/staging
+        run: |
+          terraform state show -no-color module.platform.digitalocean_app.api > resource-state.txt
+          grep -Eq 'id[[:space:]]*=[[:space:]]*"3aeb8f16-83d6-43d6-9eee-32ceeb17f26b"' resource-state.txt
+      - name: Remove stale Supabase taint marker
+        if: inputs.confirmation == 'UNTAINT-STAGING-SUPABASE'
         run: terraform untaint supabase_project.database
         working-directory: infra/environments/staging
-      - name: Verify repaired project is not planned for destruction
+      - name: Remove stale DigitalOcean App taint marker
+        if: inputs.confirmation == 'UNTAINT-STAGING-APP'
+        run: terraform untaint module.platform.digitalocean_app.api
+        working-directory: infra/environments/staging
+      - name: Verify protected staging resources are not planned for destruction
         shell: bash
         working-directory: infra/environments/staging
         run: |
@@ -68,14 +88,17 @@ jobs:
           terraform show -json tfplan > tfplan.json
           if jq -e '
             .resource_changes[]
-            | select(.address == "supabase_project.database")
+            | select(
+                .address == "supabase_project.database"
+                or .address == "module.platform.digitalocean_app.api"
+              )
             | .change.actions
             | index("delete")
           ' tfplan.json >/dev/null; then
-            echo "::error::The repaired staging Supabase project is still planned for destruction"
+            echo "::error::A protected staging resource is still planned for destruction"
             exit 1
           fi
       - if: always()
         name: Remove protected Terraform inputs and plan files
         working-directory: infra/environments/staging
-        run: rm -f ci.auto.tfvars.json project-state.txt tfplan tfplan.json
+        run: rm -f ci.auto.tfvars.json resource-state.txt tfplan tfplan.json
