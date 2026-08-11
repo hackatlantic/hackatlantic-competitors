@@ -1,0 +1,81 @@
+name: Terraform State Repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Type UNTAINT-STAGING-SUPABASE to repair the staging project state"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-state-repair
+  cancel-in-progress: false
+
+jobs:
+  untaint-staging-supabase:
+    name: Untaint staging Supabase project
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: staging
+    env:
+      TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
+      TF_IN_AUTOMATION: "true"
+      TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+      SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+      SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: { terraform_version: 1.14.3 }
+      - name: Require explicit repair confirmation
+        env:
+          REPAIR_CONFIRMATION: ${{ inputs.confirmation }}
+        run: test "${REPAIR_CONFIRMATION}" = "UNTAINT-STAGING-SUPABASE"
+      - name: Materialize protected Terraform inputs
+        shell: bash
+        working-directory: infra/environments/staging
+        run: |
+          test -n "${TF_TOKEN_app_terraform_io}"
+          test -n "${TF_VARS_JSON}"
+          umask 077
+          printf '%s' "${TF_VARS_JSON}" > ci.auto.tfvars.json
+      - name: Initialize staging workspace
+        run: terraform init -input=false -backend-config=backend.hcl.example
+        working-directory: infra/environments/staging
+      - name: Verify exact imported project
+        shell: bash
+        working-directory: infra/environments/staging
+        run: |
+          terraform state show -no-color supabase_project.database > project-state.txt
+          grep -Eq 'id[[:space:]]*=[[:space:]]*"ovzrhurmiwqthfgycamx"' project-state.txt
+          rm -f project-state.txt
+      - name: Remove stale taint marker
+        run: terraform untaint supabase_project.database
+        working-directory: infra/environments/staging
+      - name: Verify repaired project is not planned for destruction
+        shell: bash
+        working-directory: infra/environments/staging
+        run: |
+          terraform plan -input=false -out=tfplan
+          terraform show -json tfplan > tfplan.json
+          if jq -e '
+            .resource_changes[]
+            | select(.address == "supabase_project.database")
+            | .change.actions
+            | index("delete")
+          ' tfplan.json >/dev/null; then
+            echo "::error::The repaired staging Supabase project is still planned for destruction"
+            exit 1
+          fi
+      - if: always()
+        name: Remove protected Terraform inputs and plan files
+        working-directory: infra/environments/staging
+        run: rm -f ci.auto.tfvars.json project-state.txt tfplan tfplan.json

@@ -6,12 +6,19 @@ locals {
   })
 }
 
+// The provider created this project during the initial apply but returned an
+// inconsistent instance_size value before Terraform could persist it to state.
+// A declarative import adopts that existing staging project idempotently.
+import {
+  to = supabase_project.database
+  id = "ovzrhurmiwqthfgycamx"
+}
+
 resource "supabase_project" "database" {
   organization_id   = var.supabase_organization_id
   name              = "hackatlantic-ats-staging"
   database_password = var.supabase_database_password
   region            = var.supabase_region
-  instance_size     = "nano"
   lifecycle { prevent_destroy = true }
 }
 
