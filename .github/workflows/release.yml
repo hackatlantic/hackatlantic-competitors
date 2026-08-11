@@ -255,9 +255,10 @@ jobs:
         shell: bash
         working-directory: infra/environments/production
         run: |
-          app_id="$(terraform state show -no-color module.platform.digitalocean_app.api 2>/dev/null \
-            | sed -n 's/^[[:space:]]*id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' \
-            | head -n 1)"
+          app_id="$(curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
+            "https://api.digitalocean.com/v2/apps?per_page=200" \
+            | jq -er '[.apps[] | select(.spec.name == "hackatlantic-api")] | if length == 1 then .[0].id else error("expected exactly one production app") end')"
           echo "app_id=${app_id}" >> "$GITHUB_OUTPUT"
           if [[ -n "${app_id}" ]]; then
             deployment_id="$(curl --fail --silent -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" "https://api.digitalocean.com/v2/apps/${app_id}/deployments" | jq -r '.deployments[] | select(.phase == "ACTIVE") | .id' | head -n 1)"
