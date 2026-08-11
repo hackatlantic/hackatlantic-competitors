@@ -153,8 +153,14 @@ jobs:
         shell: bash
         working-directory: infra/environments/staging
         run: |
-          api_url="$(terraform output -raw api_live_url)"
-          test -n "${api_url}"
+          # DigitalOcean leaves live_url empty until the first successful app
+          # deployment has fully propagated. The custom domain is declarative,
+          # stable, and is the endpoint the smoke and load gates must exercise.
+          api_url="$(terraform output -raw api_live_url 2>/dev/null || true)"
+          if [[ -z "${api_url}" ]]; then
+            api_url="$(terraform output -raw api_url)"
+          fi
+          [[ "${api_url}" == https://* ]]
           echo "STAGING_API_URL=${api_url}" >> "$GITHUB_ENV"
       - if: always()
         name: Remove protected Terraform inputs
