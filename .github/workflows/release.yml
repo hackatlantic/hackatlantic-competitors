@@ -171,7 +171,7 @@ jobs:
         env:
           API_BASE_URL: ${{ env.STAGING_API_URL }}
           EXPECTED_GIT_SHA: ${{ github.sha }}
-      - uses: grafana/setup-k6-action@c00053c996b4061198c9c24a00474b748abdf8b7 # v1
+      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
       - uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1
         with:
           path: tests/load/smoke.js
