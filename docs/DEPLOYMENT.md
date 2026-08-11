@@ -23,8 +23,11 @@ Use two database credentials:
 When an IPv4-only host must authenticate to Supabase through the shared
 session pooler with the project `postgres` credential, set
 `DATABASE_ROLE=hackatlantic_app`. The API executes and verifies `SET ROLE` on
-every newly opened connection before it enters the pool. Grant that role only
-the `ats` schema privileges required by the API.
+every newly opened connection before it enters the pool. Migration
+`000012_runtime_database_role.sql` idempotently creates the `NOLOGIN` role,
+grants the migration owner permission to assume it, and limits it to the ATS
+schema privileges required by the API. New environments therefore require no
+manual role bootstrap before their first pre-deploy migration job.
 
 For Supabase, prefer its direct connection for migrations and for a persistent
 Go service when the host supports IPv6. On an IPv4-only host, use Supavisor
