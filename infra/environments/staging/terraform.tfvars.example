@@ -1,7 +1,7 @@
 api_image_digest          = "sha256:replace-with-64-hex-characters"
 supabase_organization_id  = "replace-me"
 supabase_database_password = "replace-me"
-alert_emails              = ["adebowale.ca@gmail.com", "swe@daxmanuel.com"]
+digitalocean_alert_emails = ["dacodegen@gmail.com"]
 
 api_env = {
   DATABASE_MAX_CONNS               = "5"
