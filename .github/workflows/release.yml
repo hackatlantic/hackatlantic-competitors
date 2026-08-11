@@ -161,7 +161,7 @@ jobs:
             curl --fail --silent --show-error \
               -H "Authorization: Bearer ${DIGITALOCEAN_TOKEN}" \
               "https://api.digitalocean.com/v2/apps/${app_id}" \
-              | jq -r '.app.live_url // empty'
+              | jq -r '.app.live_url_base // empty'
           )"
           if [[ -z "${api_url}" ]]; then
             echo "DigitalOcean did not return an app ingress URL" >&2
@@ -281,7 +281,7 @@ jobs:
             curl --fail --silent --show-error \
               -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" \
               "https://api.digitalocean.com/v2/apps/${app_id}" \
-              | jq -r '.app.live_url // empty'
+              | jq -r '.app.live_url_base // empty'
           )"
           [[ "${api_url}" == https://* ]]
           echo "PRODUCTION_API_URL=${api_url}" >> "$GITHUB_ENV"
