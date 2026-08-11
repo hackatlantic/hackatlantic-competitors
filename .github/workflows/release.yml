@@ -153,16 +153,9 @@ jobs:
         shell: bash
         working-directory: infra/environments/staging
         run: |
-          # Resolve the provider-owned ingress directly from DigitalOcean. It
-          # isolates release verification from custom-domain DNS propagation
-          # while still exercising the deployed App Platform service.
-          app_id="$(terraform output -raw api_app_id)"
-          api_url="$(
-            curl --fail --silent --show-error \
-              -H "Authorization: Bearer ${DIGITALOCEAN_TOKEN}" \
-              "https://api.digitalocean.com/v2/apps/${app_id}" \
-              | jq -r '.app.live_url_base // empty'
-          )"
+          # The provider exposes the stable .ondigitalocean.app endpoint as
+          # default_ingress even when a custom domain is marked PRIMARY.
+          api_url="$(terraform output -raw api_default_ingress)"
           if [[ -z "${api_url}" ]]; then
             echo "DigitalOcean did not return an app ingress URL" >&2
             exit 1

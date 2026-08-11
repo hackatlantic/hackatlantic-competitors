@@ -34,4 +34,5 @@ variable "digitalocean_alert_emails" {
 output "api_app_id" { value = module.platform.app_id }
 output "api_url" { value = "https://${module.platform.api_domain}" }
 output "api_live_url" { value = module.platform.api_live_url }
+output "api_default_ingress" { value = module.platform.api_default_ingress }
 output "supabase_project_ref" { value = supabase_project.database.id }
