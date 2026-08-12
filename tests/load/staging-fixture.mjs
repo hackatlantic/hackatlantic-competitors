@@ -80,12 +80,15 @@ function saveFixture(fixture) {
 }
 
 async function createIdentity(email, firstName, lastName) {
+  const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
     method: "POST",
     body: JSON.stringify({
       email_address: [email],
       first_name: firstName,
       last_name: lastName,
+      password,
+      skip_password_checks: true,
       skip_legal_checks: true,
     }),
   });
