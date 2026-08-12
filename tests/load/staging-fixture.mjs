@@ -7,6 +7,7 @@ const apiBaseURL = process.env.API_BASE_URL;
 const webBaseURL = process.env.WEB_BASE_URL;
 const clerkSecret = process.env.CLERK_SECRET_KEY;
 const databaseURL = process.env.DATABASE_URL;
+const vercelAutomationBypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
 
 function requireConfiguration() {
@@ -79,13 +80,15 @@ function saveFixture(fixture) {
 }
 
 async function createIdentity(email, firstName, lastName) {
+  const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
     method: "POST",
     body: JSON.stringify({
       email_address: [email],
       first_name: firstName,
       last_name: lastName,
-      skip_password_requirement: true,
+      password,
+      skip_password_checks: true,
       skip_legal_checks: true,
     }),
   });
@@ -93,7 +96,7 @@ async function createIdentity(email, firstName, lastName) {
 }
 
 async function browserTokens(identities) {
-  const [{ chromium }, { clerk: testingClerk, clerkSetup }] = await Promise.all([
+  const [{ chromium }, { clerk: testingClerk, clerkSetup, setupClerkTestingToken }] = await Promise.all([
     import("@playwright/test"),
     import("@clerk/testing/playwright"),
   ]);
@@ -101,17 +104,36 @@ async function browserTokens(identities) {
   const browser = await chromium.launch();
   const tokens = [];
   try {
-    const batchSize = 8;
+    const batchSize = 4;
     for (let start = 0; start < identities.length; start += batchSize) {
       const batch = identities.slice(start, start + batchSize);
       const batchTokens = await Promise.all(batch.map(async (identity) => {
         const context = await browser.newContext();
         try {
+          await setupClerkTestingToken({
+            context,
+            options: { frontendApiUrl: process.env.CLERK_FRONTEND_API_URL },
+          });
+          if (vercelAutomationBypass) {
+            const webOrigin = new URL(webBaseURL).origin;
+            await context.route(webOrigin + "/**", async (route) => {
+              await route.continue({
+                headers: {
+                  ...route.request().headers(),
+                  "x-vercel-protection-bypass": vercelAutomationBypass,
+                },
+              });
+            });
+          }
           const page = await context.newPage();
-          await page.goto(webBaseURL);
-          await testingClerk.signIn({ page, emailAddress: identity.email });
+          await page.goto(new URL("/__load-auth", webBaseURL).toString());
+          await testingClerk.signIn({
+            page,
+            emailAddress: identity.email,
+            setupClerkTestingTokenOptions: { frontendApiUrl: process.env.CLERK_FRONTEND_API_URL },
+          });
           const token = await page.evaluate(() => window.Clerk?.session?.getToken() ?? null);
-          if (!token) throw new Error("Clerk browser flow did not return a session token");
+          if (!token) throw new Error("Clerk did not issue a staging session token");
           return token;
         } finally {
           await context.close();
@@ -255,13 +277,13 @@ async function refreshScanner() {
 }
 
 async function cleanup() {
-  requireConfiguration();
   let fixture;
   try {
     fixture = loadFixture();
   } catch {
     return;
   }
+  requireConfiguration();
   const scannerClerkUserId = fixture.scanner?.scannerClerkUserId ?? fixture.identities?.[1]?.userId;
   if (scannerClerkUserId) {
     try {
