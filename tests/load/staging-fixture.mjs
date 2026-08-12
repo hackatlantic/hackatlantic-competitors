@@ -126,7 +126,22 @@ async function browserTokens(identities) {
             });
           }
           const page = await context.newPage();
-          await page.goto(new URL("/__load-auth", webBaseURL).toString());
+          const navigation = await page.goto(new URL("/__load-auth", webBaseURL).toString());
+          await page.waitForTimeout(1_000);
+          const preflight = await page.evaluate(() => ({
+            bridgeRendered: document.querySelector('[aria-label="Staging load-test authentication"]') !== null,
+            clerkDefined: window.Clerk !== undefined,
+            clerkLoaded: window.Clerk?.loaded === true,
+          }));
+          if (!preflight.bridgeRendered || !preflight.clerkDefined || !preflight.clerkLoaded) {
+            throw new Error(
+              "Staging auth bridge preflight failed: status=" + navigation?.status() +
+              " route=" + new URL(page.url()).pathname +
+              " rendered=" + preflight.bridgeRendered +
+              " clerkDefined=" + preflight.clerkDefined +
+              " clerkLoaded=" + preflight.clerkLoaded,
+            );
+          }
           await testingClerk.signIn({
             page,
             emailAddress: identity.email,
