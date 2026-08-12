@@ -4,13 +4,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 const command = process.argv[2];
 const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json";
 const apiBaseURL = process.env.API_BASE_URL;
+const webBaseURL = process.env.WEB_BASE_URL;
 const clerkSecret = process.env.CLERK_SECRET_KEY;
 const databaseURL = process.env.DATABASE_URL;
 const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
 
 function requireConfiguration() {
-  if (!apiBaseURL || !clerkSecret || !databaseURL) {
-    throw new Error("API_BASE_URL, CLERK_SECRET_KEY, and DATABASE_URL are required");
+  if (!apiBaseURL || !webBaseURL || !clerkSecret || !databaseURL) {
+    throw new Error("API_BASE_URL, WEB_BASE_URL, CLERK_SECRET_KEY, and DATABASE_URL are required");
   }
   if (!Number.isInteger(applicantCount) || applicantCount < 1 || applicantCount > 200) {
     throw new Error("K6_APPLICANT_VUS must be between 1 and 200");
@@ -105,6 +106,7 @@ async function createIdentity(email, firstName, lastName) {
 
 async function sessionTokens(identities) {
   const tokens = [];
+  const expectedAuthorizedParty = new URL(webBaseURL).origin;
   const batchSize = 8;
   for (let start = 0; start < identities.length; start += batchSize) {
     const batch = identities.slice(start, start + batchSize);
@@ -112,9 +114,17 @@ async function sessionTokens(identities) {
       const session = await clerk("/sessions", {
         method: "POST",
         body: JSON.stringify({ user_id: identity.userId }),
+        headers: { Origin: expectedAuthorizedParty },
       });
-      const token = await clerk("/sessions/" + session.id + "/tokens", { method: "POST" });
+      const token = await clerk("/sessions/" + session.id + "/tokens", {
+        method: "POST",
+        headers: { Origin: expectedAuthorizedParty },
+      });
       if (!token.jwt) throw new Error("Clerk did not issue a staging session token");
+      const payload = JSON.parse(Buffer.from(token.jwt.split(".")[1], "base64url").toString("utf8"));
+      if (payload.azp !== expectedAuthorizedParty) {
+        throw new Error("Clerk staging session token has an unexpected authorized party");
+      }
       return token.jwt;
     }));
     tokens.push(...batchTokens);
