@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"encoding/base64"
+	"testing"
+)
 
 func TestLoadClerkSettings(t *testing.T) {
 	cases := []struct {
@@ -35,6 +38,31 @@ func TestLoadClerkSettings(t *testing.T) {
 			}
 			if enabled && (settings.SecretKey == "" || settings.Issuer == "" || len(settings.AuthorizedParties) != 1) {
 				t.Fatalf("unexpected complete settings: %+v", settings)
+			}
+		})
+	}
+}
+
+func TestLoadTestAuthenticationEnvironmentGate(t *testing.T) {
+	secret := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	for _, test := range []struct {
+		name        string
+		environment string
+		secret      string
+		wantErr     bool
+	}{
+		{name: "disabled in production", environment: "production"},
+		{name: "enabled in staging", environment: "staging", secret: secret},
+		{name: "rejected in production", environment: "production", secret: secret, wantErr: true},
+		{name: "rejected in development", environment: "development", secret: secret, wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateLoadTestAuthentication(test.environment, test.secret)
+			if test.wantErr && err == nil {
+				t.Fatal("expected environment gate error")
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("unexpected environment gate error: %v", err)
 			}
 		})
 	}

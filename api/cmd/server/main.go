@@ -54,6 +54,11 @@ func main() {
 	if deploymentEnvironment == "" {
 		deploymentEnvironment = "development"
 	}
+	loadTestAuthSecret := strings.TrimSpace(os.Getenv("LOAD_TEST_AUTH_SECRET"))
+	if err := validateLoadTestAuthentication(deploymentEnvironment, loadTestAuthSecret); err != nil {
+		logger.Error("configure staging load-test authentication", "error", err)
+		os.Exit(1)
+	}
 	if configuredVersion := strings.TrimSpace(os.Getenv("APP_VERSION")); configuredVersion != "" {
 		version = configuredVersion
 	}
@@ -168,6 +173,13 @@ func main() {
 		logger.Error("configure Clerk authentication", "error", err)
 		os.Exit(1)
 	} else if verifier != nil {
+		if loadTestAuthSecret != "" {
+			verifier, err = auth.NewLoadTestVerifier(verifier, loadTestAuthSecret)
+			if err != nil {
+				logger.Error("configure staging load-test authentication", "error", err)
+				os.Exit(1)
+			}
+		}
 		dependencies.Verifier = verifier
 		dependencies.Users = resolver
 		dependencies.StaffRoles = resolver
@@ -203,6 +215,13 @@ func main() {
 		logger.Error("api shutdown failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+func validateLoadTestAuthentication(environment, secret string) error {
+	if strings.TrimSpace(secret) != "" && strings.TrimSpace(environment) != "staging" {
+		return fmt.Errorf("LOAD_TEST_AUTH_SECRET is permitted only when DEPLOYMENT_ENVIRONMENT=staging")
+	}
+	return nil
 }
 
 func loadResumeStore(getenv func(string) string) (resumes.Store, error) {

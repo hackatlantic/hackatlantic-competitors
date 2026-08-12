@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const command = process.argv[2];
@@ -6,11 +7,16 @@ const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json
 const apiBaseURL = process.env.API_BASE_URL;
 const clerkSecret = process.env.CLERK_SECRET_KEY;
 const databaseURL = process.env.DATABASE_URL;
+const loadTestAuthSecret = process.env.LOAD_TEST_AUTH_SECRET;
 const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
 
 function requireConfiguration() {
-  if (!apiBaseURL || !clerkSecret || !databaseURL) {
-    throw new Error("API_BASE_URL, CLERK_SECRET_KEY, and DATABASE_URL are required");
+  if (!apiBaseURL || !clerkSecret || !databaseURL || !loadTestAuthSecret) {
+    throw new Error("API_BASE_URL, CLERK_SECRET_KEY, DATABASE_URL, and LOAD_TEST_AUTH_SECRET are required");
+  }
+  const decodedSecret = Buffer.from(loadTestAuthSecret, "base64");
+  if (decodedSecret.length < 32 || decodedSecret.toString("base64") !== loadTestAuthSecret) {
+    throw new Error("LOAD_TEST_AUTH_SECRET must be standard base64 containing at least 32 bytes");
   }
   if (!Number.isInteger(applicantCount) || applicantCount < 1 || applicantCount > 200) {
     throw new Error("K6_APPLICANT_VUS must be between 1 and 200");
@@ -104,22 +110,13 @@ async function createIdentity(email, firstName, lastName) {
 }
 
 async function sessionTokens(identities) {
-  const tokens = [];
-  const batchSize = 8;
-  for (let start = 0; start < identities.length; start += batchSize) {
-    const batch = identities.slice(start, start + batchSize);
-    const batchTokens = await Promise.all(batch.map(async (identity) => {
-      const session = await clerk("/sessions", {
-        method: "POST",
-        body: JSON.stringify({ user_id: identity.userId }),
-      });
-      const token = await clerk("/sessions/" + session.id + "/tokens", { method: "POST" });
-      if (!token.jwt) throw new Error("Clerk did not issue a staging session token");
-      return token.jwt;
-    }));
-    tokens.push(...batchTokens);
-  }
-  return tokens;
+  const now = Math.floor(Date.now() / 1_000);
+  const secret = Buffer.from(loadTestAuthSecret, "base64");
+  return identities.map((identity) => {
+    const payload = Buffer.from(JSON.stringify({ sub: identity.userId, iat: now - 5, exp: now + 540 }));
+    const signature = createHmac("sha256", secret).update(payload).digest();
+    return "hat_load_v1." + payload.toString("base64url") + "." + signature.toString("base64url");
+  });
 }
 
 function answersFor(form, email) {

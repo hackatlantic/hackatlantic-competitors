@@ -1,10 +1,11 @@
 locals {
   database_url = "postgresql://postgres.${supabase_project.database.id}:${var.supabase_database_password}@aws-0-${var.supabase_region}.pooler.supabase.com:5432/postgres?sslmode=require"
   api_env = merge(var.api_env, {
-    DATABASE_URL       = local.database_url
-    DATABASE_ROLE      = "hackatlantic_app"
-    QR_TOKEN_PEPPER    = random_id.qr_token_pepper.b64_std
-    CLAIM_TOKEN_PEPPER = random_id.claim_token_pepper.b64_std
+    DATABASE_URL          = local.database_url
+    DATABASE_ROLE         = "hackatlantic_app"
+    QR_TOKEN_PEPPER       = random_id.qr_token_pepper.b64_std
+    CLAIM_TOKEN_PEPPER    = random_id.claim_token_pepper.b64_std
+    LOAD_TEST_AUTH_SECRET = random_id.load_test_auth_secret.b64_std
   })
 }
 
@@ -17,6 +18,10 @@ resource "random_id" "qr_token_pepper" {
 }
 
 resource "random_id" "claim_token_pepper" {
+  byte_length = 32
+}
+
+resource "random_id" "load_test_auth_secret" {
   byte_length = 32
 }
 
