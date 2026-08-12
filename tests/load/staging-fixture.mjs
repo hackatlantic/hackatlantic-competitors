@@ -4,13 +4,14 @@ import { readFileSync, writeFileSync } from "node:fs";
 const command = process.argv[2];
 const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json";
 const apiBaseURL = process.env.API_BASE_URL;
+const webBaseURL = process.env.WEB_BASE_URL;
 const clerkSecret = process.env.CLERK_SECRET_KEY;
 const databaseURL = process.env.DATABASE_URL;
 const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
 
 function requireConfiguration() {
-  if (!apiBaseURL || !clerkSecret || !databaseURL) {
-    throw new Error("API_BASE_URL, CLERK_SECRET_KEY, and DATABASE_URL are required");
+  if (!apiBaseURL || !webBaseURL || !clerkSecret || !databaseURL) {
+    throw new Error("API_BASE_URL, WEB_BASE_URL, CLERK_SECRET_KEY, and DATABASE_URL are required");
   }
   if (!Number.isInteger(applicantCount) || applicantCount < 1 || applicantCount > 200) {
     throw new Error("K6_APPLICANT_VUS must be between 1 and 200");
@@ -88,17 +89,39 @@ async function createIdentity(email, firstName, lastName) {
       skip_legal_checks: true,
     }),
   });
-  const session = await clerk("/sessions", {
-    method: "POST",
-    body: JSON.stringify({ user_id: user.id }),
-  });
-  return { userId: user.id, sessionId: session.id, email };
+  return { userId: user.id, email };
 }
 
-async function tokenFor(sessionId) {
-  const token = await clerk("/sessions/" + sessionId + "/tokens", { method: "POST", body: "{}" });
-  if (!token.jwt) throw new Error("Clerk did not return a session JWT");
-  return token.jwt;
+async function browserTokens(identities) {
+  const [{ chromium }, { clerk: testingClerk }] = await Promise.all([
+    import("@playwright/test"),
+    import("@clerk/testing/playwright"),
+  ]);
+  const browser = await chromium.launch();
+  const tokens = [];
+  try {
+    const batchSize = 8;
+    for (let start = 0; start < identities.length; start += batchSize) {
+      const batch = identities.slice(start, start + batchSize);
+      const batchTokens = await Promise.all(batch.map(async (identity) => {
+        const context = await browser.newContext();
+        try {
+          const page = await context.newPage();
+          await page.goto(webBaseURL);
+          await testingClerk.signIn({ page, emailAddress: identity.email });
+          const token = await page.evaluate(() => window.Clerk?.session?.getToken() ?? null);
+          if (!token) throw new Error("Clerk browser flow did not return a session token");
+          return token;
+        } finally {
+          await context.close();
+        }
+      }));
+      tokens.push(...batchTokens);
+    }
+  } finally {
+    await browser.close();
+  }
+  return tokens;
 }
 
 function answersFor(form, email) {
@@ -139,20 +162,18 @@ async function prepare() {
   const fixture = { runID, identities: [], applicants: [], scanner: null };
   saveFixture(fixture);
 
-  const admin = await createIdentity("loadtest+admin-" + runID + "@example.com", "Synthetic", "Admin");
+  const admin = await createIdentity("loadtest+clerk_test_admin_" + runID + "@example.com", "Synthetic", "Admin");
   fixture.identities.push(admin);
   saveFixture(fixture);
-  const scanner = await createIdentity("loadtest+scanner-" + runID + "@example.com", "Synthetic", "Scanner");
+  const scanner = await createIdentity("loadtest+clerk_test_scanner_" + runID + "@example.com", "Synthetic", "Scanner");
   fixture.identities.push(scanner);
   saveFixture(fixture);
-  const attendee = await createIdentity("loadtest+attendee-" + runID + "@example.com", "Synthetic", "Attendee");
+  const attendee = await createIdentity("loadtest+clerk_test_attendee_" + runID + "@example.com", "Synthetic", "Attendee");
   fixture.identities.push(attendee);
   saveFixture(fixture);
 
-  psql("INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
-  const adminToken = await tokenFor(admin.sessionId);
-  const scannerToken = await tokenFor(scanner.sessionId);
-  const attendeeToken = await tokenFor(attendee.sessionId);
+  psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email LIKE 'loadtest+admin-%@example.com' OR normalized_email LIKE 'loadtest+clerk_test_admin_%@example.com'; INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
+  const [adminToken, scannerToken, attendeeToken] = await browserTokens([admin, scanner, attendee]);
   await api("/v1/me", adminToken);
   const scannerUser = await api("/v1/me", scannerToken);
   await api("/v1/admin/users/" + scannerUser.id + "/roles/scanner", adminToken, { method: "PUT", body: "{}" });
@@ -190,7 +211,7 @@ async function prepare() {
   });
   fixture.scanner = {
     adminToken,
-    scannerSessionId: scanner.sessionId,
+    scannerEmail: scanner.email,
     scannerClerkUserId: scanner.userId,
     scannerUserId: scannerUser.id,
     qrToken: issuedPass.qrToken,
@@ -203,7 +224,7 @@ async function prepare() {
   for (let start = 0; start < applicantCount; start += batchSize) {
     const batch = Array.from({ length: Math.min(batchSize, applicantCount - start) }, (_, offset) => start + offset);
     const created = await Promise.all(batch.map((index) => createIdentity(
-      "loadtest+applicant-" + runID + "-" + (index + 1) + "@example.com",
+      "loadtest+clerk_test_applicant_" + runID + "_" + (index + 1) + "@example.com",
       "Synthetic",
       "Applicant " + (index + 1),
     )));
@@ -212,11 +233,12 @@ async function prepare() {
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
 
-  for (let start = 0; start < applicantCount; start += batchSize) {
-    const identities = fixture.identities.slice(3 + start, 3 + start + batchSize);
-    const tokens = await Promise.all(identities.map((identity) => tokenFor(identity.sessionId)));
-    fixture.applicants.push(...identities.map((identity, index) => ({ email: identity.email, token: tokens[index] })));
-  }
+  const applicantIdentities = fixture.identities.slice(3);
+  const applicantTokens = await browserTokens(applicantIdentities);
+  fixture.applicants.push(...applicantIdentities.map((identity, index) => ({
+    email: identity.email,
+    token: applicantTokens[index],
+  })));
   saveFixture(fixture);
   console.log("Prepared " + fixture.applicants.length + " synthetic applicants and one scanner fixture.");
 }
@@ -224,7 +246,9 @@ async function prepare() {
 async function refreshScanner() {
   requireConfiguration();
   const fixture = loadFixture();
-  fixture.scanner.token = await tokenFor(fixture.scanner.scannerSessionId);
+  const scanner = fixture.identities.find((identity) => identity.userId === fixture.scanner.scannerClerkUserId);
+  if (!scanner) throw new Error("Synthetic scanner identity is missing from the fixture");
+  [fixture.scanner.token] = await browserTokens([scanner]);
   saveFixture(fixture);
   console.log("Refreshed the synthetic scanner token.");
 }
