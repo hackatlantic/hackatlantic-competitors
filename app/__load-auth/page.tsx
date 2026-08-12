@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { LoadAuthBridge } from "@/components/load-auth-bridge";
 
 function loadAuthEnabled(): boolean {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
@@ -11,5 +12,9 @@ function loadAuthEnabled(): boolean {
 
 export default function LoadAuthPage() {
   if (!loadAuthEnabled()) notFound();
-  return <main aria-label="Staging load-test authentication" />;
+  return (
+    <main aria-label="Staging load-test authentication">
+      <LoadAuthBridge />
+    </main>
+  );
 }
