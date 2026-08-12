@@ -38,7 +38,7 @@ jobs:
         with: { node-version: 22 }
       - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
         with:
-          k6-version: v1.7.0
+          k6-version: 1.7.0
       - name: Install browser fixture dependencies
         run: |
           npm ci
