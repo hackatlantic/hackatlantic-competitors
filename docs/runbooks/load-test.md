@@ -1,22 +1,12 @@
 # Scanner load-test runbook
 
-The release pipeline runs `tests/load/smoke.js` first. The manually dispatched **Meaningful staging load test** workflow creates disposable synthetic identities, then runs a concurrent applicant submission burst and scanner redemption burst against staging. Production is never a load-test target.
+The release pipeline runs `tests/load/smoke.js` first. The manually dispatched **Meaningful staging load test** workflow creates disposable synthetic Clerk profiles, then runs a concurrent applicant submission burst and scanner redemption burst against staging. Production is never a load-test target.
 
-For an ad-hoc 100-user verification, dispatch `.github/workflows/meaningful-load-test.yml` with `concurrent_users=100`. It exercises Clerk authentication, PostgreSQL draft/submission transactions, PDF resume storage, review/decision/pass setup, QR lookup, and atomic redemption. Synthetic Clerk identities and temporary staff access are removed even when a test fails; synthetic ATS ledger records remain in staging for auditability.
+For an ad-hoc 100-user verification, dispatch `.github/workflows/meaningful-load-test.yml` with `concurrent_users=100`. It exercises API authentication, Clerk-backed profile resolution, PostgreSQL draft/submission transactions, PDF resume storage, review/decision/pass setup, QR lookup, and atomic redemption. Synthetic Clerk identities and temporary staff access are removed even when a test fails; synthetic ATS ledger records remain in staging for auditability.
 
-## One-time staging fixture
+Terraform generates `LOAD_TEST_AUTH_SECRET` only for staging. The Go API refuses to start with that setting in any other deployment environment. The workflow reads the sensitive value from HCP Terraform state and locally creates HMAC-authenticated tokens that expire within ten minutes. Normal Clerk tokens continue through the unchanged Clerk JWT verifier, and synthetic subjects still resolve against real disposable Clerk profiles. No load-test endpoint, password flow, browser session, or production bypass exists.
 
-1. Use a staging-only Clerk scanner identity and grant it the database-backed `scanner` role.
-2. Create a Clerk JWT template for load testing (recommended name: `k6-load`) with a lifetime of at least 10 minutes. Keep Clerk's required default session claims; do not add applicant data.
-3. Create a staging-only activity and checkpoint whose window covers release testing.
-4. Create and accept a synthetic applicant, issue its active pass, and grant enough checkpoint redemptions for repeated tests. Never use a real applicant or production QR token.
-5. Store the synthetic fixture as protected staging configuration:
-   - secret `K6_QR_TOKEN`
-   - variable `K6_CHECKPOINT_ID`
-   - variable `K6_SCANNER_USER_ID`
-   - variable `K6_CLERK_JWT_TEMPLATE`
-
-The preceding Playwright journey signs the scanner identity in. k6 then uses the protected Clerk backend key to mint a short-lived load-test JWT from that active session. Neither the Clerk key nor the QR token is printed.
+The workflow creates the accepted attendee, active pass, checkpoint, scanner role, and applicant identities automatically. Neither the Clerk key, staging HMAC secret, nor QR token is printed or uploaded in the sanitized result artifact.
 
 ## Local execution
 

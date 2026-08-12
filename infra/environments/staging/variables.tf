@@ -36,3 +36,7 @@ output "api_url" { value = "https://${module.platform.api_domain}" }
 output "api_live_url" { value = module.platform.api_live_url }
 output "api_default_ingress" { value = module.platform.api_default_ingress }
 output "supabase_project_ref" { value = supabase_project.database.id }
+output "load_test_auth_secret" {
+  value     = random_id.load_test_auth_secret.b64_std
+  sensitive = true
+}

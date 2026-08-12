@@ -30,6 +30,7 @@ jobs:
       K6_FIXTURE_PATH: .tmp/k6-staging-fixture.json
       K6_APPLICANT_FIXTURES: ../../.tmp/k6-staging-fixture.json
       TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
+      TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -38,6 +39,9 @@ jobs:
       - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
         with:
           k6-version: 1.7.0
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.14.3
       - name: Validate requested concurrency
         shell: bash
         run: |
@@ -55,6 +59,15 @@ jobs:
           echo "CLERK_SECRET_KEY=${clerk_secret}" >> "${GITHUB_ENV}"
           echo "DATABASE_URL=postgresql://postgres.ovzrhurmiwqthfgycamx:${database_password}@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require" >> "${GITHUB_ENV}"
           mkdir -p .tmp
+          printf '%s' "${TF_VARS_JSON}" > infra/environments/staging/ci.auto.tfvars.json
+      - name: Load staging-only synthetic identity secret
+        shell: bash
+        run: |
+          terraform -chdir=infra/environments/staging init -input=false -backend-config=backend.hcl.example
+          load_test_auth_secret="$(terraform -chdir=infra/environments/staging output -raw load_test_auth_secret)"
+          test -n "${load_test_auth_secret}"
+          echo "::add-mask::${load_test_auth_secret}"
+          echo "LOAD_TEST_AUTH_SECRET=${load_test_auth_secret}" >> "${GITHUB_ENV}"
       - name: Prepare staging-only synthetic identities and event fixture
         run: node tests/load/staging-fixture.mjs prepare
       - name: Run applicant submission burst
@@ -88,8 +101,11 @@ jobs:
             jq -r '"- Requests: \(.metrics.http_reqs.count)\n- Failure rate: \(.metrics.http_req_failed.value * 100)%\n- Overall p95: \(.metrics.http_req_duration[\"p(95)\"]) ms"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
           fi
       - name: Remove synthetic identities and temporary staff access
-        if: always()
+        if: ${{ always() && env.LOAD_TEST_AUTH_SECRET != '' }}
         run: node tests/load/staging-fixture.mjs cleanup
+      - name: Remove protected Terraform inputs
+        if: always()
+        run: rm -f infra/environments/staging/ci.auto.tfvars.json
       - name: Upload sanitized k6 summaries
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
