@@ -68,10 +68,14 @@ jobs:
       - name: Prepare staging-only synthetic identities and event fixture
         run: node tests/load/staging-fixture.mjs prepare
       - name: Run applicant submission burst
+        id: applicant_load
+        continue-on-error: true
         run: k6 run --summary-export .tmp/applicant-summary.json tests/load/applicant.js
       - name: Refresh short-lived scanner authentication
+        if: always()
         run: node tests/load/staging-fixture.mjs refresh-scanner
       - name: Export scanner fixture to k6 without logging credentials
+        if: always()
         shell: bash
         run: |
           set +x
@@ -84,6 +88,8 @@ jobs:
           echo "QR_TOKEN=${qr_token}" >> "${GITHUB_ENV}"
           echo "CHECKPOINT_ID=${checkpoint_id}" >> "${GITHUB_ENV}"
       - name: Run scanner redemption burst
+        id: scanner_load
+        continue-on-error: true
         run: k6 run --summary-export .tmp/scanner-summary.json tests/load/scanner.js
       - name: Publish concise results
         if: always()
@@ -117,3 +123,9 @@ jobs:
             .tmp/scanner-summary.json
           if-no-files-found: ignore
           retention-days: 30
+      - name: Enforce both load-test gates
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.applicant_load.outcome }}" = "success"
+          test "${{ steps.scanner_load.outcome }}" = "success"
