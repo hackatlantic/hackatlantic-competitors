@@ -79,35 +79,17 @@ function saveFixture(fixture) {
   writeFileSync(fixturePath, JSON.stringify(fixture) + "\n", { mode: 0o600 });
 }
 
-function hostedClerkSignInURL() {
-  const frontendAPI = process.env.CLERK_FRONTEND_API_URL;
-  const accountsHost = frontendAPI?.replace(/\.clerk\.accounts\.dev$/, ".accounts.dev");
-  if (!frontendAPI || accountsHost === frontendAPI) {
-    throw new Error("CLERK_FRONTEND_API_URL must identify a Clerk development instance");
-  }
-  const signInURL = new URL("https://" + accountsHost + "/sign-in");
-  signInURL.searchParams.set("redirect_url", webBaseURL);
-  return signInURL.toString();
-}
-
-function isSessionCookie(cookie) {
-  return cookie.name === "__session" || /^__session_.{8}$/.test(cookie.name);
-}
-
 async function createIdentity(email, firstName, lastName) {
-  const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
     method: "POST",
     body: JSON.stringify({
       email_address: [email],
       first_name: firstName,
       last_name: lastName,
-      password,
-      skip_password_checks: true,
       skip_legal_checks: true,
     }),
   });
-  return { userId: user.id, email, password };
+  return { userId: user.id, email };
 }
 
 async function browserTokens(identities) {
@@ -141,19 +123,22 @@ async function browserTokens(identities) {
             });
           }
           const page = await context.newPage();
-          await page.goto(hostedClerkSignInURL());
-          await page.getByLabel("Email address").fill(identity.email);
-          await page.getByRole("button", { name: "Continue", exact: true }).click();
-          await page.getByLabel("Password", { exact: true }).fill(identity.password);
-          await page.getByRole("button", { name: "Continue", exact: true }).click();
-          let session;
-          for (let attempt = 0; attempt < 60; attempt += 1) {
-            session = (await context.cookies()).find(isSessionCookie);
-            if (session?.value) break;
-            await page.waitForTimeout(500);
+          const authenticatedRequest = page.waitForRequest((request) =>
+            request.url().startsWith(apiBaseURL + "/") &&
+            request.headers().authorization?.startsWith("Bearer "),
+          );
+          const signIn = await clerk("/sign_in_tokens", {
+            method: "POST",
+            body: JSON.stringify({ user_id: identity.userId, expires_in_seconds: 60 }),
+          });
+          const appURL = new URL(webBaseURL);
+          appURL.searchParams.set("__clerk_ticket", signIn.token);
+          await page.goto(appURL.toString());
+          const authorization = (await authenticatedRequest).headers().authorization;
+          if (!authorization?.startsWith("Bearer ")) {
+            throw new Error("The staging app did not issue an authenticated API request");
           }
-          if (!session?.value) throw new Error("Clerk sign-in did not create a session cookie");
-          return session.value;
+          return authorization.slice("Bearer ".length);
         } finally {
           await context.close();
         }
