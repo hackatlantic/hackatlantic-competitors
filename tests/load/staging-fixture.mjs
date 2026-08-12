@@ -79,6 +79,17 @@ function saveFixture(fixture) {
   writeFileSync(fixturePath, JSON.stringify(fixture) + "\n", { mode: 0o600 });
 }
 
+function clerkHostedSignInURL(ticket) {
+  const accountsHost = process.env.CLERK_FRONTEND_API_URL?.replace(/\.clerk\.accounts\.dev$/, ".accounts.dev");
+  if (!accountsHost || accountsHost === process.env.CLERK_FRONTEND_API_URL) {
+    throw new Error("CLERK_FRONTEND_API_URL must identify a Clerk development instance");
+  }
+  const signInURL = new URL("https://" + accountsHost + "/sign-in");
+  signInURL.searchParams.set("__clerk_ticket", ticket);
+  signInURL.searchParams.set("redirect_url", webBaseURL);
+  return signInURL.toString();
+}
+
 async function createIdentity(email, firstName, lastName) {
   const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
@@ -134,9 +145,7 @@ async function browserTokens(identities) {
             method: "POST",
             body: JSON.stringify({ user_id: identity.userId, expires_in_seconds: 60 }),
           });
-          const appURL = new URL(webBaseURL);
-          appURL.searchParams.set("__clerk_ticket", signIn.token);
-          await page.goto(appURL.toString());
+          await page.goto(clerkHostedSignInURL(signIn.token));
           const authorization = (await authenticatedRequest).headers().authorization;
           if (!authorization?.startsWith("Bearer ")) {
             throw new Error("The staging app did not issue an authenticated API request");
