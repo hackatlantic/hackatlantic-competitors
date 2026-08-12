@@ -121,6 +121,7 @@ async function browserTokens(identities) {
                 headers: {
                   ...route.request().headers(),
                   "x-vercel-protection-bypass": vercelAutomationBypass,
+                  "x-vercel-set-bypass-cookie": "true",
                 },
               });
             });
