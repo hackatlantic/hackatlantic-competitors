@@ -79,17 +79,6 @@ function saveFixture(fixture) {
   writeFileSync(fixturePath, JSON.stringify(fixture) + "\n", { mode: 0o600 });
 }
 
-function clerkHostedSignInURL(ticket) {
-  const accountsHost = process.env.CLERK_FRONTEND_API_URL?.replace(/\.clerk\.accounts\.dev$/, ".accounts.dev");
-  if (!accountsHost || accountsHost === process.env.CLERK_FRONTEND_API_URL) {
-    throw new Error("CLERK_FRONTEND_API_URL must identify a Clerk development instance");
-  }
-  const signInURL = new URL("https://" + accountsHost + "/sign-in");
-  signInURL.searchParams.set("__clerk_ticket", ticket);
-  signInURL.searchParams.set("redirect_url", webBaseURL);
-  return signInURL.toString();
-}
-
 async function createIdentity(email, firstName, lastName) {
   const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
@@ -107,7 +96,7 @@ async function createIdentity(email, firstName, lastName) {
 }
 
 async function browserTokens(identities) {
-  const [{ chromium }, { clerkSetup, setupClerkTestingToken }] = await Promise.all([
+  const [{ chromium }, { clerk: testingClerk, clerkSetup, setupClerkTestingToken }] = await Promise.all([
     import("@playwright/test"),
     import("@clerk/testing/playwright"),
   ]);
@@ -115,7 +104,7 @@ async function browserTokens(identities) {
   const browser = await chromium.launch();
   const tokens = [];
   try {
-    const batchSize = 8;
+    const batchSize = 4;
     for (let start = 0; start < identities.length; start += batchSize) {
       const batch = identities.slice(start, start + batchSize);
       const batchTokens = await Promise.all(batch.map(async (identity) => {
@@ -137,20 +126,15 @@ async function browserTokens(identities) {
             });
           }
           const page = await context.newPage();
-          const authenticatedRequest = page.waitForRequest((request) =>
-            request.url().startsWith(apiBaseURL + "/") &&
-            request.headers().authorization?.startsWith("Bearer "),
-          );
-          const signIn = await clerk("/sign_in_tokens", {
-            method: "POST",
-            body: JSON.stringify({ user_id: identity.userId, expires_in_seconds: 60 }),
+          await page.goto(webBaseURL);
+          await testingClerk.signIn({
+            page,
+            emailAddress: identity.email,
+            setupClerkTestingTokenOptions: { frontendApiUrl: process.env.CLERK_FRONTEND_API_URL },
           });
-          await page.goto(clerkHostedSignInURL(signIn.token));
-          const authorization = (await authenticatedRequest).headers().authorization;
-          if (!authorization?.startsWith("Bearer ")) {
-            throw new Error("The staging app did not issue an authenticated API request");
-          }
-          return authorization.slice("Bearer ".length);
+          const token = await page.evaluate(() => window.Clerk?.session?.getToken() ?? null);
+          if (!token) throw new Error("Clerk did not issue a staging session token");
+          return token;
         } finally {
           await context.close();
         }
