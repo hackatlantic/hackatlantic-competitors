@@ -7,6 +7,7 @@ const apiBaseURL = process.env.API_BASE_URL;
 const webBaseURL = process.env.WEB_BASE_URL;
 const clerkSecret = process.env.CLERK_SECRET_KEY;
 const databaseURL = process.env.DATABASE_URL;
+const vercelAutomationBypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
 
 function requireConfiguration() {
@@ -107,6 +108,17 @@ async function browserTokens(identities) {
       const batchTokens = await Promise.all(batch.map(async (identity) => {
         const context = await browser.newContext();
         try {
+          if (vercelAutomationBypass) {
+            const webOrigin = new URL(webBaseURL).origin;
+            await context.route(webOrigin + "/**", async (route) => {
+              await route.continue({
+                headers: {
+                  ...route.request().headers(),
+                  "x-vercel-protection-bypass": vercelAutomationBypass,
+                },
+              });
+            });
+          }
           const page = await context.newPage();
           await page.goto(webBaseURL);
           await testingClerk.signIn({ page, emailAddress: identity.email });

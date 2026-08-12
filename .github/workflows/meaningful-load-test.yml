@@ -30,6 +30,7 @@ jobs:
       K6_FIXTURE_PATH: .tmp/k6-staging-fixture.json
       K6_APPLICANT_FIXTURES: ../../.tmp/k6-staging-fixture.json
       TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
