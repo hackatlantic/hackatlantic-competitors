@@ -281,13 +281,13 @@ async function refreshScanner() {
 }
 
 async function cleanup() {
-  requireConfiguration();
   let fixture;
   try {
     fixture = loadFixture();
   } catch {
     return;
   }
+  requireConfiguration();
   const scannerClerkUserId = fixture.scanner?.scannerClerkUserId ?? fixture.identities?.[1]?.userId;
   if (scannerClerkUserId) {
     try {
