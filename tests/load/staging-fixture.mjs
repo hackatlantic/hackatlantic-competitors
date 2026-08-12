@@ -90,6 +90,10 @@ function hostedClerkSignInURL() {
   return signInURL.toString();
 }
 
+function isSessionCookie(cookie) {
+  return cookie.name === "__session" || /^__session_.{8}$/.test(cookie.name);
+}
+
 async function createIdentity(email, firstName, lastName) {
   const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
@@ -144,7 +148,7 @@ async function browserTokens(identities) {
           await page.getByRole("button", { name: "Continue", exact: true }).click();
           let session;
           for (let attempt = 0; attempt < 60; attempt += 1) {
-            session = (await context.cookies()).find((cookie) => cookie.name === "__session");
+            session = (await context.cookies()).find(isSessionCookie);
             if (session?.value) break;
             await page.waitForTimeout(500);
           }
