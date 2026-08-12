@@ -52,11 +52,8 @@ jobs:
         run: |
           set +x
           test -n "${TF_VARS_JSON}"
-          clerk_secret="$(jq -er '.api_env.CLERK_SECRET_KEY' <<<"${TF_VARS_JSON}")"
           database_password="$(jq -er '.supabase_database_password' <<<"${TF_VARS_JSON}")"
-          echo "::add-mask::${clerk_secret}"
           echo "::add-mask::${database_password}"
-          echo "CLERK_SECRET_KEY=${clerk_secret}" >> "${GITHUB_ENV}"
           echo "DATABASE_URL=postgresql://postgres.ovzrhurmiwqthfgycamx:${database_password}@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require" >> "${GITHUB_ENV}"
           mkdir -p .tmp
           printf '%s' "${TF_VARS_JSON}" > infra/environments/staging/ci.auto.tfvars.json
@@ -94,11 +91,15 @@ jobs:
         run: |
           if [[ -f .tmp/applicant-summary.json ]]; then
             echo "### Applicant submission burst" >> "${GITHUB_STEP_SUMMARY}"
-            jq -r '"- Requests: \(.metrics.http_reqs.count)\n- Failure rate: \(.metrics.http_req_failed.value * 100)%\n- Overall p95: \(.metrics.http_req_duration[\"p(95)\"]) ms"' .tmp/applicant-summary.json >> "${GITHUB_STEP_SUMMARY}"
+            jq -r '.metrics.http_reqs.count | "- Requests: \(.)"' .tmp/applicant-summary.json >> "${GITHUB_STEP_SUMMARY}"
+            jq -r '.metrics.http_req_failed.value * 100 | "- Failure rate: \(.)%"' .tmp/applicant-summary.json >> "${GITHUB_STEP_SUMMARY}"
+            jq -r '.metrics.http_req_duration["p(95)"] | "- Overall p95: \(.) ms"' .tmp/applicant-summary.json >> "${GITHUB_STEP_SUMMARY}"
           fi
           if [[ -f .tmp/scanner-summary.json ]]; then
             echo "### Scanner redemption burst" >> "${GITHUB_STEP_SUMMARY}"
-            jq -r '"- Requests: \(.metrics.http_reqs.count)\n- Failure rate: \(.metrics.http_req_failed.value * 100)%\n- Overall p95: \(.metrics.http_req_duration[\"p(95)\"]) ms"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
+            jq -r '.metrics.http_reqs.count | "- Requests: \(.)"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
+            jq -r '.metrics.http_req_failed.value * 100 | "- Failure rate: \(.)%"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
+            jq -r '.metrics.http_req_duration["p(95)"] | "- Overall p95: \(.) ms"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
           fi
       - name: Remove synthetic identities and temporary staff access
         if: ${{ always() && env.LOAD_TEST_AUTH_SECRET != '' }}

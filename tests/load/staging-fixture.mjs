@@ -5,14 +5,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 const command = process.argv[2];
 const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json";
 const apiBaseURL = process.env.API_BASE_URL;
-const clerkSecret = process.env.CLERK_SECRET_KEY;
 const databaseURL = process.env.DATABASE_URL;
 const loadTestAuthSecret = process.env.LOAD_TEST_AUTH_SECRET;
 const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
 
 function requireConfiguration() {
-  if (!apiBaseURL || !clerkSecret || !databaseURL || !loadTestAuthSecret) {
-    throw new Error("API_BASE_URL, CLERK_SECRET_KEY, DATABASE_URL, and LOAD_TEST_AUTH_SECRET are required");
+  if (!apiBaseURL || !databaseURL || !loadTestAuthSecret) {
+    throw new Error("API_BASE_URL, DATABASE_URL, and LOAD_TEST_AUTH_SECRET are required");
   }
   const decodedSecret = Buffer.from(loadTestAuthSecret, "base64");
   if (decodedSecret.length < 32 || decodedSecret.toString("base64") !== loadTestAuthSecret) {
@@ -21,29 +20,6 @@ function requireConfiguration() {
   if (!Number.isInteger(applicantCount) || applicantCount < 1 || applicantCount > 200) {
     throw new Error("K6_APPLICANT_VUS must be between 1 and 200");
   }
-}
-
-async function clerk(path, options = {}) {
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    const response = await fetch("https://api.clerk.com/v1" + path, {
-      ...options,
-      headers: {
-        Authorization: "Bearer " + clerkSecret,
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
-    });
-    if (response.ok) return response.json();
-    if (attempt === 5 || (response.status !== 429 && response.status < 500)) {
-      throw new Error("Clerk " + path + " failed with " + response.status);
-    }
-    const retryAfter = Number(response.headers.get("retry-after"));
-    const delay = Number.isFinite(retryAfter) && retryAfter > 0
-      ? retryAfter * 1_000
-      : Math.min(250 * (2 ** (attempt - 1)), 4_000);
-    await new Promise((resolve) => setTimeout(resolve, delay));
-  }
-  throw new Error("Clerk request retry budget exhausted");
 }
 
 async function api(path, token, options = {}) {
@@ -142,20 +118,11 @@ WHERE cycle.active
 `, { admin_clerk_user_id: adminClerkUserID, run_id: runID });
 }
 
-async function createIdentity(email, firstName, lastName) {
-  const password = "Load!" + crypto.randomUUID() + "Aa9";
-  const user = await clerk("/users", {
-    method: "POST",
-    body: JSON.stringify({
-      email_address: [email],
-      first_name: firstName,
-      last_name: lastName,
-      password,
-      skip_password_checks: true,
-      skip_legal_checks: true,
-    }),
-  });
-  return { userId: user.id, email };
+function createIdentity(runID, role, sequence = 0) {
+  const normalizedRunID = runID.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+  const suffix = sequence > 0 ? "_" + sequence : "";
+  const userId = "hat_load_" + normalizedRunID + "_" + role + suffix;
+  return { userId, email: userId + "@loadtest.invalid" };
 }
 
 async function sessionTokens(identities) {
@@ -206,17 +173,17 @@ async function prepare() {
   const fixture = { runID, identities: [], applicants: [], scanner: null };
   saveFixture(fixture);
 
-  const admin = await createIdentity("loadtest+clerk_test_admin_" + runID + "@example.com", "Synthetic", "Admin");
+  const admin = createIdentity(runID, "admin");
   fixture.identities.push(admin);
   saveFixture(fixture);
-  const scanner = await createIdentity("loadtest+clerk_test_scanner_" + runID + "@example.com", "Synthetic", "Scanner");
+  const scanner = createIdentity(runID, "scanner");
   fixture.identities.push(scanner);
   saveFixture(fixture);
-  const attendee = await createIdentity("loadtest+clerk_test_attendee_" + runID + "@example.com", "Synthetic", "Attendee");
+  const attendee = createIdentity(runID, "attendee");
   fixture.identities.push(attendee);
   saveFixture(fixture);
 
-  psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email LIKE 'loadtest+admin-%@example.com' OR normalized_email LIKE 'loadtest+clerk_test_admin_%@example.com'; INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
+  psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email LIKE 'hat_load_%@loadtest.invalid'; INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
   const [adminToken, scannerToken, attendeeToken] = await sessionTokens([admin, scanner, attendee]);
   await api("/v1/me", adminToken);
   ensureOpenApplicationForm(admin.userId, runID);
@@ -268,14 +235,9 @@ async function prepare() {
   const batchSize = 8;
   for (let start = 0; start < applicantCount; start += batchSize) {
     const batch = Array.from({ length: Math.min(batchSize, applicantCount - start) }, (_, offset) => start + offset);
-    const created = await Promise.all(batch.map((index) => createIdentity(
-      "loadtest+clerk_test_applicant_" + runID + "_" + (index + 1) + "@example.com",
-      "Synthetic",
-      "Applicant " + (index + 1),
-    )));
+    const created = batch.map((index) => createIdentity(runID, "applicant", index + 1));
     fixture.identities.push(...created);
     saveFixture(fixture);
-    await new Promise((resolve) => setTimeout(resolve, 300));
   }
 
   const applicantIdentities = fixture.identities.slice(3);
@@ -324,13 +286,7 @@ async function cleanup() {
       console.warn("Could not remove the temporary admin allowlist entry; manual staging cleanup is required.");
     }
   }
-  const batchSize = 8;
-  for (let start = 0; start < fixture.identities.length; start += batchSize) {
-    await Promise.all(fixture.identities.slice(start, start + batchSize).map((identity) =>
-      clerk("/users/" + identity.userId, { method: "DELETE" }).catch(() => undefined),
-    ));
-  }
-  console.log("Deleted " + fixture.identities.length + " synthetic Clerk identities and removed temporary staff access.");
+  console.log("Removed temporary staff access for " + fixture.identities.length + " staging-local synthetic identities.");
 }
 
 if (command === "prepare") await prepare();
