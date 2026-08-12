@@ -93,10 +93,11 @@ async function createIdentity(email, firstName, lastName) {
 }
 
 async function browserTokens(identities) {
-  const [{ chromium }, { clerk: testingClerk }] = await Promise.all([
+  const [{ chromium }, { clerk: testingClerk, clerkSetup }] = await Promise.all([
     import("@playwright/test"),
     import("@clerk/testing/playwright"),
   ]);
+  await clerkSetup({ frontendApiUrl: process.env.CLERK_FRONTEND_API_URL });
   const browser = await chromium.launch();
   const tokens = [];
   try {
