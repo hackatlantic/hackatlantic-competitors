@@ -93,6 +93,55 @@ function saveFixture(fixture) {
   writeFileSync(fixturePath, JSON.stringify(fixture) + "\n", { mode: 0o600 });
 }
 
+function ensureOpenApplicationForm(adminClerkUserID, runID) {
+  psql(`
+INSERT INTO ats.application_cycles (
+  slug,
+  name,
+  applications_open_at,
+  applications_close_at,
+  active
+)
+SELECT
+  'load-test-' || :'run_id',
+  'Synthetic load-test cycle',
+  CURRENT_TIMESTAMP - INTERVAL '1 day',
+  CURRENT_TIMESTAMP + INTERVAL '30 days',
+  true
+WHERE NOT EXISTS (SELECT 1 FROM ats.application_cycles WHERE active);
+
+UPDATE ats.application_cycles
+SET applications_open_at = CURRENT_TIMESTAMP - INTERVAL '1 day',
+    applications_close_at = CURRENT_TIMESTAMP + INTERVAL '30 days',
+    updated_at = CURRENT_TIMESTAMP
+WHERE active
+  AND NOT (applications_open_at <= CURRENT_TIMESTAMP AND CURRENT_TIMESTAMP < applications_close_at);
+
+INSERT INTO ats.application_forms (
+  cycle_id,
+  version,
+  schema_json,
+  published_at,
+  created_by
+)
+SELECT
+  cycle.id,
+  COALESCE((SELECT MAX(existing.version) + 1 FROM ats.application_forms AS existing WHERE existing.cycle_id = cycle.id), 1),
+  '{"resumeRequired":true,"questions":[{"key":"full_name","label":"Full name","type":"string","required":true},{"key":"email","label":"Email","type":"string","required":true},{"key":"school","label":"School","type":"string","required":true}]}'::jsonb,
+  CURRENT_TIMESTAMP,
+  creator.id
+FROM ats.application_cycles AS cycle
+JOIN ats.users AS creator ON creator.clerk_user_id = :'admin_clerk_user_id'
+WHERE cycle.active
+  AND NOT EXISTS (
+    SELECT 1
+    FROM ats.application_forms AS published
+    WHERE published.cycle_id = cycle.id
+      AND published.published_at IS NOT NULL
+  );
+`, { admin_clerk_user_id: adminClerkUserID, run_id: runID });
+}
+
 async function createIdentity(email, firstName, lastName) {
   const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
@@ -170,6 +219,7 @@ async function prepare() {
   psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email LIKE 'loadtest+admin-%@example.com' OR normalized_email LIKE 'loadtest+clerk_test_admin_%@example.com'; INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
   const [adminToken, scannerToken, attendeeToken] = await sessionTokens([admin, scanner, attendee]);
   await api("/v1/me", adminToken);
+  ensureOpenApplicationForm(admin.userId, runID);
   const scannerUser = await api("/v1/me", scannerToken);
   await api("/v1/admin/users/" + scannerUser.id + "/roles/scanner", adminToken, { method: "PUT", body: "{}" });
   await api("/v1/me", attendeeToken);
