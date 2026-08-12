@@ -62,8 +62,11 @@ function databaseEnvironment() {
 function psql(sql, variables = {}) {
   const args = ["-v", "ON_ERROR_STOP=1", "-q"];
   for (const [name, value] of Object.entries(variables)) args.push("-v", name + "=" + value);
-  args.push("-c", sql);
-  execFileSync("psql", args, { env: databaseEnvironment(), stdio: ["ignore", "ignore", "pipe"] });
+  execFileSync("psql", args, {
+    env: databaseEnvironment(),
+    input: sql + "\n",
+    stdio: ["pipe", "ignore", "pipe"],
+  });
 }
 
 function loadFixture() {
