@@ -126,7 +126,7 @@ async function browserTokens(identities) {
             });
           }
           const page = await context.newPage();
-          await page.goto(webBaseURL);
+          await page.goto(new URL("/__load-auth", webBaseURL).toString());
           await testingClerk.signIn({
             page,
             emailAddress: identity.email,
