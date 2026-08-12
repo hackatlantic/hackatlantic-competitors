@@ -30,7 +30,6 @@ jobs:
       K6_FIXTURE_PATH: .tmp/k6-staging-fixture.json
       K6_APPLICANT_FIXTURES: ../../.tmp/k6-staging-fixture.json
       TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
-      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -39,10 +38,6 @@ jobs:
       - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
         with:
           k6-version: 1.7.0
-      - name: Install browser fixture dependencies
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
       - name: Validate requested concurrency
         shell: bash
         run: |
@@ -55,16 +50,10 @@ jobs:
           test -n "${TF_VARS_JSON}"
           clerk_secret="$(jq -er '.api_env.CLERK_SECRET_KEY' <<<"${TF_VARS_JSON}")"
           database_password="$(jq -er '.supabase_database_password' <<<"${TF_VARS_JSON}")"
-          web_base_url="$(jq -er '.api_env.APP_BASE_URL' <<<"${TF_VARS_JSON}")"
-          clerk_frontend_api_url="$(jq -er '.api_env.CLERK_ISSUER_URL' <<<"${TF_VARS_JSON}" | sed -E 's#^https?://##; s#/$##')"
-          clerk_publishable_key="pk_test_$(printf '%s$' "${clerk_frontend_api_url}" | base64 -w 0)"
           echo "::add-mask::${clerk_secret}"
           echo "::add-mask::${database_password}"
           echo "CLERK_SECRET_KEY=${clerk_secret}" >> "${GITHUB_ENV}"
-          echo "CLERK_PUBLISHABLE_KEY=${clerk_publishable_key}" >> "${GITHUB_ENV}"
           echo "DATABASE_URL=postgresql://postgres.ovzrhurmiwqthfgycamx:${database_password}@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require" >> "${GITHUB_ENV}"
-          echo "WEB_BASE_URL=${web_base_url}" >> "${GITHUB_ENV}"
-          echo "CLERK_FRONTEND_API_URL=${clerk_frontend_api_url}" >> "${GITHUB_ENV}"
           mkdir -p .tmp
       - name: Prepare staging-only synthetic identities and event fixture
         run: node tests/load/staging-fixture.mjs prepare

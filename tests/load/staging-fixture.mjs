@@ -4,15 +4,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 const command = process.argv[2];
 const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json";
 const apiBaseURL = process.env.API_BASE_URL;
-const webBaseURL = process.env.WEB_BASE_URL;
 const clerkSecret = process.env.CLERK_SECRET_KEY;
 const databaseURL = process.env.DATABASE_URL;
-const vercelAutomationBypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
 
 function requireConfiguration() {
-  if (!apiBaseURL || !webBaseURL || !clerkSecret || !databaseURL) {
-    throw new Error("API_BASE_URL, WEB_BASE_URL, CLERK_SECRET_KEY, and DATABASE_URL are required");
+  if (!apiBaseURL || !clerkSecret || !databaseURL) {
+    throw new Error("API_BASE_URL, CLERK_SECRET_KEY, and DATABASE_URL are required");
   }
   if (!Number.isInteger(applicantCount) || applicantCount < 1 || applicantCount > 200) {
     throw new Error("K6_APPLICANT_VUS must be between 1 and 200");
@@ -20,16 +18,26 @@ function requireConfiguration() {
 }
 
 async function clerk(path, options = {}) {
-  const response = await fetch("https://api.clerk.com/v1" + path, {
-    ...options,
-    headers: {
-      Authorization: "Bearer " + clerkSecret,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-  if (!response.ok) throw new Error("Clerk " + path + " failed with " + response.status);
-  return response.json();
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const response = await fetch("https://api.clerk.com/v1" + path, {
+      ...options,
+      headers: {
+        Authorization: "Bearer " + clerkSecret,
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+    if (response.ok) return response.json();
+    if (attempt === 5 || (response.status !== 429 && response.status < 500)) {
+      throw new Error("Clerk " + path + " failed with " + response.status);
+    }
+    const retryAfter = Number(response.headers.get("retry-after"));
+    const delay = Number.isFinite(retryAfter) && retryAfter > 0
+      ? retryAfter * 1_000
+      : Math.min(250 * (2 ** (attempt - 1)), 4_000);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+  throw new Error("Clerk request retry budget exhausted");
 }
 
 async function api(path, token, options = {}) {
@@ -95,70 +103,21 @@ async function createIdentity(email, firstName, lastName) {
   return { userId: user.id, email };
 }
 
-async function browserTokens(identities) {
-  const [{ chromium }, { clerk: testingClerk, clerkSetup, setupClerkTestingToken }] = await Promise.all([
-    import("@playwright/test"),
-    import("@clerk/testing/playwright"),
-  ]);
-  await clerkSetup({ frontendApiUrl: process.env.CLERK_FRONTEND_API_URL });
-  const browser = await chromium.launch();
+async function sessionTokens(identities) {
   const tokens = [];
-  try {
-    const batchSize = 4;
-    for (let start = 0; start < identities.length; start += batchSize) {
-      const batch = identities.slice(start, start + batchSize);
-      const batchTokens = await Promise.all(batch.map(async (identity) => {
-        const context = await browser.newContext();
-        try {
-          await setupClerkTestingToken({
-            context,
-            options: { frontendApiUrl: process.env.CLERK_FRONTEND_API_URL },
-          });
-          if (vercelAutomationBypass) {
-            const webOrigin = new URL(webBaseURL).origin;
-            await context.route(webOrigin + "/**", async (route) => {
-              await route.continue({
-                headers: {
-                  ...route.request().headers(),
-                  "x-vercel-protection-bypass": vercelAutomationBypass,
-                  "x-vercel-set-bypass-cookie": "true",
-                },
-              });
-            });
-          }
-          const page = await context.newPage();
-          const navigation = await page.goto(new URL("/__load-auth", webBaseURL).toString());
-          await page.waitForTimeout(1_000);
-          const preflight = await page.evaluate(() => ({
-            bridgeRendered: document.querySelector('[aria-label="Staging load-test authentication"]') !== null,
-            clerkDefined: window.Clerk !== undefined,
-            clerkLoaded: window.Clerk?.loaded === true,
-          }));
-          if (!preflight.bridgeRendered || !preflight.clerkDefined || !preflight.clerkLoaded) {
-            throw new Error(
-              "Staging auth bridge preflight failed: status=" + navigation?.status() +
-              " route=" + new URL(page.url()).pathname +
-              " rendered=" + preflight.bridgeRendered +
-              " clerkDefined=" + preflight.clerkDefined +
-              " clerkLoaded=" + preflight.clerkLoaded,
-            );
-          }
-          await testingClerk.signIn({
-            page,
-            emailAddress: identity.email,
-            setupClerkTestingTokenOptions: { frontendApiUrl: process.env.CLERK_FRONTEND_API_URL },
-          });
-          const token = await page.evaluate(() => window.Clerk?.session?.getToken() ?? null);
-          if (!token) throw new Error("Clerk did not issue a staging session token");
-          return token;
-        } finally {
-          await context.close();
-        }
-      }));
-      tokens.push(...batchTokens);
-    }
-  } finally {
-    await browser.close();
+  const batchSize = 8;
+  for (let start = 0; start < identities.length; start += batchSize) {
+    const batch = identities.slice(start, start + batchSize);
+    const batchTokens = await Promise.all(batch.map(async (identity) => {
+      const session = await clerk("/sessions", {
+        method: "POST",
+        body: JSON.stringify({ user_id: identity.userId }),
+      });
+      const token = await clerk("/sessions/" + session.id + "/tokens", { method: "POST" });
+      if (!token.jwt) throw new Error("Clerk did not issue a staging session token");
+      return token.jwt;
+    }));
+    tokens.push(...batchTokens);
   }
   return tokens;
 }
@@ -212,7 +171,7 @@ async function prepare() {
   saveFixture(fixture);
 
   psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email LIKE 'loadtest+admin-%@example.com' OR normalized_email LIKE 'loadtest+clerk_test_admin_%@example.com'; INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
-  const [adminToken, scannerToken, attendeeToken] = await browserTokens([admin, scanner, attendee]);
+  const [adminToken, scannerToken, attendeeToken] = await sessionTokens([admin, scanner, attendee]);
   await api("/v1/me", adminToken);
   const scannerUser = await api("/v1/me", scannerToken);
   await api("/v1/admin/users/" + scannerUser.id + "/roles/scanner", adminToken, { method: "PUT", body: "{}" });
@@ -273,7 +232,7 @@ async function prepare() {
   }
 
   const applicantIdentities = fixture.identities.slice(3);
-  const applicantTokens = await browserTokens(applicantIdentities);
+  const applicantTokens = await sessionTokens(applicantIdentities);
   fixture.applicants.push(...applicantIdentities.map((identity, index) => ({
     email: identity.email,
     token: applicantTokens[index],
@@ -287,7 +246,7 @@ async function refreshScanner() {
   const fixture = loadFixture();
   const scanner = fixture.identities.find((identity) => identity.userId === fixture.scanner.scannerClerkUserId);
   if (!scanner) throw new Error("Synthetic scanner identity is missing from the fixture");
-  [fixture.scanner.token] = await browserTokens([scanner]);
+  [fixture.scanner.token] = await sessionTokens([scanner]);
   saveFixture(fixture);
   console.log("Refreshed the synthetic scanner token.");
 }
