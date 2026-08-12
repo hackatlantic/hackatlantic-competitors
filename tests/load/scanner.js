@@ -2,13 +2,23 @@ import http from "k6/http";
 import { check } from "k6";
 import exec from "k6/execution";
 
+const virtualUsers = Number(__ENV.K6_SCANNER_VUS ?? 25);
+const iterations = Number(__ENV.K6_SCANNER_ITERATIONS ?? 0);
+
 export const options = {
   scenarios: {
-    scanner_lookup: {
-      executor: "constant-vus",
-      vus: Number(__ENV.K6_SCANNER_VUS ?? 25),
-      duration: __ENV.K6_SCANNER_DURATION ?? "5m",
-    },
+    scanner_lookup: iterations > 0
+      ? {
+          executor: "per-vu-iterations",
+          vus: virtualUsers,
+          iterations,
+          maxDuration: __ENV.K6_SCANNER_MAX_DURATION ?? "2m",
+        }
+      : {
+          executor: "constant-vus",
+          vus: virtualUsers,
+          duration: __ENV.K6_SCANNER_DURATION ?? "5m",
+        },
   },
   thresholds: {
     "http_req_duration{operation:lookup}": ["p(95)<500"],

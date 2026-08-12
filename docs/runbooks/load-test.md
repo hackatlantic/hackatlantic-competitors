@@ -1,6 +1,8 @@
 # Scanner load-test runbook
 
-The release pipeline runs `tests/load/smoke.js` first and then gates production on `tests/load/scanner.js` at 25 concurrent virtual users for five minutes.
+The release pipeline runs `tests/load/smoke.js` first. The manually dispatched **Meaningful staging load test** workflow creates disposable synthetic identities, then runs a concurrent applicant submission burst and scanner redemption burst against staging. Production is never a load-test target.
+
+For an ad-hoc 100-user verification, dispatch `.github/workflows/meaningful-load-test.yml` with `concurrent_users=100`. It exercises Clerk authentication, PostgreSQL draft/submission transactions, PDF resume storage, review/decision/pass setup, QR lookup, and atomic redemption. Synthetic Clerk identities and temporary staff access are removed even when a test fails; synthetic ATS ledger records remain in staging for auditability.
 
 ## One-time staging fixture
 

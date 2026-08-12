@@ -1,0 +1,100 @@
+name: Meaningful staging load test
+
+on:
+  workflow_dispatch:
+    inputs:
+      concurrent_users:
+        description: Concurrent synthetic applicants and scanners
+        required: true
+        default: "100"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meaningful-staging-load-test
+  cancel-in-progress: false
+
+jobs:
+  load-test:
+    name: Applicant submissions and scanner redemptions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: staging
+    env:
+      API_BASE_URL: https://hackatlantic-api-staging-5c4l8.ondigitalocean.app
+      K6_APPLICANT_VUS: ${{ inputs.concurrent_users }}
+      K6_SCANNER_VUS: ${{ inputs.concurrent_users }}
+      K6_SCANNER_ITERATIONS: "1"
+      K6_FIXTURE_PATH: .tmp/k6-staging-fixture.json
+      K6_APPLICANT_FIXTURES: ../../.tmp/k6-staging-fixture.json
+      TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22 }
+      - uses: grafana/setup-k6-action@db07bd9765aac508ef18982e52ab937fe633a065 # v1
+      - name: Validate requested concurrency
+        shell: bash
+        run: |
+          [[ "${K6_APPLICANT_VUS}" =~ ^[0-9]+$ ]]
+          (( K6_APPLICANT_VUS >= 1 && K6_APPLICANT_VUS <= 200 ))
+      - name: Materialize protected staging connections
+        shell: bash
+        run: |
+          set +x
+          test -n "${TF_VARS_JSON}"
+          clerk_secret="$(jq -er '.api_env.CLERK_SECRET_KEY' <<<"${TF_VARS_JSON}")"
+          database_password="$(jq -er '.supabase_database_password' <<<"${TF_VARS_JSON}")"
+          echo "::add-mask::${clerk_secret}"
+          echo "::add-mask::${database_password}"
+          echo "CLERK_SECRET_KEY=${clerk_secret}" >> "${GITHUB_ENV}"
+          echo "DATABASE_URL=postgresql://postgres.ovzrhurmiwqthfgycamx:${database_password}@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require" >> "${GITHUB_ENV}"
+          mkdir -p .tmp
+      - name: Prepare staging-only synthetic identities and event fixture
+        run: node tests/load/staging-fixture.mjs prepare
+      - name: Run applicant submission burst
+        run: k6 run --summary-export .tmp/applicant-summary.json tests/load/applicant.js
+      - name: Refresh short-lived scanner authentication
+        run: node tests/load/staging-fixture.mjs refresh-scanner
+      - name: Export scanner fixture to k6 without logging credentials
+        shell: bash
+        run: |
+          set +x
+          scanner_token="$(jq -er '.scanner.token' "${K6_FIXTURE_PATH}")"
+          qr_token="$(jq -er '.scanner.qrToken' "${K6_FIXTURE_PATH}")"
+          checkpoint_id="$(jq -er '.scanner.checkpointId' "${K6_FIXTURE_PATH}")"
+          echo "::add-mask::${scanner_token}"
+          echo "::add-mask::${qr_token}"
+          echo "SCANNER_TOKEN=${scanner_token}" >> "${GITHUB_ENV}"
+          echo "QR_TOKEN=${qr_token}" >> "${GITHUB_ENV}"
+          echo "CHECKPOINT_ID=${checkpoint_id}" >> "${GITHUB_ENV}"
+      - name: Run scanner redemption burst
+        run: k6 run --summary-export .tmp/scanner-summary.json tests/load/scanner.js
+      - name: Publish concise results
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f .tmp/applicant-summary.json ]]; then
+            echo "### Applicant submission burst" >> "${GITHUB_STEP_SUMMARY}"
+            jq -r '"- Requests: \(.metrics.http_reqs.count)\n- Failure rate: \(.metrics.http_req_failed.value * 100)%\n- Overall p95: \(.metrics.http_req_duration[\"p(95)\"]) ms"' .tmp/applicant-summary.json >> "${GITHUB_STEP_SUMMARY}"
+          fi
+          if [[ -f .tmp/scanner-summary.json ]]; then
+            echo "### Scanner redemption burst" >> "${GITHUB_STEP_SUMMARY}"
+            jq -r '"- Requests: \(.metrics.http_reqs.count)\n- Failure rate: \(.metrics.http_req_failed.value * 100)%\n- Overall p95: \(.metrics.http_req_duration[\"p(95)\"]) ms"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
+          fi
+      - name: Remove synthetic identities and temporary staff access
+        if: always()
+        run: node tests/load/staging-fixture.mjs cleanup
+      - name: Upload sanitized k6 summaries
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: meaningful-load-test-${{ github.run_id }}
+          path: |
+            .tmp/applicant-summary.json
+            .tmp/scanner-summary.json
+          if-no-files-found: ignore
+          retention-days: 30
