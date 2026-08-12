@@ -79,6 +79,17 @@ function saveFixture(fixture) {
   writeFileSync(fixturePath, JSON.stringify(fixture) + "\n", { mode: 0o600 });
 }
 
+function hostedClerkSignInURL() {
+  const frontendAPI = process.env.CLERK_FRONTEND_API_URL;
+  const accountsHost = frontendAPI?.replace(/\.clerk\.accounts\.dev$/, ".accounts.dev");
+  if (!frontendAPI || accountsHost === frontendAPI) {
+    throw new Error("CLERK_FRONTEND_API_URL must identify a Clerk development instance");
+  }
+  const signInURL = new URL("https://" + accountsHost + "/sign-in");
+  signInURL.searchParams.set("redirect_url", webBaseURL);
+  return signInURL.toString();
+}
+
 async function createIdentity(email, firstName, lastName) {
   const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
@@ -126,8 +137,7 @@ async function browserTokens(identities) {
             });
           }
           const page = await context.newPage();
-          await page.goto(webBaseURL);
-          await page.getByRole("button", { name: "Sign in", exact: true }).click();
+          await page.goto(hostedClerkSignInURL());
           await page.getByLabel("Email address").fill(identity.email);
           await page.getByRole("button", { name: "Continue", exact: true }).click();
           await page.getByLabel("Password", { exact: true }).fill(identity.password);
