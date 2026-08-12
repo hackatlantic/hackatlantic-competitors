@@ -80,21 +80,23 @@ function saveFixture(fixture) {
 }
 
 async function createIdentity(email, firstName, lastName) {
+  const password = "Load!" + crypto.randomUUID() + "Aa9";
   const user = await clerk("/users", {
     method: "POST",
     body: JSON.stringify({
       email_address: [email],
       first_name: firstName,
       last_name: lastName,
-      skip_password_requirement: true,
+      password,
+      skip_password_checks: true,
       skip_legal_checks: true,
     }),
   });
-  return { userId: user.id, email };
+  return { userId: user.id, email, password };
 }
 
 async function browserTokens(identities) {
-  const [{ chromium }, { clerk: testingClerk, clerkSetup }] = await Promise.all([
+  const [{ chromium }, { clerkSetup, setupClerkTestingToken }] = await Promise.all([
     import("@playwright/test"),
     import("@clerk/testing/playwright"),
   ]);
@@ -108,6 +110,10 @@ async function browserTokens(identities) {
       const batchTokens = await Promise.all(batch.map(async (identity) => {
         const context = await browser.newContext();
         try {
+          await setupClerkTestingToken({
+            context,
+            options: { frontendApiUrl: process.env.CLERK_FRONTEND_API_URL },
+          });
           if (vercelAutomationBypass) {
             const webOrigin = new URL(webBaseURL).origin;
             await context.route(webOrigin + "/**", async (route) => {
@@ -121,10 +127,19 @@ async function browserTokens(identities) {
           }
           const page = await context.newPage();
           await page.goto(webBaseURL);
-          await testingClerk.signIn({ page, emailAddress: identity.email });
-          const token = await page.evaluate(() => window.Clerk?.session?.getToken() ?? null);
-          if (!token) throw new Error("Clerk browser flow did not return a session token");
-          return token;
+          await page.getByRole("button", { name: "Sign in", exact: true }).click();
+          await page.getByLabel("Email address").fill(identity.email);
+          await page.getByRole("button", { name: "Continue", exact: true }).click();
+          await page.getByLabel("Password", { exact: true }).fill(identity.password);
+          await page.getByRole("button", { name: "Continue", exact: true }).click();
+          let session;
+          for (let attempt = 0; attempt < 60; attempt += 1) {
+            session = (await context.cookies()).find((cookie) => cookie.name === "__session");
+            if (session?.value) break;
+            await page.waitForTimeout(500);
+          }
+          if (!session?.value) throw new Error("Clerk sign-in did not create a session cookie");
+          return session.value;
         } finally {
           await context.close();
         }
