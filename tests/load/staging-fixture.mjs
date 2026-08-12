@@ -132,8 +132,12 @@ async function browserTokens(identities) {
           await page.getByRole("button", { name: "Continue", exact: true }).click();
           await page.getByLabel("Password", { exact: true }).fill(identity.password);
           await page.getByRole("button", { name: "Continue", exact: true }).click();
-          await page.waitForFunction(() => document.cookie.includes("__session="));
-          const session = (await context.cookies()).find((cookie) => cookie.name === "__session");
+          let session;
+          for (let attempt = 0; attempt < 60; attempt += 1) {
+            session = (await context.cookies()).find((cookie) => cookie.name === "__session");
+            if (session?.value) break;
+            await page.waitForTimeout(500);
+          }
           if (!session?.value) throw new Error("Clerk sign-in did not create a session cookie");
           return session.value;
         } finally {
