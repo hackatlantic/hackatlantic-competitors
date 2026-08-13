@@ -26,6 +26,7 @@ jobs:
       API_BASE_URL: https://hackatlantic-api-staging-5c4l8.ondigitalocean.app
       K6_APPLICANT_VUS: ${{ inputs.concurrent_users }}
       K6_SCANNER_VUS: ${{ inputs.concurrent_users }}
+      K6_SCANNER_IDENTITIES: "20"
       K6_SCANNER_ITERATIONS: "1"
       K6_FIXTURE_PATH: .tmp/k6-staging-fixture.json
       K6_APPLICANT_FIXTURES: ../../.tmp/k6-staging-fixture.json
@@ -48,6 +49,8 @@ jobs:
         run: |
           [[ "${K6_APPLICANT_VUS}" =~ ^[0-9]+$ ]]
           (( K6_APPLICANT_VUS >= 1 && K6_APPLICANT_VUS <= 200 ))
+          [[ "${K6_SCANNER_IDENTITIES}" =~ ^[0-9]+$ ]]
+          (( K6_SCANNER_IDENTITIES >= 10 && K6_SCANNER_IDENTITIES <= 25 ))
       - name: Materialize protected staging connections
         shell: bash
         run: |
@@ -75,15 +78,12 @@ jobs:
       - name: Refresh short-lived scanner authentication
         if: always()
         run: node tests/load/staging-fixture.mjs refresh-scanner
-      - name: Export scanner fixture to k6 without logging credentials
+      - name: Export scanner checkpoint to k6
         if: always()
         shell: bash
         run: |
           set +x
-          scanner_token="$(jq -er '.scanner.token' "${K6_FIXTURE_PATH}")"
           checkpoint_id="$(jq -er '.scanner.checkpointId' "${K6_FIXTURE_PATH}")"
-          echo "::add-mask::${scanner_token}"
-          echo "SCANNER_TOKEN=${scanner_token}" >> "${GITHUB_ENV}"
           echo "CHECKPOINT_ID=${checkpoint_id}" >> "${GITHUB_ENV}"
       - name: Run scanner redemption burst
         id: scanner_load
