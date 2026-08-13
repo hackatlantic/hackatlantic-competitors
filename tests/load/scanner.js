@@ -1,9 +1,15 @@
 import http from "k6/http";
 import { check } from "k6";
+import { SharedArray } from "k6/data";
 import exec from "k6/execution";
 
 const virtualUsers = Number(__ENV.K6_SCANNER_VUS ?? 25);
 const iterations = Number(__ENV.K6_SCANNER_ITERATIONS ?? 0);
+const fixturePath = __ENV.K6_SCANNER_FIXTURES;
+const scannerPasses = new SharedArray("synthetic scanner passes", () => {
+  if (!fixturePath) throw new Error("K6_SCANNER_FIXTURES is required");
+  return JSON.parse(open(fixturePath)).scanner.passes;
+});
 
 export const options = {
   scenarios: {
@@ -28,7 +34,6 @@ export const options = {
 };
 
 const baseURL = __ENV.API_BASE_URL;
-const qrToken = __ENV.QR_TOKEN;
 const checkpointID = __ENV.CHECKPOINT_ID;
 const acceptedDomainStatuses = http.expectedStatuses(200, 409, 422);
 
@@ -68,9 +73,10 @@ function operationID() {
 }
 
 export default function scannerLoad(data) {
-  if (!baseURL || !data.scannerToken || !qrToken || !checkpointID) {
-    exec.test.abort("API_BASE_URL, scanner authentication, QR_TOKEN and CHECKPOINT_ID are required");
+  if (!baseURL || !data.scannerToken || !checkpointID || scannerPasses.length < virtualUsers) {
+    exec.test.abort("API_BASE_URL, scanner authentication, CHECKPOINT_ID, and one pass per virtual user are required");
   }
+  const qrToken = scannerPasses[exec.vu.idInTest - 1].qrToken;
   const headers = { Authorization: `Bearer ${data.scannerToken}`, "Content-Type": "application/json" };
   const lookup = http.post(`${baseURL}/v1/scans/lookup`, JSON.stringify({ qrToken }), {
     headers,

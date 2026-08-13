@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const command = process.argv[2];
@@ -135,36 +135,122 @@ async function sessionTokens(identities) {
   });
 }
 
-function answersFor(form, email) {
-  return Object.fromEntries(form.questions.map((question) => {
-    const description = question.key + " " + question.label;
-    if (question.type === "boolean") return [question.key, true];
-    if (question.type === "number") return [question.key, 1];
-    if (/email/i.test(description)) return [question.key, email];
-    if (/school/i.test(description)) return [question.key, "Synthetic Atlantic University"];
-    return [question.key, "Synthetic fixture response for " + question.label];
-  }));
+function seedAcceptedAttendees(form, runID, count) {
+  const attendees = Array.from({ length: count }, (_, index) => {
+    const identity = createIdentity(runID, "scanner_attendee", index + 1);
+    return {
+      clerk_user_id: identity.userId,
+      email: identity.email,
+      user_id: randomUUID(),
+      application_id: randomUUID(),
+      attendee_id: randomUUID(),
+      display_name: "Synthetic attendee " + (index + 1),
+    };
+  });
+  const rows = JSON.stringify(attendees);
+  psql(`
+WITH input AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
+    clerk_user_id text,
+    email text,
+    user_id uuid,
+    application_id uuid,
+    attendee_id uuid,
+    display_name text
+  )
+)
+INSERT INTO ats.users (id, clerk_user_id, primary_email, display_name)
+SELECT user_id, clerk_user_id, email, display_name FROM input;
+
+WITH input AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
+    clerk_user_id text,
+    email text,
+    user_id uuid,
+    application_id uuid,
+    attendee_id uuid,
+    display_name text
+  )
+)
+INSERT INTO ats.user_roles (user_id, role)
+SELECT user_id, 'applicant' FROM input;
+
+WITH input AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
+    clerk_user_id text,
+    email text,
+    user_id uuid,
+    application_id uuid,
+    attendee_id uuid,
+    display_name text
+  )
+)
+INSERT INTO ats.applications (
+  id,
+  cycle_id,
+  form_id,
+  applicant_user_id,
+  status,
+  submitted_at,
+  current_decision,
+  decision_released_at
+)
+SELECT
+  application_id,
+  :'cycle_id'::uuid,
+  :'form_id'::uuid,
+  user_id,
+  'accepted',
+  CURRENT_TIMESTAMP,
+  'accepted',
+  CURRENT_TIMESTAMP
+FROM input;
+
+WITH input AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
+    clerk_user_id text,
+    email text,
+    user_id uuid,
+    application_id uuid,
+    attendee_id uuid,
+    display_name text
+  )
+)
+INSERT INTO ats.attendees (id, cycle_id, application_id, user_id, display_name, email)
+SELECT attendee_id, :'cycle_id'::uuid, application_id, user_id, display_name, email FROM input;
+
+WITH input AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
+    clerk_user_id text,
+    email text,
+    user_id uuid,
+    application_id uuid,
+    attendee_id uuid,
+    display_name text
+  )
+)
+INSERT INTO ats.attendee_roles (attendee_id, role)
+SELECT attendee_id, 'hacker' FROM input;
+`, { rows, cycle_id: form.cycleId, form_id: form.id });
+  return attendees;
 }
 
-async function createSubmittedApplication(identity, token) {
-  const form = await api("/v1/application-forms/current", token);
-  const application = await api("/v1/applications", token, { method: "POST" });
-  const draft = await api("/v1/applications/" + application.id + "/draft", token, {
-    method: "PUT",
-    body: JSON.stringify({ lockVersion: application.lockVersion, answers: answersFor(form, identity.email) }),
-  });
-  if (form.resumeRequired) {
-    await api("/v1/applications/" + application.id + "/resume", token, {
-      method: "PUT",
-      body: "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
-      headers: { "Content-Type": "application/pdf", "X-File-Name": "synthetic-fixture.pdf" },
-    });
+async function issueScannerPasses(attendees, adminToken) {
+  const passes = [];
+  const batchSize = 4;
+  for (let start = 0; start < attendees.length; start += batchSize) {
+    const batch = attendees.slice(start, start + batchSize);
+    const issued = await Promise.all(batch.map((attendee) =>
+      api("/v1/admin/attendees/" + attendee.attendee_id + "/passes", adminToken, { method: "POST" }),
+    ));
+    passes.push(...issued.map((pass) => ({ qrToken: pass.qrToken, attendeeId: pass.attendeeId })));
   }
-  await api("/v1/applications/" + application.id + "/submit", token, {
-    method: "POST",
-    body: JSON.stringify({ lockVersion: draft.lockVersion }),
-  });
-  return { form, application };
+  return passes;
 }
 
 async function prepare() {
@@ -179,34 +265,13 @@ async function prepare() {
   const scanner = createIdentity(runID, "scanner");
   fixture.identities.push(scanner);
   saveFixture(fixture);
-  const attendee = createIdentity(runID, "attendee");
-  fixture.identities.push(attendee);
-  saveFixture(fixture);
-
   psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email LIKE 'hat_load_%@loadtest.invalid'; INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
-  const [adminToken, scannerToken, attendeeToken] = await sessionTokens([admin, scanner, attendee]);
+  const [adminToken, scannerToken] = await sessionTokens([admin, scanner]);
   await api("/v1/me", adminToken);
   ensureOpenApplicationForm(admin.userId, runID);
   const scannerUser = await api("/v1/me", scannerToken);
   await api("/v1/admin/users/" + scannerUser.id + "/roles/scanner", adminToken, { method: "PUT", body: "{}" });
-  await api("/v1/me", attendeeToken);
-
-  const { form, application } = await createSubmittedApplication(attendee, attendeeToken);
-  const reviewDraft = await api("/v1/reviewer/applications/" + application.id + "/review", adminToken, {
-    method: "PUT",
-    body: JSON.stringify({ lockVersion: 0, score: 5, recommendation: "strong_yes", internalNotes: "Synthetic load fixture" }),
-  });
-  await api("/v1/reviewer/applications/" + application.id + "/review/submit", adminToken, {
-    method: "POST",
-    body: JSON.stringify({ lockVersion: reviewDraft.review.lockVersion }),
-  });
-  const decision = await api("/v1/admin/applications/" + application.id + "/decisions", adminToken, {
-    method: "POST",
-    body: JSON.stringify({ outcome: "accepted", internalReason: "Synthetic load fixture" }),
-  });
-  await api("/v1/admin/decisions/" + decision.id + "/release", adminToken, { method: "POST" });
-  const detail = await api("/v1/admin/applications/" + application.id, adminToken);
-  const issuedPass = await api("/v1/admin/attendees/" + detail.attendeePass.attendeeId + "/passes", adminToken, { method: "POST" });
+  const form = await api("/v1/application-forms/current", adminToken);
   const checkpoint = await api("/v1/admin/checkpoints", adminToken, {
     method: "POST",
     body: JSON.stringify({
@@ -217,16 +282,18 @@ async function prepare() {
       opensAt: null,
       closesAt: null,
       defaultAllowed: true,
-      defaultMaxRedemptions: applicantCount,
+      defaultMaxRedemptions: 1,
       active: true,
     }),
   });
+  const scannerAttendees = seedAcceptedAttendees(form, runID, applicantCount);
+  const scannerPasses = await issueScannerPasses(scannerAttendees, adminToken);
   fixture.scanner = {
     adminToken,
     scannerEmail: scanner.email,
     scannerClerkUserId: scanner.userId,
     scannerUserId: scannerUser.id,
-    qrToken: issuedPass.qrToken,
+    passes: scannerPasses,
     checkpointId: checkpoint.id,
     adminEmail: admin.email,
   };
@@ -240,14 +307,14 @@ async function prepare() {
     saveFixture(fixture);
   }
 
-  const applicantIdentities = fixture.identities.slice(3);
+  const applicantIdentities = fixture.identities.slice(2);
   const applicantTokens = await sessionTokens(applicantIdentities);
   fixture.applicants.push(...applicantIdentities.map((identity, index) => ({
     email: identity.email,
     token: applicantTokens[index],
   })));
   saveFixture(fixture);
-  console.log("Prepared " + fixture.applicants.length + " synthetic applicants and one scanner fixture.");
+  console.log("Prepared " + fixture.applicants.length + " synthetic applicants and " + fixture.scanner.passes.length + " distinct scanner passes.");
 }
 
 async function refreshScanner() {
@@ -286,7 +353,7 @@ async function cleanup() {
       console.warn("Could not remove the temporary admin allowlist entry; manual staging cleanup is required.");
     }
   }
-  console.log("Removed temporary staff access for " + fixture.identities.length + " staging-local synthetic identities.");
+  console.log("Removed temporary staging admin and scanner privileges. Append-only synthetic redemption records remain isolated by their hat_load run identifiers.");
 }
 
 if (command === "prepare") await prepare();
