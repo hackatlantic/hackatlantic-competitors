@@ -298,7 +298,7 @@ SELECT
     checkpoint.active
 FROM ats.checkpoints AS checkpoint
 WHERE checkpoint.id = $1
-FOR UPDATE OF checkpoint
+FOR SHARE OF checkpoint
 `
 
 type LockCheckpointForRedemptionRow struct {
