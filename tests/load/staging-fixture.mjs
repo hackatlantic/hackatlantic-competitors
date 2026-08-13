@@ -8,6 +8,7 @@ const apiBaseURL = process.env.API_BASE_URL;
 const databaseURL = process.env.DATABASE_URL;
 const loadTestAuthSecret = process.env.LOAD_TEST_AUTH_SECRET;
 const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
+const scannerIdentityCount = Number(process.env.K6_SCANNER_IDENTITIES ?? 20);
 
 function requireConfiguration() {
   if (!apiBaseURL || !databaseURL || !loadTestAuthSecret) {
@@ -19,6 +20,9 @@ function requireConfiguration() {
   }
   if (!Number.isInteger(applicantCount) || applicantCount < 1 || applicantCount > 200) {
     throw new Error("K6_APPLICANT_VUS must be between 1 and 200");
+  }
+  if (!Number.isInteger(scannerIdentityCount) || scannerIdentityCount < 10 || scannerIdentityCount > 25) {
+    throw new Error("K6_SCANNER_IDENTITIES must be between 10 and 25");
   }
 }
 
@@ -262,15 +266,21 @@ async function prepare() {
   const admin = createIdentity(runID, "admin");
   fixture.identities.push(admin);
   saveFixture(fixture);
-  const scanner = createIdentity(runID, "scanner");
-  fixture.identities.push(scanner);
+  const scanners = Array.from({ length: scannerIdentityCount }, (_, index) => createIdentity(runID, "scanner", index + 1));
+  fixture.identities.push(...scanners);
   saveFixture(fixture);
   psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email LIKE 'hat_load_%@loadtest.invalid'; INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
-  const [adminToken, scannerToken] = await sessionTokens([admin, scanner]);
+  const [adminToken] = await sessionTokens([admin]);
   await api("/v1/me", adminToken);
   ensureOpenApplicationForm(admin.userId, runID);
-  const scannerUser = await api("/v1/me", scannerToken);
-  await api("/v1/admin/users/" + scannerUser.id + "/roles/scanner", adminToken, { method: "PUT", body: "{}" });
+  const scannerTokens = await sessionTokens(scanners);
+  for (let start = 0; start < scanners.length; start += 4) {
+    const batch = scanners.slice(start, start + 4);
+    await Promise.all(batch.map(async (_scanner, offset) => {
+      const scannerUser = await api("/v1/me", scannerTokens[start + offset]);
+      await api("/v1/admin/users/" + scannerUser.id + "/roles/scanner", adminToken, { method: "PUT", body: "{}" });
+    }));
+  }
   const form = await api("/v1/application-forms/current", adminToken);
   const checkpoint = await api("/v1/admin/checkpoints", adminToken, {
     method: "POST",
@@ -289,10 +299,8 @@ async function prepare() {
   const scannerAttendees = seedAcceptedAttendees(form, runID, applicantCount);
   const scannerPasses = await issueScannerPasses(scannerAttendees, adminToken);
   fixture.scanner = {
-    adminToken,
-    scannerEmail: scanner.email,
-    scannerClerkUserId: scanner.userId,
-    scannerUserId: scannerUser.id,
+    identities: scanners,
+    tokens: scannerTokens,
     passes: scannerPasses,
     checkpointId: checkpoint.id,
     adminEmail: admin.email,
@@ -307,22 +315,23 @@ async function prepare() {
     saveFixture(fixture);
   }
 
-  const applicantIdentities = fixture.identities.slice(2);
+  const applicantIdentities = fixture.identities.slice(1 + scanners.length);
   const applicantTokens = await sessionTokens(applicantIdentities);
   fixture.applicants.push(...applicantIdentities.map((identity, index) => ({
     email: identity.email,
     token: applicantTokens[index],
   })));
   saveFixture(fixture);
-  console.log("Prepared " + fixture.applicants.length + " synthetic applicants and " + fixture.scanner.passes.length + " distinct scanner passes.");
+  console.log("Prepared " + fixture.applicants.length + " synthetic applicants and " + fixture.scanner.passes.length + " distinct passes across " + fixture.scanner.identities.length + " scanner identities.");
 }
 
 async function refreshScanner() {
   requireConfiguration();
   const fixture = loadFixture();
-  const scanner = fixture.identities.find((identity) => identity.userId === fixture.scanner.scannerClerkUserId);
-  if (!scanner) throw new Error("Synthetic scanner identity is missing from the fixture");
-  [fixture.scanner.token] = await sessionTokens([scanner]);
+  if (!Array.isArray(fixture.scanner?.identities) || fixture.scanner.identities.length === 0) {
+    throw new Error("Synthetic scanner identities are missing from the fixture");
+  }
+  fixture.scanner.tokens = await sessionTokens(fixture.scanner.identities);
   saveFixture(fixture);
   console.log("Refreshed the synthetic scanner token.");
 }
@@ -335,12 +344,17 @@ async function cleanup() {
     return;
   }
   requireConfiguration();
-  const scannerClerkUserId = fixture.scanner?.scannerClerkUserId ?? fixture.identities?.[1]?.userId;
-  if (scannerClerkUserId) {
+  const scannerIdentities = fixture.scanner?.identities ?? [];
+  if (scannerIdentities.length > 0) {
     try {
-      psql("DELETE FROM ats.user_roles WHERE role = 'scanner' AND user_id = (SELECT id FROM ats.users WHERE clerk_user_id = :'clerk_user_id')", {
-        clerk_user_id: scannerClerkUserId,
-      });
+      psql(`DELETE FROM ats.user_roles
+        WHERE role = 'scanner'
+          AND user_id IN (
+            SELECT ats.users.id
+            FROM ats.users
+            JOIN jsonb_array_elements_text(:'clerk_user_ids'::jsonb) AS ids(clerk_user_id)
+              ON ats.users.clerk_user_id = ids.clerk_user_id
+          )`, { clerk_user_ids: JSON.stringify(scannerIdentities.map((identity) => identity.userId)) });
     } catch {
       console.warn("Could not remove the temporary scanner role; manual staging cleanup is required.");
     }
