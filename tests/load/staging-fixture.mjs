@@ -314,7 +314,7 @@ async function prepare() {
   const scanners = Array.from({ length: scannerIdentityCount }, (_, index) => createIdentity(runID, "scanner", index + 1));
   fixture.identities.push(...scanners);
   saveFixture(fixture);
-  psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email LIKE 'hat_load_%@loadtest.invalid'; INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
+  psql("INSERT INTO ats.admin_email_allowlist (normalized_email) VALUES (lower(:'email')) ON CONFLICT (normalized_email) DO NOTHING", { email: admin.email });
   const [adminToken] = await sessionTokens([admin]);
   await api("/v1/me", adminToken);
   ensureOpenApplicationForm(admin.userId, runID);
