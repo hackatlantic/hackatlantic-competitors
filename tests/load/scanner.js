@@ -82,6 +82,8 @@ const alreadyExhausted = new Counter("scanner_already_exhausted");
 const unauthorized = new Counter("scanner_http_401");
 const forbidden = new Counter("scanner_http_403");
 const rateLimited = new Counter("scanner_http_429");
+const conflicts = new Counter("scanner_http_409");
+const unprocessable = new Counter("scanner_http_422");
 const serverErrors = new Counter("scanner_http_5xx");
 const otherHTTPFailures = new Counter("scanner_http_other_failures");
 const baseURL = __ENV.API_BASE_URL;
@@ -101,6 +103,8 @@ function recordSystemResult(response) {
     if (response.status === 401) unauthorized.add(1);
     else if (response.status === 403) forbidden.add(1);
     else if (response.status === 429) rateLimited.add(1);
+    else if (response.status === 409) conflicts.add(1);
+    else if (response.status === 422) unprocessable.add(1);
     else if (response.status >= 500) serverErrors.add(1);
     else otherHTTPFailures.add(1);
   }

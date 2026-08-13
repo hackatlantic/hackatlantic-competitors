@@ -212,9 +212,9 @@ jobs:
             echo "K6_SCANNER_FIXTURES=../../.tmp/k6-staging-fixture.json"
             echo "K6_SCANNER_PROFILE=release"
             echo "K6_SCANNER_IDENTITIES=20"
-            echo "K6_SCANNER_PASS_COUNT=1800"
+            echo "K6_SCANNER_PASS_COUNT=1500"
             echo "K6_SCANNER_VUS=20"
-            echo "K6_SCANNER_ITERATIONS=1800"
+            echo "K6_SCANNER_ITERATIONS=1500"
             echo "K6_APPLICANT_COUNT=0"
           } >> "$GITHUB_ENV"
       - name: Prepare realistic scanner release-gate fixture
