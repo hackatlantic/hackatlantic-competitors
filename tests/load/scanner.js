@@ -79,6 +79,11 @@ const domainFailures = new Rate("scanner_domain_failures");
 const idempotencyMismatches = new Rate("scanner_idempotency_mismatches");
 const redeemed = new Counter("scanner_redeemed");
 const alreadyExhausted = new Counter("scanner_already_exhausted");
+const unauthorized = new Counter("scanner_http_401");
+const forbidden = new Counter("scanner_http_403");
+const rateLimited = new Counter("scanner_http_429");
+const serverErrors = new Counter("scanner_http_5xx");
+const otherHTTPFailures = new Counter("scanner_http_other_failures");
 const baseURL = __ENV.API_BASE_URL;
 const checkpointID = __ENV.CHECKPOINT_ID;
 const expectedHTTP = http.expectedStatuses(200);
@@ -92,7 +97,18 @@ function operationID() {
 function recordSystemResult(response) {
   const failed = response.status !== 200;
   systemFailures.add(failed);
+  if (failed) {
+    if (response.status === 401) unauthorized.add(1);
+    else if (response.status === 403) forbidden.add(1);
+    else if (response.status === 429) rateLimited.add(1);
+    else if (response.status >= 500) serverErrors.add(1);
+    else otherHTTPFailures.add(1);
+  }
   return !failed;
+}
+
+function releasePacing() {
+  if (profile === "release") sleep(2 + Math.random() * 3);
 }
 
 function selectedPass() {
@@ -115,7 +131,10 @@ export default function scannerLoad() {
   });
   const lookupOK = recordSystemResult(lookup);
   check(lookup, { "lookup is HTTP 200": () => lookupOK });
-  if (!lookupOK) return;
+  if (!lookupOK) {
+    releasePacing();
+    return;
+  }
 
   const idempotencyKey = operationID();
   const requestBody = JSON.stringify({ qrToken: pass.qrToken, checkpointId: checkpointID, idempotencyKey });
@@ -147,5 +166,5 @@ export default function scannerLoad() {
     check(redemption, { "distinct pass is redeemed": () => !domainFailed });
   }
 
-  if (profile === "release") sleep(2 + Math.random() * 3);
+  releasePacing();
 }

@@ -164,6 +164,7 @@ jobs:
               jq -r '.metrics.http_req_failed.value * 100 | "- System HTTP failure rate: \(.)%"' .tmp/profile-summary.json
               jq -r '.metrics["http_req_duration{operation:lookup}"]["p(95)"]? // empty | "- Lookup p95: \(.) ms"' .tmp/profile-summary.json
               jq -r '.metrics["http_req_duration{operation:redemption}"]["p(95)"]? // empty | "- Redemption p95: \(.) ms"' .tmp/profile-summary.json
+              jq -r '["scanner_http_401", "scanner_http_403", "scanner_http_429", "scanner_http_5xx", "scanner_http_other_failures"][] as $metric | (.metrics[$metric].count? // 0) | "- \($metric): \(.)"' .tmp/profile-summary.json
             } >> "${GITHUB_STEP_SUMMARY}"
           fi
       - name: Remove temporary staging staff access
