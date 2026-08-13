@@ -7,7 +7,9 @@ const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json
 const apiBaseURL = process.env.API_BASE_URL;
 const databaseURL = process.env.DATABASE_URL;
 const loadTestAuthSecret = process.env.LOAD_TEST_AUTH_SECRET;
-const applicantCount = Number(process.env.K6_APPLICANT_VUS ?? 100);
+const applicantCount = Number(process.env.K6_APPLICANT_COUNT ?? process.env.K6_APPLICANT_VUS ?? 0);
+const applicantProfile = process.env.K6_APPLICANT_PROFILE ?? "sustained";
+const scannerPassCount = Number(process.env.K6_SCANNER_PASS_COUNT ?? 0);
 const scannerIdentityCount = Number(process.env.K6_SCANNER_IDENTITIES ?? 20);
 
 function requireConfiguration() {
@@ -18,11 +20,14 @@ function requireConfiguration() {
   if (decodedSecret.length < 32 || decodedSecret.toString("base64") !== loadTestAuthSecret) {
     throw new Error("LOAD_TEST_AUTH_SECRET must be standard base64 containing at least 32 bytes");
   }
-  if (!Number.isInteger(applicantCount) || applicantCount < 1 || applicantCount > 200) {
-    throw new Error("K6_APPLICANT_VUS must be between 1 and 200");
+  if (!Number.isInteger(applicantCount) || applicantCount < 0 || applicantCount > 200) {
+    throw new Error("K6_APPLICANT_COUNT must be between 0 and 200");
   }
-  if (!Number.isInteger(scannerIdentityCount) || scannerIdentityCount < 10 || scannerIdentityCount > 25) {
-    throw new Error("K6_SCANNER_IDENTITIES must be between 10 and 25");
+  if (!Number.isInteger(scannerPassCount) || scannerPassCount < 0 || scannerPassCount > 3000) {
+    throw new Error("K6_SCANNER_PASS_COUNT must be between 0 and 3000");
+  }
+  if (!Number.isInteger(scannerIdentityCount) || scannerIdentityCount < 0 || scannerIdentityCount > 25 || (scannerPassCount > 0 && scannerIdentityCount < 10)) {
+    throw new Error("K6_SCANNER_IDENTITIES must be 0 for applicant-only profiles or between 10 and 25 for scanner profiles");
   }
 }
 
@@ -151,8 +156,9 @@ function seedAcceptedAttendees(form, runID, count) {
       display_name: "Synthetic attendee " + (index + 1),
     };
   });
-  const rows = JSON.stringify(attendees);
-  psql(`
+  for (let start = 0; start < attendees.length; start += 100) {
+    const rows = JSON.stringify(attendees.slice(start, start + 100));
+    psql(`
 WITH input AS (
   SELECT *
   FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
@@ -241,12 +247,13 @@ WITH input AS (
 INSERT INTO ats.attendee_roles (attendee_id, role)
 SELECT attendee_id, 'hacker' FROM input;
 `, { rows, cycle_id: form.cycleId, form_id: form.id });
+  }
   return attendees;
 }
 
 async function issueScannerPasses(attendees, adminToken) {
   const passes = [];
-  const batchSize = 4;
+  const batchSize = 20;
   for (let start = 0; start < attendees.length; start += batchSize) {
     const batch = attendees.slice(start, start + batchSize);
     const issued = await Promise.all(batch.map((attendee) =>
@@ -255,6 +262,42 @@ async function issueScannerPasses(attendees, adminToken) {
     passes.push(...issued.map((pass) => ({ qrToken: pass.qrToken, attendeeId: pass.attendeeId })));
   }
   return passes;
+}
+
+function applicantAnswers(form, email, sequence) {
+  return Object.fromEntries(form.questions.map((question) => {
+    const description = question.key + " " + question.label;
+    if (question.type === "boolean") return [question.key, true];
+    if (question.type === "number") return [question.key, sequence + 1];
+    if (/email/i.test(description)) return [question.key, email];
+    if (/school/i.test(description)) return [question.key, "Synthetic Atlantic University"];
+    return [question.key, "Synthetic deadline response " + (sequence + 1)];
+  }));
+}
+
+async function prepareDeadlineApplicants(applicants, form) {
+  const prepared = [];
+  for (let start = 0; start < applicants.length; start += 4) {
+    const batch = applicants.slice(start, start + 4);
+    const results = await Promise.all(batch.map(async (applicant, offset) => {
+      const index = start + offset;
+      const application = await api("/v1/applications", applicant.token, { method: "POST" });
+      const draft = await api("/v1/applications/" + application.id + "/draft", applicant.token, {
+        method: "PUT",
+        body: JSON.stringify({ lockVersion: application.lockVersion, answers: applicantAnswers(form, applicant.email, index) }),
+      });
+      if (form.resumeRequired) {
+        await api("/v1/applications/" + application.id + "/resume", applicant.token, {
+          method: "PUT",
+          body: "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
+          headers: { "Content-Type": "application/pdf", "X-File-Name": "synthetic-deadline-" + (index + 1) + ".pdf" },
+        });
+      }
+      return { ...applicant, applicationId: application.id, lockVersion: draft.lockVersion };
+    }));
+    prepared.push(...results);
+  }
+  return prepared;
 }
 
 async function prepare() {
@@ -282,27 +325,31 @@ async function prepare() {
     }));
   }
   const form = await api("/v1/application-forms/current", adminToken);
-  const checkpoint = await api("/v1/admin/checkpoints", adminToken, {
-    method: "POST",
-    body: JSON.stringify({
-      cycleId: form.cycleId,
-      activityId: null,
-      slug: "load-" + runID,
-      name: "Synthetic load checkpoint",
-      opensAt: null,
-      closesAt: null,
-      defaultAllowed: true,
-      defaultMaxRedemptions: 1,
-      active: true,
-    }),
-  });
-  const scannerAttendees = seedAcceptedAttendees(form, runID, applicantCount);
-  const scannerPasses = await issueScannerPasses(scannerAttendees, adminToken);
+  let checkpoint = null;
+  let scannerPasses = [];
+  if (scannerPassCount > 0) {
+    checkpoint = await api("/v1/admin/checkpoints", adminToken, {
+      method: "POST",
+      body: JSON.stringify({
+        cycleId: form.cycleId,
+        activityId: null,
+        slug: "load-" + runID,
+        name: "Synthetic load checkpoint",
+        opensAt: null,
+        closesAt: null,
+        defaultAllowed: true,
+        defaultMaxRedemptions: 1,
+        active: true,
+      }),
+    });
+    const scannerAttendees = seedAcceptedAttendees(form, runID, scannerPassCount);
+    scannerPasses = await issueScannerPasses(scannerAttendees, adminToken);
+  }
   fixture.scanner = {
     identities: scanners,
     tokens: scannerTokens,
     passes: scannerPasses,
-    checkpointId: checkpoint.id,
+    checkpointId: checkpoint?.id ?? null,
     adminEmail: admin.email,
   };
   saveFixture(fixture);
@@ -321,6 +368,7 @@ async function prepare() {
     email: identity.email,
     token: applicantTokens[index],
   })));
+  if (applicantProfile === "deadline") fixture.applicants = await prepareDeadlineApplicants(fixture.applicants, form);
   saveFixture(fixture);
   console.log("Prepared " + fixture.applicants.length + " synthetic applicants and " + fixture.scanner.passes.length + " distinct passes across " + fixture.scanner.identities.length + " scanner identities.");
 }
@@ -334,6 +382,25 @@ async function refreshScanner() {
   fixture.scanner.tokens = await sessionTokens(fixture.scanner.identities);
   saveFixture(fixture);
   console.log("Refreshed the synthetic scanner token.");
+}
+
+function verifyScanner() {
+  requireConfiguration();
+  const fixture = loadFixture();
+  const checkpointID = fixture.scanner?.checkpointId;
+  if (!checkpointID) throw new Error("Synthetic scanner checkpoint is missing from the fixture");
+  const expectedRedemptions = (process.env.K6_SCANNER_PROFILE ?? "release") === "contention" ? 1 : scannerPassCount;
+  psql(`SELECT CASE WHEN count(*) = :'expected_redemptions'::bigint
+      AND count(*) = count(DISTINCT attendee_id)
+    THEN 'true' ELSE 'false' END AS verified
+  FROM ats.redemptions
+  WHERE checkpoint_id = :'checkpoint_id'::uuid
+  \gset
+  \if :verified
+  \else
+    \quit 1
+  \endif`, { checkpoint_id: checkpointID, expected_redemptions: expectedRedemptions });
+  console.log("Verified " + expectedRedemptions + " atomic redemption ledger entries with no duplicate attendees.");
 }
 
 async function cleanup() {
@@ -372,5 +439,6 @@ async function cleanup() {
 
 if (command === "prepare") await prepare();
 else if (command === "refresh-scanner") await refreshScanner();
+else if (command === "verify-scanner") verifyScanner();
 else if (command === "cleanup") await cleanup();
-else throw new Error("usage: node tests/load/staging-fixture.mjs <prepare|refresh-scanner|cleanup>");
+else throw new Error("usage: node tests/load/staging-fixture.mjs <prepare|refresh-scanner|verify-scanner|cleanup>");

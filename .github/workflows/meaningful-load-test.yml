@@ -1,33 +1,36 @@
-name: Meaningful staging load test
+name: Staging ATS load profiles
 
 on:
   workflow_dispatch:
     inputs:
-      concurrent_users:
-        description: Concurrent synthetic applicants and scanners
+      profile:
+        description: Realistic release gate or explicitly non-gating stress/correctness profile
         required: true
-        default: "100"
-        type: string
+        default: scanner-release
+        type: choice
+        options:
+          - scanner-release
+          - scanner-spike
+          - scanner-contention
+          - applicant-sustained
+          - applicant-deadline
+          - applicant-stress
 
 permissions:
   contents: read
 
 concurrency:
-  group: meaningful-staging-load-test
+  group: staging-load-${{ inputs.profile }}
   cancel-in-progress: false
 
 jobs:
   load-test:
-    name: Applicant submissions and scanner redemptions
+    name: ${{ inputs.profile }}
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     environment: staging
     env:
       API_BASE_URL: https://hackatlantic-api-staging-5c4l8.ondigitalocean.app
-      K6_APPLICANT_VUS: ${{ inputs.concurrent_users }}
-      K6_SCANNER_VUS: ${{ inputs.concurrent_users }}
-      K6_SCANNER_IDENTITIES: "20"
-      K6_SCANNER_ITERATIONS: "1"
       K6_FIXTURE_PATH: .tmp/k6-staging-fixture.json
       K6_APPLICANT_FIXTURES: ../../.tmp/k6-staging-fixture.json
       K6_SCANNER_FIXTURES: ../../.tmp/k6-staging-fixture.json
@@ -44,13 +47,69 @@ jobs:
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: 1.14.3
-      - name: Validate requested concurrency
+      - name: Configure the selected fixed profile
         shell: bash
         run: |
-          [[ "${K6_APPLICANT_VUS}" =~ ^[0-9]+$ ]]
-          (( K6_APPLICANT_VUS >= 1 && K6_APPLICANT_VUS <= 200 ))
-          [[ "${K6_SCANNER_IDENTITIES}" =~ ^[0-9]+$ ]]
-          (( K6_SCANNER_IDENTITIES >= 10 && K6_SCANNER_IDENTITIES <= 25 ))
+          case "${{ inputs.profile }}" in
+            scanner-release)
+              cat >> "$GITHUB_ENV" <<'EOF'
+          K6_SCANNER_PROFILE=release
+          K6_SCANNER_IDENTITIES=20
+          K6_SCANNER_PASS_COUNT=1800
+          K6_SCANNER_VUS=20
+          K6_SCANNER_ITERATIONS=1800
+          K6_APPLICANT_COUNT=0
+          EOF
+              ;;
+            scanner-spike)
+              cat >> "$GITHUB_ENV" <<'EOF'
+          K6_SCANNER_PROFILE=spike
+          K6_SCANNER_IDENTITIES=20
+          K6_SCANNER_PASS_COUNT=100
+          K6_SCANNER_VUS=100
+          K6_SCANNER_RATE=5
+          K6_SCANNER_DURATION=20s
+          K6_APPLICANT_COUNT=0
+          EOF
+              ;;
+            scanner-contention)
+              cat >> "$GITHUB_ENV" <<'EOF'
+          K6_SCANNER_PROFILE=contention
+          K6_SCANNER_IDENTITIES=20
+          K6_SCANNER_PASS_COUNT=1
+          K6_SCANNER_VUS=100
+          K6_SCANNER_ITERATIONS=100
+          K6_APPLICANT_COUNT=0
+          EOF
+              ;;
+            applicant-sustained)
+              cat >> "$GITHUB_ENV" <<'EOF'
+          K6_APPLICANT_PROFILE=sustained
+          K6_APPLICANT_COUNT=50
+          K6_APPLICANT_VUS=20
+          K6_SCANNER_IDENTITIES=0
+          K6_SCANNER_PASS_COUNT=0
+          EOF
+              ;;
+            applicant-deadline)
+              cat >> "$GITHUB_ENV" <<'EOF'
+          K6_APPLICANT_PROFILE=deadline
+          K6_APPLICANT_COUNT=25
+          K6_APPLICANT_VUS=25
+          K6_SCANNER_IDENTITIES=0
+          K6_SCANNER_PASS_COUNT=0
+          EOF
+              ;;
+            applicant-stress)
+              cat >> "$GITHUB_ENV" <<'EOF'
+          K6_APPLICANT_PROFILE=stress
+          K6_APPLICANT_COUNT=100
+          K6_APPLICANT_VUS=100
+          K6_SCANNER_IDENTITIES=0
+          K6_SCANNER_PASS_COUNT=0
+          EOF
+              ;;
+          esac
       - name: Materialize protected staging connections
         shell: bash
         run: |
@@ -69,41 +128,43 @@ jobs:
           test -n "${load_test_auth_secret}"
           echo "::add-mask::${load_test_auth_secret}"
           echo "LOAD_TEST_AUTH_SECRET=${load_test_auth_secret}" >> "${GITHUB_ENV}"
-      - name: Prepare staging-only synthetic identities and event fixture
+      - name: Prepare staging-only synthetic fixture
         run: node tests/load/staging-fixture.mjs prepare
-      - name: Run applicant submission burst
-        id: applicant_load
-        continue-on-error: true
-        run: k6 run --summary-export .tmp/applicant-summary.json tests/load/applicant.js
       - name: Refresh short-lived scanner authentication
-        if: always()
+        if: startsWith(inputs.profile, 'scanner-')
         run: node tests/load/staging-fixture.mjs refresh-scanner
       - name: Export scanner checkpoint to k6
-        if: always()
+        if: startsWith(inputs.profile, 'scanner-')
         shell: bash
         run: |
           set +x
           checkpoint_id="$(jq -er '.scanner.checkpointId' "${K6_FIXTURE_PATH}")"
           echo "CHECKPOINT_ID=${checkpoint_id}" >> "${GITHUB_ENV}"
-      - name: Run scanner redemption burst
+      - name: Run scanner profile
         id: scanner_load
+        if: startsWith(inputs.profile, 'scanner-')
         continue-on-error: true
-        run: k6 run --summary-export .tmp/scanner-summary.json tests/load/scanner.js
+        run: k6 run --summary-export .tmp/profile-summary.json tests/load/scanner.js
+      - name: Run applicant profile
+        id: applicant_load
+        if: startsWith(inputs.profile, 'applicant-')
+        continue-on-error: true
+        run: k6 run --summary-export .tmp/profile-summary.json tests/load/applicant.js
+      - name: Verify scanner ledger correctness
+        if: always() && startsWith(inputs.profile, 'scanner-')
+        run: node tests/load/staging-fixture.mjs verify-scanner
       - name: Publish concise results
         if: always()
         shell: bash
         run: |
-          if [[ -f .tmp/applicant-summary.json ]]; then
-            echo "### Applicant submission burst" >> "${GITHUB_STEP_SUMMARY}"
-            jq -r '.metrics.http_reqs.count | "- Requests: \(.)"' .tmp/applicant-summary.json >> "${GITHUB_STEP_SUMMARY}"
-            jq -r '.metrics.http_req_failed.value * 100 | "- Failure rate: \(.)%"' .tmp/applicant-summary.json >> "${GITHUB_STEP_SUMMARY}"
-            jq -r '.metrics.http_req_duration["p(95)"] | "- Overall p95: \(.) ms"' .tmp/applicant-summary.json >> "${GITHUB_STEP_SUMMARY}"
-          fi
-          if [[ -f .tmp/scanner-summary.json ]]; then
-            echo "### Scanner redemption burst" >> "${GITHUB_STEP_SUMMARY}"
-            jq -r '.metrics.http_reqs.count | "- Requests: \(.)"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
-            jq -r '.metrics.http_req_failed.value * 100 | "- Failure rate: \(.)%"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
-            jq -r '.metrics.http_req_duration["p(95)"] | "- Overall p95: \(.) ms"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
+          if [[ -f .tmp/profile-summary.json ]]; then
+            {
+              echo "### ${{ inputs.profile }}"
+              jq -r '.metrics.http_reqs.count | "- Requests: \(.)"' .tmp/profile-summary.json
+              jq -r '.metrics.http_req_failed.value * 100 | "- System HTTP failure rate: \(.)%"' .tmp/profile-summary.json
+              jq -r '.metrics["http_req_duration{operation:lookup}"]["p(95)"]? // empty | "- Lookup p95: \(.) ms"' .tmp/profile-summary.json
+              jq -r '.metrics["http_req_duration{operation:redemption}"]["p(95)"]? // empty | "- Redemption p95: \(.) ms"' .tmp/profile-summary.json
+            } >> "${GITHUB_STEP_SUMMARY}"
           fi
       - name: Remove temporary staging staff access
         if: ${{ always() && env.LOAD_TEST_AUTH_SECRET != '' }}
@@ -111,19 +172,22 @@ jobs:
       - name: Remove protected Terraform inputs
         if: always()
         run: rm -f infra/environments/staging/ci.auto.tfvars.json
-      - name: Upload sanitized k6 summaries
+      - name: Upload sanitized k6 summary
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: meaningful-load-test-${{ github.run_id }}
-          path: |
-            .tmp/applicant-summary.json
-            .tmp/scanner-summary.json
+          name: ${{ inputs.profile }}-${{ github.run_id }}
+          path: .tmp/profile-summary.json
           if-no-files-found: ignore
           retention-days: 30
-      - name: Enforce both load-test gates
+      - name: Enforce the selected profile
         if: always()
         shell: bash
+        env:
+          SELECTED_PROFILE: ${{ inputs.profile }}
         run: |
-          test "${{ steps.applicant_load.outcome }}" = "success"
-          test "${{ steps.scanner_load.outcome }}" = "success"
+          if [[ "${SELECTED_PROFILE}" == scanner-* ]]; then
+            test "${{ steps.scanner_load.outcome }}" = "success"
+          else
+            test "${{ steps.applicant_load.outcome }}" = "success"
+          fi
