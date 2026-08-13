@@ -205,6 +205,7 @@ jobs:
           test -n "${load_test_auth_secret}"
           echo "::add-mask::${load_test_auth_secret}"
           {
+            echo "API_BASE_URL=${STAGING_API_URL}"
             echo "DATABASE_URL=postgresql://postgres.ovzrhurmiwqthfgycamx:${database_password}@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require"
             echo "LOAD_TEST_AUTH_SECRET=${load_test_auth_secret}"
             echo "K6_FIXTURE_PATH=.tmp/k6-staging-fixture.json"
@@ -228,7 +229,7 @@ jobs:
         env:
           API_BASE_URL: ${{ env.STAGING_API_URL }}
       - name: Verify scanner release-gate ledger correctness
-        if: always()
+        if: ${{ always() && hashFiles('.tmp/k6-staging-fixture.json') != '' }}
         run: node tests/load/staging-fixture.mjs verify-scanner
       - name: Remove temporary staging staff access
         if: ${{ always() && env.LOAD_TEST_AUTH_SECRET != '' }}
