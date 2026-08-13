@@ -140,7 +140,7 @@ async function sessionTokens(identities) {
   const now = Math.floor(Date.now() / 1_000);
   const secret = Buffer.from(loadTestAuthSecret, "base64");
   return identities.map((identity) => {
-    const payload = Buffer.from(JSON.stringify({ sub: identity.userId, iat: now - 5, exp: now + 540 }));
+    const payload = Buffer.from(JSON.stringify({ sub: identity.userId, iat: now - 5, exp: now + 595 }));
     const signature = createHmac("sha256", secret).update(payload).digest();
     return "hat_load_v1." + payload.toString("base64url") + "." + signature.toString("base64url");
   });

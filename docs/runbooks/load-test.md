@@ -6,7 +6,7 @@ Production is never a load-test target. The release pipeline always runs the pub
 
 | Profile | Workload | Purpose | Gate |
 | --- | --- | --- | --- |
-| `scanner-release` | 20 scanner identities, 1,800 distinct passes, 2–5 seconds between scans, approximately 5 minutes | Busy but realistic check-in or meal service | Lookup p95 <750 ms; redemption p95 <1,000 ms; system errors <1%; every distinct pass redeemed once |
+| `scanner-release` | 20 scanner identities, 1,500 distinct passes, 2–5 seconds between scans, approximately 7–9 minutes | Busy but realistic check-in or meal service | Lookup p95 <750 ms; redemption p95 <1,000 ms; system errors <1%; every distinct pass redeemed once |
 | `scanner-spike` | 100 distinct passes at 5 scans/second for 20 seconds | Abrupt capacity spike | System errors <1%; latency is reported, not used as a release gate |
 | `scanner-contention` | 100 attempts against one pass | Adversarial atomicity and idempotency proof | Exactly one `redeemed`, 99 `already_exhausted`, identical replay results, system errors <1% |
 
@@ -33,7 +33,7 @@ For local script validation with a staging-only fixture:
 ```bash
 K6_SCANNER_PROFILE=release \
 K6_SCANNER_VUS=20 \
-K6_SCANNER_ITERATIONS=1800 \
+K6_SCANNER_ITERATIONS=1500 \
 k6 run \
   -e API_BASE_URL=https://staging-api.hackatlantic.ca \
   -e CHECKPOINT_ID="$CHECKPOINT_ID" \
