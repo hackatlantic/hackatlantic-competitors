@@ -1,24 +1,39 @@
-# Scanner load-test runbook
+# ATS load-test profiles
 
-The release pipeline runs `tests/load/smoke.js` first. The manually dispatched **Meaningful staging load test** workflow creates staging-local synthetic identities, then runs a concurrent applicant submission burst and a distinct-pass scanner redemption burst against staging. Production is never a load-test target.
+Production is never a load-test target. The release pipeline always runs the public health smoke test. Authenticated ATS and scanner profiles run manually against staging through **Staging ATS load profiles** (`.github/workflows/meaningful-load-test.yml`).
 
-For an ad-hoc 100-user verification, dispatch `.github/workflows/meaningful-load-test.yml` with `concurrent_users=100`. It exercises API authentication, PostgreSQL draft/submission transactions, PDF resume storage, pass issuance, QR lookup, and atomic redemption. The controlled benchmark distributes 100 different accepted-attendee passes round-robin across 20 scanner identities. Temporary staff access is removed even when a test fails; synthetic ATS ledger records remain in staging for auditability and are recognizable by their `hat_load` run identifiers.
+## Scanner profiles
 
-Terraform generates `LOAD_TEST_AUTH_SECRET` only for staging. The Go API refuses to start with that setting in any other deployment environment. The workflow reads the sensitive value from HCP Terraform state and locally creates HMAC-authenticated tokens that expire within ten minutes. Normal Clerk tokens continue through the unchanged Clerk JWT verifier. No load-test endpoint, password flow, browser session, or production bypass exists.
+| Profile | Workload | Purpose | Gate |
+| --- | --- | --- | --- |
+| `scanner-release` | 20 scanner identities, 1,800 distinct passes, 2–5 seconds between scans, approximately 5 minutes | Busy but realistic check-in or meal service | Lookup p95 <750 ms; redemption p95 <1,000 ms; system errors <1%; every distinct pass redeemed once |
+| `scanner-spike` | 100 distinct passes at 5 scans/second for 20 seconds | Abrupt capacity spike | System errors <1%; latency is reported, not used as a release gate |
+| `scanner-contention` | 100 attempts against one pass | Adversarial atomicity and idempotency proof | Exactly one `redeemed`, 99 `already_exhausted`, identical replay results, system errors <1% |
 
-The workflow creates 20 scanner identities, one accepted attendee and active pass per virtual user, and a shared checkpoint. Neither the staging HMAC secret nor any QR or scanner token is printed or uploaded in the sanitized result artifact.
+`already_exhausted`, `not_entitled`, and other redemption outcomes are domain results returned in an HTTP 200 body. They are not transport/server failures. The scripts count HTTP failures separately from unexpected domain outcomes.
 
-## Local execution
+The release profile consumes one distinct attendee pass per scan. Scanner identities are reused round-robin because real devices perform many scans; a scanner account is not created per attendee.
 
-Run the public smoke profile:
+## Applicant profiles
+
+| Profile | Workload | Purpose |
+| --- | --- | --- |
+| `applicant-sustained` | 50 applicants across 20 active users, multiple draft saves, intermittent résumé upload, 20–45 second think times | Normal application intake |
+| `applicant-deadline` | 25 fully prepared applications submitted evenly over one minute | Realistic deadline burst |
+| `applicant-stress` | 100 applicants completing the entire lifecycle simultaneously | Explicitly non-realistic stress/capacity test |
+
+The deadline fixture prepares drafts and résumés before k6 starts; the measured workload is therefore the submission spike rather than application setup.
+
+## Running a profile
+
+From GitHub Actions, dispatch **Staging ATS load profiles** and choose one fixed profile. The fixed topology prevents an ad-hoc stress value from accidentally becoming a release standard.
+
+For local script validation with a staging-only fixture:
 
 ```bash
-k6 run -e API_BASE_URL=http://localhost:8080 tests/load/smoke.js
-```
-
-Run the scanner profile only against a synthetic environment:
-
-```bash
+K6_SCANNER_PROFILE=release \
+K6_SCANNER_VUS=20 \
+K6_SCANNER_ITERATIONS=1800 \
 k6 run \
   -e API_BASE_URL=https://staging-api.hackatlantic.ca \
   -e CHECKPOINT_ID="$CHECKPOINT_ID" \
@@ -26,4 +41,4 @@ k6 run \
   tests/load/scanner.js
 ```
 
-The gate fails when lookup p95 exceeds 500 ms, redemption p95 exceeds 750 ms, or the HTTP failure rate reaches 1%. Domain outcomes such as `already_exhausted` remain valid responses and do not hide transport/server failures.
+The workflow creates staging-only HMAC-authenticated identities, accepted attendees, passes, and checkpoints. Temporary administrator/scanner access is removed even when a test fails. Synthetic ATS ledger records remain in staging for auditability and use `hat_load` identifiers. Secrets, QR tokens, and scanner tokens are never uploaded with the sanitized k6 summary.
