@@ -397,11 +397,11 @@ function verifyScanner() {
     THEN 'true' ELSE 'false' END AS verified
   FROM ats.redemptions
   WHERE checkpoint_id = :'checkpoint_id'::uuid
-  \gset
-  \if :verified
-  \else
-    \quit 1
-  \endif`, { checkpoint_id: checkpointID, expected_redemptions: expectedRedemptions });
+  \\gset
+  \\if :verified
+  \\else
+    \\quit 1
+  \\endif`, { checkpoint_id: checkpointID, expected_redemptions: expectedRedemptions });
   console.log("Verified " + expectedRedemptions + " atomic redemption ledger entries with no duplicate attendees.");
 }
 
