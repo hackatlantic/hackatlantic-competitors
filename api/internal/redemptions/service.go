@@ -349,7 +349,7 @@ func findRedemptionRequest(ctx context.Context, tx pgx.Tx, idempotencyKey pgtype
 func lockCheckpoint(ctx context.Context, tx pgx.Tx, id pgtype.UUID) (lockedCheckpoint, error) {
 	var checkpoint lockedCheckpoint
 	err := tx.QueryRow(ctx, `SELECT id, cycle_id, name, opens_at, closes_at, default_allowed, default_max_redemptions, active
-		FROM ats.checkpoints WHERE id = $1 FOR UPDATE`, id).Scan(
+		FROM ats.checkpoints WHERE id = $1 FOR SHARE`, id).Scan(
 		&checkpoint.id, &checkpoint.cycleID, &checkpoint.name, &checkpoint.opensAt, &checkpoint.closesAt,
 		&checkpoint.defaultAllowed, &checkpoint.defaultMaxRedemptions, &checkpoint.active,
 	)

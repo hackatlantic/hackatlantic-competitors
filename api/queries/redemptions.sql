@@ -50,7 +50,7 @@ SELECT
     checkpoint.active
 FROM ats.checkpoints AS checkpoint
 WHERE checkpoint.id = sqlc.arg(checkpoint_id)
-FOR UPDATE OF checkpoint;
+FOR SHARE OF checkpoint;
 
 -- name: LockPassForRedemptionByQRTokenHash :one
 SELECT
