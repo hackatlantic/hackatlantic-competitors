@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHmac, randomUUID } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 
 const command = process.argv[2];
 const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json";
@@ -75,6 +76,7 @@ function loadFixture() {
 }
 
 function saveFixture(fixture) {
+  mkdirSync(dirname(fixturePath), { recursive: true });
   writeFileSync(fixturePath, JSON.stringify(fixture) + "\n", { mode: 0o600 });
 }
 
