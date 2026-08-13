@@ -29,6 +29,7 @@ jobs:
       K6_SCANNER_ITERATIONS: "1"
       K6_FIXTURE_PATH: .tmp/k6-staging-fixture.json
       K6_APPLICANT_FIXTURES: ../../.tmp/k6-staging-fixture.json
+      K6_SCANNER_FIXTURES: ../../.tmp/k6-staging-fixture.json
       TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
       TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
     steps:
@@ -80,12 +81,9 @@ jobs:
         run: |
           set +x
           scanner_token="$(jq -er '.scanner.token' "${K6_FIXTURE_PATH}")"
-          qr_token="$(jq -er '.scanner.qrToken' "${K6_FIXTURE_PATH}")"
           checkpoint_id="$(jq -er '.scanner.checkpointId' "${K6_FIXTURE_PATH}")"
           echo "::add-mask::${scanner_token}"
-          echo "::add-mask::${qr_token}"
           echo "SCANNER_TOKEN=${scanner_token}" >> "${GITHUB_ENV}"
-          echo "QR_TOKEN=${qr_token}" >> "${GITHUB_ENV}"
           echo "CHECKPOINT_ID=${checkpoint_id}" >> "${GITHUB_ENV}"
       - name: Run scanner redemption burst
         id: scanner_load
@@ -107,7 +105,7 @@ jobs:
             jq -r '.metrics.http_req_failed.value * 100 | "- Failure rate: \(.)%"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
             jq -r '.metrics.http_req_duration["p(95)"] | "- Overall p95: \(.) ms"' .tmp/scanner-summary.json >> "${GITHUB_STEP_SUMMARY}"
           fi
-      - name: Remove synthetic identities and temporary staff access
+      - name: Remove temporary staging staff access
         if: ${{ always() && env.LOAD_TEST_AUTH_SECRET != '' }}
         run: node tests/load/staging-fixture.mjs cleanup
       - name: Remove protected Terraform inputs
