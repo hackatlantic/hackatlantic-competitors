@@ -95,7 +95,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npx --yes vercel@58.1.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
@@ -179,7 +179,7 @@ jobs:
           path: tests/load/smoke.js
         env:
           API_BASE_URL: ${{ env.STAGING_API_URL }}
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
@@ -332,7 +332,7 @@ jobs:
           curl --fail-with-body -X POST -H 'Content-Type: application/json' -H "Authorization: Bearer ${DIGITALOCEAN_ACCESS_TOKEN}" -d '{"deployment_id":"${{ steps.current.outputs.deployment_id }}"}' "https://api.digitalocean.com/v2/apps/${{ steps.current.outputs.app_id }}/rollback"
       - if: steps.smoke.outcome == 'failure'
         run: exit 1
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with: { node-version: 20 }
       - name: Promote staged frontend without rebuilding
         run: npx --yes vercel@58.1.0 promote "${{ needs.frontend-stage.outputs.deployment_url }}" --yes --token="$VERCEL_TOKEN"
