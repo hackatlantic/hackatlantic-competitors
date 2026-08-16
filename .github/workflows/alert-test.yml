@@ -1,0 +1,63 @@
+name: Operational Alert Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Protected environment whose alert transports should be tested
+        required: true
+        default: staging
+        type: choice
+        options:
+          - staging
+          - backup
+          - disaster-recovery
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    name: Test Discord, email, and Grafana delivery
+    runs-on: ubuntu-24.04
+    environment:
+      name: ${{ inputs.environment }}
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      ALERT_EMAIL_FROM: ${{ vars.ALERT_EMAIL_FROM }}
+      ADMIN_ALERT_EMAILS: ${{ vars.ADMIN_ALERT_EMAILS }}
+      GRAFANA_OTLP_ENDPOINT: ${{ vars.GRAFANA_OTLP_ENDPOINT }}
+      GRAFANA_OTLP_AUTHORIZATION: ${{ secrets.GRAFANA_OTLP_AUTHORIZATION }}
+      DEPLOYMENT_ENVIRONMENT: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: Validate alert transports
+        shell: bash
+        run: |
+          [[ -n "${DISCORD_WEBHOOK_URL:-}" ]] || { echo "::error::DISCORD_WEBHOOK_URL is not configured"; exit 1; }
+          [[ -n "${RESEND_API_KEY:-}" ]] || { echo "::error::RESEND_API_KEY is not configured"; exit 1; }
+          [[ -n "${ALERT_EMAIL_FROM:-}" ]] || { echo "::error::ALERT_EMAIL_FROM is not configured"; exit 1; }
+          [[ -n "${ADMIN_ALERT_EMAILS:-}" ]] || { echo "::error::ADMIN_ALERT_EMAILS is not configured"; exit 1; }
+      - name: Deliver Discord and email test alerts
+        run: bash scripts/notify-incident.sh
+        env:
+          ALERT_MESSAGE: HackAtlantic operational alert test succeeded for ${{ inputs.environment }} from workflow run ${{ github.run_id }}.
+      - name: Publish Grafana test marker
+        if: env.GRAFANA_OTLP_ENDPOINT != '' && env.GRAFANA_OTLP_AUTHORIZATION != ''
+        run: bash scripts/push-otlp-gauge.sh hackatlantic.alert_test.last_success_unixtime "$(date +%s)" s
+      - name: Record evidence
+        shell: bash
+        run: |
+          {
+            echo "### Operational alert test"
+            echo "- Environment: ${{ inputs.environment }}"
+            echo "- Discord: delivered"
+            echo "- Email: delivered"
+            if [[ -n "${GRAFANA_OTLP_ENDPOINT:-}" && -n "${GRAFANA_OTLP_AUTHORIZATION:-}" ]]; then
+              echo "- Grafana marker: delivered"
+            else
+              echo "- Grafana marker: not configured"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

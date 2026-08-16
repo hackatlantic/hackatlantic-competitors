@@ -1,0 +1,101 @@
+name: Staging Rollback Drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type ROLLBACK STAGING to temporarily activate the previous staging deployment
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-release
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    name: Roll back and restore staging
+    if: inputs.confirmation == 'ROLLBACK STAGING'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: https://staging-api.hackatlantic.ca
+    env:
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+      APP_NAME: hackatlantic-api-staging
+      API_BASE_URL: https://staging-api.hackatlantic.ca
+    steps:
+      - name: Validate configuration
+        shell: bash
+        run: test -n "${DIGITALOCEAN_TOKEN}"
+      - name: Prove rollback and restore the original digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          auth=(-H "Authorization: Bearer ${DIGITALOCEAN_TOKEN}")
+          app_id="$(curl --fail --silent --show-error "${auth[@]}" \
+            'https://api.digitalocean.com/v2/apps?per_page=200' \
+            | jq -er --arg name "$APP_NAME" '[.apps[] | select(.spec.name == $name)] | if length == 1 then .[0].id else error("expected exactly one staging app") end')"
+          deployments="$(curl --fail --silent --show-error "${auth[@]}" \
+            "https://api.digitalocean.com/v2/apps/${app_id}/deployments?per_page=200")"
+          original_id="$(jq -er '.deployments[] | select(.phase == "ACTIVE") | .id' <<<"$deployments" | head -n 1)"
+          previous_id="$(jq -er '.deployments[] | select(.phase == "SUPERSEDED") | .id' <<<"$deployments" | head -n 1)"
+          original_digest="$(curl --fail --silent --show-error "${auth[@]}" \
+            "https://api.digitalocean.com/v2/apps/${app_id}" \
+            | jq -er '.app.active_deployment.spec.services[] | select(.name == "api") | .image.digest')"
+          previous_digest="$(curl --fail --silent --show-error "${auth[@]}" \
+            "https://api.digitalocean.com/v2/apps/${app_id}/deployments/${previous_id}" \
+            | jq -er '.deployment.spec.services[] | select(.name == "api") | .image.digest')"
+          [[ "$original_digest" != "$previous_digest" ]] || { echo "No distinct previous digest is available for a meaningful drill" >&2; exit 1; }
+
+          restored=false
+          restore_original() {
+            if [[ "$restored" != true ]]; then
+              curl --fail-with-body --silent --show-error -X POST \
+                -H 'Content-Type: application/json' "${auth[@]}" \
+                -d "{\"deployment_id\":\"${original_id}\"}" \
+                "https://api.digitalocean.com/v2/apps/${app_id}/rollback" >/dev/null || true
+            fi
+          }
+          trap restore_original EXIT
+
+          wait_for_digest() {
+            local expected="$1"
+            for _ in {1..36}; do
+              active="$(curl --fail --silent --show-error "${auth[@]}" \
+                "https://api.digitalocean.com/v2/apps/${app_id}" \
+                | jq -r '.app.active_deployment.spec.services[] | select(.name == "api") | .image.digest // empty')"
+              [[ "$active" == "$expected" ]] && return 0
+              sleep 10
+            done
+            return 1
+          }
+
+          started="$(date +%s)"
+          curl --fail-with-body --silent --show-error -X POST \
+            -H 'Content-Type: application/json' "${auth[@]}" \
+            -d "{\"deployment_id\":\"${previous_id}\"}" \
+            "https://api.digitalocean.com/v2/apps/${app_id}/rollback" >/dev/null
+          wait_for_digest "$previous_digest"
+          rollback_seconds="$(( $(date +%s) - started ))"
+
+          curl --fail-with-body --silent --show-error -X POST \
+            -H 'Content-Type: application/json' "${auth[@]}" \
+            -d "{\"deployment_id\":\"${original_id}\"}" \
+            "https://api.digitalocean.com/v2/apps/${app_id}/rollback" >/dev/null
+          wait_for_digest "$original_digest"
+          curl --fail --silent --show-error "${API_BASE_URL}/readyz" | grep -q ready
+          restored=true
+          trap - EXIT
+
+          {
+            echo '### Staging rollback drill'
+            echo "- Previous digest activated: yes"
+            echo "- Original digest restored: yes"
+            echo "- Readiness after restoration: passed"
+            echo "- Rollback activation time: ${rollback_seconds}s"
+          } >> "$GITHUB_STEP_SUMMARY"

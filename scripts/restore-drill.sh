@@ -32,12 +32,35 @@ chmod 600 "$identity"
 aws --endpoint-url "$SPACES_ENDPOINT" s3 cp "s3://${BACKUP_BUCKET}/${latest_key}" "$encrypted" --only-show-errors
 age --decrypt --identity "$identity" --output "$dump" "$encrypted"
 
-pg_restore --clean --if-exists --no-owner --no-acl --dbname="$RESTORE_DATABASE_URL" "$dump"
+if [[ -n "${POSTGRES_CLIENT_IMAGE:-}" ]]; then
+  export DUMP_FILE="$(basename "$dump")"
+  docker run --rm --network host \
+    --env RESTORE_DATABASE_URL \
+    --env DUMP_FILE \
+    --volume "$workdir:/backup:ro" \
+    "$POSTGRES_CLIENT_IMAGE" \
+    sh -euc 'pg_restore --clean --if-exists --no-owner --no-acl --dbname="$RESTORE_DATABASE_URL" "/backup/${DUMP_FILE}"'
+else
+  pg_restore --clean --if-exists --no-owner --no-acl --dbname="$RESTORE_DATABASE_URL" "$dump"
+fi
 DATABASE_URL="$RESTORE_DATABASE_URL" go -C api run ./cmd/migrate
 
-schema_exists="$(psql "$RESTORE_DATABASE_URL" -Atqc "SELECT count(*) FROM information_schema.schemata WHERE schema_name = 'ats'")"
-table_count="$(psql "$RESTORE_DATABASE_URL" -Atqc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'ats'")"
-migration_count="$(psql "$RESTORE_DATABASE_URL" -Atqc "SELECT count(*) FROM ats.schema_migrations")"
+psql_value() {
+  local query="$1"
+  if [[ -n "${POSTGRES_CLIENT_IMAGE:-}" ]]; then
+    docker run --rm --network host \
+      --env RESTORE_DATABASE_URL \
+      --env QUERY="$query" \
+      "$POSTGRES_CLIENT_IMAGE" \
+      sh -euc 'psql "$RESTORE_DATABASE_URL" -Atqc "$QUERY"'
+  else
+    psql "$RESTORE_DATABASE_URL" -Atqc "$query"
+  fi
+}
+
+schema_exists="$(psql_value "SELECT count(*) FROM information_schema.schemata WHERE schema_name = 'ats'")"
+table_count="$(psql_value "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'ats'")"
+migration_count="$(psql_value "SELECT count(*) FROM ats.schema_migrations")"
 if [[ "$schema_exists" != "1" || "$table_count" -lt "15" || "$migration_count" -lt "11" ]]; then
   echo "Restore integrity validation failed" >&2
   exit 1

@@ -1,5 +1,10 @@
 # Rollback runbook
 
+The **Staging Rollback Drill** workflow exercises DigitalOcean's real rollback
+API without leaving staging on an old release. It activates the most recent
+superseded digest, measures activation time, restores the original digest, and
+requires `/readyz` to pass. Enter `ROLLBACK STAGING` when dispatching it.
+
 The release workflow automatically asks DigitalOcean to restore the prior active deployment when production API smoke tests fail. This should restore code and configuration within five minutes. It does not reverse database migrations.
 
 ## API
