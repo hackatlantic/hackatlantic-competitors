@@ -37,7 +37,7 @@
     "clerk": "^3.0.0",
     "eslint": "latest",
     "eslint-config-next": "latest",
-    "jsdom": "29.0.0",
+    "jsdom": "30.0.1",
     "typescript": "latest",
     "vitest": "4.1.10"
   }
