@@ -42,3 +42,7 @@ k6 run \
 ```
 
 The workflow creates staging-only HMAC-authenticated identities, accepted attendees, passes, and checkpoints. Temporary administrator/scanner access is removed even when a test fails. Synthetic ATS ledger records remain in staging for auditability and use `hat_load` identifiers. Secrets, QR tokens, and scanner tokens are never uploaded with the sanitized k6 summary.
+
+Redemption idempotency UUIDs include the staging fixture run identifier. Never
+replace them with VU/iteration-only values: redemption requests are append-only,
+and cross-run key reuse correctly returns HTTP 409 when a new pass is supplied.
