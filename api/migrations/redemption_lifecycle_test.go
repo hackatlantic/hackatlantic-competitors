@@ -298,6 +298,103 @@ func TestScannerRedemptionsAreAtomicIdempotentAndMinimal(t *testing.T) {
 	assertRedemptionPersistence(t, ctx, pool, scannerID, mainAttendeeID, mainPass.ID, defaultCheckpointID, firstKey, *first.RedemptionID, mainPass.QRToken)
 }
 
+func TestDistinctPassRedemptionsSustainTwentyConcurrentScanners(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), integrationTimeout)
+	defer cancel()
+	pool, cleanup := disposableDatabase(t, ctx)
+	defer cleanup()
+	if err := migrations.Apply(ctx, pool); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	organizerID := createUser(t, ctx, pool, "clerk-redemption-load-organizer")
+	cycleID := insertCycle(t, ctx, pool, "redemption-load", true)
+	formID := insertWorkflowForm(t, ctx, pool, cycleID, organizerID)
+	checkpointID := insertRedemptionCheckpoint(t, ctx, pool, cycleID, "load", "Load entrance", true, 1, true, nil, nil)
+	organizer := decisionTestUser(organizerID, "clerk-redemption-load-organizer", users.RoleOrganizer)
+
+	passService, err := passes.NewService(pool, 5*time.Second, 15*time.Second, passes.Config{
+		QRTokenPepper: encodedTestPepper(0x51), ClaimTokenPepper: encodedTestPepper(0x52), AppBaseURL: "https://app.example",
+	})
+	if err != nil {
+		t.Fatalf("create pass service: %v", err)
+	}
+	redemptionService := redemptions.NewService(pool, 15*time.Second, passService)
+
+	const scannerCount = 20
+	const passCount = 100
+	scanners := make([]users.User, scannerCount)
+	for index := range scanners {
+		clerkID := fmt.Sprintf("clerk-redemption-load-scanner-%02d", index)
+		id := createUser(t, ctx, pool, clerkID)
+		scanners[index] = decisionTestUser(id, clerkID, users.RoleScanner)
+	}
+
+	issued := make([]passes.Issuance, passCount)
+	for index := range issued {
+		clerkID := fmt.Sprintf("clerk-redemption-load-attendee-%03d", index)
+		userID := createUser(t, ctx, pool, clerkID)
+		applicationID := insertDraftWorkflowApplication(t, ctx, pool, cycleID, formID, userID, fmt.Sprintf("Load attendee %03d", index))
+		if _, err := pool.Exec(ctx, `UPDATE ats.applications SET status = 'accepted', submitted_at = CURRENT_TIMESTAMP,
+			current_decision = 'accepted', decision_released_at = CURRENT_TIMESTAMP WHERE id = $1`, applicationID); err != nil {
+			t.Fatalf("accept load application %d: %v", index, err)
+		}
+		var attendeeID string
+		if err := pool.QueryRow(ctx, `INSERT INTO ats.attendees (cycle_id, application_id, user_id, display_name, email)
+			VALUES ($1, $2, $3, $4, $5) RETURNING id::text`, cycleID, applicationID, userID,
+			fmt.Sprintf("Load attendee %03d", index), clerkID+"@example.test").Scan(&attendeeID); err != nil {
+			t.Fatalf("create load attendee %d: %v", index, err)
+		}
+		issued[index], err = passService.Issue(ctx, organizer, attendeeID)
+		if err != nil {
+			t.Fatalf("issue load pass %d: %v", index, err)
+		}
+	}
+
+	start := make(chan struct{})
+	work := make(chan int)
+	errorsByPass := make([]error, passCount)
+	results := make([]redemptions.Result, passCount)
+	var workers sync.WaitGroup
+	workers.Add(scannerCount)
+	for scannerIndex := range scanners {
+		go func(scanner users.User) {
+			defer workers.Done()
+			<-start
+			for passIndex := range work {
+				results[passIndex], errorsByPass[passIndex] = redemptionService.Redeem(ctx, scanner, redemptions.RedeemInput{
+					QRToken: issued[passIndex].QRToken, CheckpointID: checkpointID,
+					IdempotencyKey: fmt.Sprintf("10000000-0000-4000-8000-%012d", passIndex),
+				})
+			}
+		}(scanners[scannerIndex])
+	}
+	close(start)
+	for index := range issued {
+		work <- index
+	}
+	close(work)
+	workers.Wait()
+
+	for index, err := range errorsByPass {
+		if err != nil {
+			t.Errorf("redeem distinct pass %d: %v", index, err)
+			continue
+		}
+		if results[index].Outcome != redemptions.OutcomeRedeemed || results[index].RedemptionID == nil {
+			t.Errorf("distinct pass %d returned unexpected result: %+v", index, results[index])
+		}
+	}
+	var redemptionCount, distinctAttendeeCount int
+	if err := pool.QueryRow(ctx, `SELECT count(*), count(DISTINCT attendee_id) FROM ats.redemptions WHERE checkpoint_id = $1`, checkpointID).
+		Scan(&redemptionCount, &distinctAttendeeCount); err != nil {
+		t.Fatalf("count load redemptions: %v", err)
+	}
+	if redemptionCount != passCount || distinctAttendeeCount != passCount {
+		t.Fatalf("distinct-pass load lost or duplicated redemptions: rows=%d attendees=%d", redemptionCount, distinctAttendeeCount)
+	}
+}
+
 type asyncRedemptionResult struct {
 	result redemptionOutcomeResponse
 	err    error
