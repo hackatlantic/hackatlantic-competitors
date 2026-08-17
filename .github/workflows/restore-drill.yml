@@ -42,6 +42,7 @@ jobs:
       ADMIN_ALERT_EMAILS: ${{ vars.ADMIN_ALERT_EMAILS }}
       GRAFANA_OTLP_ENDPOINT: ${{ vars.GRAFANA_OTLP_ENDPOINT }}
       GRAFANA_OTLP_AUTHORIZATION: ${{ secrets.GRAFANA_OTLP_AUTHORIZATION }}
+      POSTGRES_CLIENT_IMAGE: postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -49,8 +50,23 @@ jobs:
         with:
           go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
-      - name: Install PostgreSQL and age
-        run: sudo apt-get update && sudo apt-get install --yes postgresql-client age
+      - name: Install age
+        run: sudo apt-get update && sudo apt-get install --yes age
+      - name: Validate restore configuration
+        shell: bash
+        run: |
+          missing=()
+          for name in SPACES_ENDPOINT SPACES_REGION BACKUP_BUCKET SPACES_ACCESS_KEY_ID SPACES_SECRET_ACCESS_KEY AGE_IDENTITY; do
+            [[ -n "${!name:-}" ]] || missing+=("${name}")
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "::error::Missing restore configuration: ${missing[*]}"
+            exit 1
+          fi
+          command -v aws >/dev/null
+          command -v docker >/dev/null
+          command -v age >/dev/null
+          docker run --rm "$POSTGRES_CLIENT_IMAGE" pg_restore --version
       - id: restore
         continue-on-error: true
         run: bash scripts/restore-drill.sh
@@ -61,8 +77,9 @@ jobs:
         continue-on-error: true
         run: bash scripts/push-otlp-gauge.sh hackatlantic.restore_drill.duration "${{ steps.restore.outputs.rto_seconds }}" s
       - if: steps.restore.outcome == 'failure'
+        continue-on-error: true
         run: bash scripts/notify-incident.sh
         env:
           ALERT_MESSAGE: HackAtlantic monthly ATS restore drill failed. Review GitHub Actions immediately.
-      - if: steps.restore.outcome == 'failure'
+      - if: always() && steps.restore.outcome == 'failure'
         run: exit 1

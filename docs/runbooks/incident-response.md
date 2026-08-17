@@ -1,5 +1,11 @@
 # Incident response runbook
 
+Use the **Operational Alert Test** workflow after configuring or rotating alert
+credentials. It requires both Discord and Resend delivery to succeed and emits
+a Grafana marker when OTLP credentials are present. Run it separately against
+the `staging`, `backup`, and `disaster-recovery` environments because GitHub
+environment credentials are isolated.
+
 ## Triage
 
 1. Acknowledge the alert in Discord/email and name an incident lead.

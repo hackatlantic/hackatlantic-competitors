@@ -35,7 +35,7 @@ const (
 	OutcomeRevokedPass      = "revoked_pass"
 
 	defaultTransactionTimeout = 15 * time.Second
-	serializableRetries       = 3
+	transactionRetries        = 3
 )
 
 // QRTokenHasher is implemented by passes.Service. It retains ownership of the
@@ -132,8 +132,10 @@ func (s *Service) Lookup(ctx context.Context, actor users.User, qrToken string) 
 }
 
 // Redeem records a scanner request exactly once. Every decision, its safe
-// snapshot, and any successful redemption are inserted in one serializable
-// transaction. Retrying serialization/unique races re-reads the idempotency
+// snapshot, and any successful redemption are inserted in one transaction.
+// Pass-row locks serialize the same attendee credential, the shared checkpoint
+// lock prevents policy changes from racing, and database uniqueness protects
+// idempotency. Retrying serialization/unique races re-reads the idempotency
 // ledger rather than producing a second redemption.
 func (s *Service) Redeem(ctx context.Context, actor users.User, input RedeemInput) (Result, error) {
 	if !actor.HasRole(users.RoleScanner) {
@@ -161,14 +163,14 @@ func (s *Service) Redeem(ctx context.Context, actor users.User, input RedeemInpu
 
 	ctx, cancel := context.WithTimeout(ctx, s.transactionTimeout)
 	defer cancel()
-	for range serializableRetries {
+	for range transactionRetries {
 		result, retry, err := s.redeemAttempt(ctx, actorID, checkpointID, idempotencyKey, qrHash, validQR)
 		if retry && ctx.Err() == nil {
 			continue
 		}
 		return result, err
 	}
-	return Result{}, fmt.Errorf("redeem transaction did not serialize after %d attempts", serializableRetries)
+	return Result{}, fmt.Errorf("redeem transaction did not complete after %d attempts", transactionRetries)
 }
 
 type redemptionRequestRow struct {
@@ -204,7 +206,12 @@ type lockedPass struct {
 }
 
 func (s *Service) redeemAttempt(ctx context.Context, scannerID, checkpointID, idempotencyKey pgtype.UUID, qrHash []byte, validQR bool) (Result, bool, error) {
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.Serializable})
+	// READ COMMITTED is deliberate. The stronger SERIALIZABLE level turns the
+	// initial absent-idempotency and zero-redemption index probes into broad
+	// predicate conflicts, so unrelated passes can repeatedly abort under a
+	// normal check-in burst. The explicit pass/checkpoint row locks and unique
+	// constraints below provide the required, narrower serialization boundaries.
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return Result{}, false, fmt.Errorf("begin redemption transaction: %w", err)
 	}

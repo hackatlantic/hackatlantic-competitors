@@ -3,13 +3,15 @@ import { check, sleep } from "k6";
 import { Counter, Rate } from "k6/metrics";
 import { SharedArray } from "k6/data";
 import exec from "k6/execution";
+import { loadTestOperationID } from "./idempotency.js";
 
 const profile = __ENV.K6_SCANNER_PROFILE ?? "release";
 const fixturePath = __ENV.K6_SCANNER_FIXTURES;
 const scannerFixture = new SharedArray("synthetic scanner fixture", () => {
   if (!fixturePath) throw new Error("K6_SCANNER_FIXTURES is required");
-  const scanner = JSON.parse(open(fixturePath)).scanner;
-  return [{ passes: scanner.passes, tokens: scanner.tokens }];
+  const fixture = JSON.parse(open(fixturePath));
+  const scanner = fixture.scanner;
+  return [{ runID: fixture.runID, passes: scanner.passes, tokens: scanner.tokens }];
 })[0];
 const virtualUsers = Number(__ENV.K6_SCANNER_VUS ?? (profile === "release" ? 20 : 100));
 const iterations = Number(__ENV.K6_SCANNER_ITERATIONS ?? scannerFixture.passes.length);
@@ -91,9 +93,7 @@ const checkpointID = __ENV.CHECKPOINT_ID;
 const expectedHTTP = http.expectedStatuses(200);
 
 function operationID() {
-  const vu = String(exec.vu.idInTest).padStart(3, "0").slice(-3);
-  const iteration = String(exec.scenario.iterationInTest).padStart(9, "0").slice(-9);
-  return `00000000-0000-4000-8000-${vu}${iteration}`;
+  return loadTestOperationID(scannerFixture.runID, exec.vu.idInTest, exec.scenario.iterationInTest);
 }
 
 function recordSystemResult(response) {
