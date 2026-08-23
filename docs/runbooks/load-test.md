@@ -18,7 +18,7 @@ The release profile consumes one distinct attendee pass per scan. Scanner identi
 
 | Profile | Workload | Purpose |
 | --- | --- | --- |
-| `applicant-sustained` | 50 applicants across 20 active users, multiple draft saves, intermittent résumé upload, 20–45 second think times | Normal application intake |
+| `applicant-sustained` | 50 applicants across 20 active users ramped over one minute, multiple draft saves, intermittent résumé upload, 20–45 second think times | Normal application intake |
 | `applicant-deadline` | 25 fully prepared applications submitted evenly over one minute | Realistic deadline burst |
 | `applicant-stress` | 100 applicants completing the entire lifecycle simultaneously | Explicitly non-realistic stress/capacity test |
 

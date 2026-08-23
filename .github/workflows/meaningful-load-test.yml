@@ -87,6 +87,7 @@ jobs:
           K6_APPLICANT_PROFILE=sustained
           K6_APPLICANT_COUNT=50
           K6_APPLICANT_VUS=20
+          K6_APPLICANT_RAMP_SECONDS=60
           K6_SCANNER_IDENTITIES=0
           K6_SCANNER_PASS_COUNT=0
           EOF
