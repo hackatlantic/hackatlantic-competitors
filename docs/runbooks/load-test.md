@@ -20,7 +20,7 @@ The release profile consumes one distinct attendee pass per scan. Scanner identi
 | --- | --- | --- |
 | `applicant-sustained` | 50 applicants across 20 active users ramped over one minute, multiple draft saves, intermittent résumé upload, 20–45 second think times | Normal application intake |
 | `applicant-deadline` | 25 fully prepared applications submitted evenly over one minute | Realistic deadline burst |
-| `applicant-stress` | 100 applicants completing the entire lifecycle simultaneously | Explicitly non-realistic stress/capacity test |
+| `applicant-stress` | 100 applicants completing the entire lifecycle simultaneously | Explicitly non-realistic stress/capacity test; enforces correctness and `<1%` transport/server errors while reporting, rather than gating on, normal-traffic latency targets |
 
 The deadline fixture prepares drafts and résumés before k6 starts; the measured workload is therefore the submission spike rather than application setup.
 

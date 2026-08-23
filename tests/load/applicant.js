@@ -42,6 +42,9 @@ function applicantThresholds() {
   if (profile === "deadline") {
     return { ...common, "http_req_duration{operation:submit}": ["p(95)<1500"] };
   }
+  if (profile === "stress") {
+    return common;
+  }
   return {
     ...common,
     "http_req_duration{operation:form}": ["p(95)<750"],
