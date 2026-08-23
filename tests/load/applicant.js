@@ -42,6 +42,9 @@ function applicantThresholds() {
   if (profile === "deadline") {
     return { ...common, "http_req_duration{operation:submit}": ["p(95)<1500"] };
   }
+  if (profile === "stress") {
+    return common;
+  }
   return {
     ...common,
     "http_req_duration{operation:form}": ["p(95)<750"],
@@ -79,6 +82,15 @@ function think() {
   if (profile === "sustained") sleep(20 + Math.random() * 25);
 }
 
+function rampSustainedApplicants(index) {
+  if (profile !== "sustained") return;
+  const rampSeconds = Number(__ENV.K6_APPLICANT_RAMP_SECONDS ?? 60);
+  if (!Number.isFinite(rampSeconds) || rampSeconds < 0) {
+    exec.test.abort("K6_APPLICANT_RAMP_SECONDS must be a non-negative number");
+  }
+  sleep((index % virtualUsers) * (rampSeconds / virtualUsers));
+}
+
 function submitPreparedApplicant(applicant, index) {
   sleep((index * 60) / applicants.length);
   const headers = { Authorization: "Bearer " + applicant.token, "Content-Type": "application/json" };
@@ -102,6 +114,7 @@ export default function applicantSubmission() {
     submitPreparedApplicant(applicant, index);
     return;
   }
+  rampSustainedApplicants(index);
   const headers = { Authorization: "Bearer " + applicant.token, "Content-Type": "application/json" };
 
   const formResponse = http.get(baseURL + "/v1/application-forms/current", {
