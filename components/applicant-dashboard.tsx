@@ -28,6 +28,34 @@ import {
 
 type FieldErrors = Record<string, string>;
 type BusyAction = "saving" | "submitting" | "uploading-resume" | null;
+type ApplicationStep = 1 | 2;
+
+const profileQuestionKeys = new Set(["name", "email", "school"]);
+const shortTextQuestionKeys = new Set([
+  "name",
+  "email",
+  "school",
+  "desiredTeammates",
+  "hardwareEquipment",
+  "dietaryRestrictions",
+]);
+const stringChoiceOptions: Record<string, string[]> = {
+  priorHackathonExperience: [
+    "This is my first hackathon",
+    "1-3 hackathons",
+    "3+ hackathons",
+  ],
+};
+
+const questionPlaceholders: Record<string, string> = {
+  name: "Your full name",
+  email: "you@example.com",
+  school: "Your university or institution",
+  hackAtlanticExcitement: "Tell us what excites you most about this event...",
+  desiredTeammates: "e.g. Alex Chen, Jordan Smith",
+  hardwareEquipment: "e.g. Raspberry Pi, Arduino, sensors...",
+  dietaryRestrictions: "None, vegetarian, vegan, gluten-free, etc.",
+};
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -81,6 +109,27 @@ function validationErrors(error: unknown): FieldErrors {
   return result;
 }
 
+function wordCount(value: string): number {
+  return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function answerWordLimitErrors(
+  questions: CurrentApplicationForm["questions"],
+  answers: ApplicationAnswers,
+): FieldErrors {
+  const result: FieldErrors = {};
+  for (const question of questions) {
+    if (!question.maxWords || question.type !== "string") {
+      continue;
+    }
+    const value = answers[question.key];
+    if (typeof value === "string" && wordCount(value) > question.maxWords) {
+      result[question.key] = `Use ${question.maxWords} words or fewer.`;
+    }
+  }
+  return result;
+}
+
 function displayTimestamp(value: string): string {
   const timestamp = new Date(value);
   if (Number.isNaN(timestamp.getTime())) {
@@ -110,6 +159,7 @@ export function ApplicantDashboard() {
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [loading, setLoading] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
+  const [applicationStep, setApplicationStep] = useState<ApplicationStep>(1);
   const [decision, setDecision] = useState<ApplicantReleasedDecision | null>(null);
   const [decisionState, setDecisionState] = useState<DecisionLoadState>("loading");
 
@@ -240,6 +290,9 @@ export function ApplicantDashboard() {
       } else {
         next[key] = value;
       }
+      if (key === "hardwareProject" && value !== true) {
+        delete next.hardwareEquipment;
+      }
       return next;
     });
     setFieldErrors((current) => {
@@ -262,6 +315,14 @@ export function ApplicantDashboard() {
     setBusyAction("saving");
     setNotice("");
     setFieldErrors({});
+
+    const clientErrors = answerWordLimitErrors(currentForm.questions, answers);
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      setNotice("Check the highlighted answers.");
+      setBusyAction(null);
+      return;
+    }
 
     try {
       const savedApplication = await client.saveApplicationDraft(application.id, {
@@ -296,6 +357,10 @@ export function ApplicantDashboard() {
 
   const submitApplication = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (applicationStep === 1) {
+      setApplicationStep(2);
+      return;
+    }
     if (!currentForm || !application || application.status !== "draft") {
       return;
     }
@@ -307,6 +372,14 @@ export function ApplicantDashboard() {
     setBusyAction("submitting");
     setNotice("");
     setFieldErrors({});
+
+    const clientErrors = answerWordLimitErrors(currentForm.questions, answers);
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      setNotice("Check the highlighted answers.");
+      setBusyAction(null);
+      return;
+    }
 
     try {
       const savedApplication = await client.saveApplicationDraft(application.id, {
@@ -380,7 +453,152 @@ export function ApplicantDashboard() {
   }
 
   const questions = currentForm?.questions ?? [];
+  const profileQuestions = questions.filter((question) =>
+    profileQuestionKeys.has(question.key),
+  );
+  const hackathonQuestions = questions.filter(
+    (question) => !profileQuestionKeys.has(question.key),
+  );
   const submitted = application.status === "submitted";
+  const activeStep = submitted ? 2 : applicationStep;
+  const renderQuestion = (
+    question: CurrentApplicationForm["questions"][number],
+    index: number,
+  ) => {
+    if (question.key === "hardwareEquipment" && answers.hardwareProject !== true) {
+      return null;
+    }
+    const value = answers[question.key];
+    const helpId = `question-${question.key}-${index}-help`;
+    const errorId = `question-${question.key}-${index}-error`;
+    const describedBy = [
+      question.help ? helpId : undefined,
+      fieldErrors[question.key] ? errorId : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
+    const stringOptions = stringChoiceOptions[question.key];
+
+    return (
+      <div className="question-field" key={question.key}>
+        {question.type === "boolean" ? (
+          <fieldset
+            aria-describedby={describedBy}
+            aria-invalid={Boolean(fieldErrors[question.key])}
+            aria-required={question.required}
+          >
+            <legend>
+              {question.label}
+              {question.required ? <span aria-hidden="true"> *</span> : null}
+            </legend>
+            {question.help ? <p id={helpId}>{question.help}</p> : null}
+            <div className="boolean-options">
+              <label>
+                <input
+                  checked={value === true}
+                  name={question.key}
+                  onChange={() => updateAnswer(question.key, true)}
+                  type="radio"
+                />
+                Yes
+              </label>
+              <label>
+                <input
+                  checked={value === false}
+                  name={question.key}
+                  onChange={() => updateAnswer(question.key, false)}
+                  type="radio"
+                />
+                No
+              </label>
+            </div>
+          </fieldset>
+        ) : (
+          <>
+            <label htmlFor={`question-${question.key}-${index}`}>
+              {question.label}
+              {question.required ? <span aria-hidden="true"> *</span> : null}
+              {!question.required ? <span className="optional-label"> (optional)</span> : null}
+            </label>
+            {question.help ? <p id={helpId}>{question.help}</p> : null}
+            {question.type === "number" ? (
+              <input
+                aria-describedby={describedBy}
+                aria-invalid={Boolean(fieldErrors[question.key])}
+                aria-required={question.required}
+                id={`question-${question.key}-${index}`}
+                inputMode="decimal"
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  if (!nextValue) {
+                    updateAnswer(question.key, undefined);
+                    return;
+                  }
+                  const numberValue = Number(nextValue);
+                  if (Number.isFinite(numberValue)) {
+                    updateAnswer(question.key, numberValue);
+                  }
+                }}
+                step="any"
+                type="number"
+                value={typeof value === "number" ? value : ""}
+              />
+            ) : stringOptions ? (
+              <div className="choice-options">
+                {stringOptions.map((option) => (
+                  <label key={option}>
+                    <input
+                      checked={value === option}
+                      name={question.key}
+                      onChange={() => updateAnswer(question.key, option)}
+                      type="radio"
+                    />
+                    {option}
+                  </label>
+                ))}
+              </div>
+            ) : shortTextQuestionKeys.has(question.key) ? (
+              <input
+                aria-describedby={describedBy}
+                aria-invalid={Boolean(fieldErrors[question.key])}
+                aria-required={question.required}
+                id={`question-${question.key}-${index}`}
+                onChange={(event) =>
+                  updateAnswer(question.key, event.target.value || undefined)
+                }
+                placeholder={questionPlaceholders[question.key]}
+                type={question.key === "email" ? "email" : "text"}
+                value={typeof value === "string" ? value : ""}
+              />
+            ) : (
+              <textarea
+                aria-describedby={describedBy}
+                aria-invalid={Boolean(fieldErrors[question.key])}
+                aria-required={question.required}
+                id={`question-${question.key}-${index}`}
+                onChange={(event) =>
+                  updateAnswer(question.key, event.target.value || undefined)
+                }
+                placeholder={questionPlaceholders[question.key]}
+                rows={3}
+                value={typeof value === "string" ? value : ""}
+              />
+            )}
+            {question.maxWords && typeof value === "string" ? (
+              <p className="question-limit">
+                {wordCount(value)} / {question.maxWords}
+              </p>
+            ) : null}
+          </>
+        )}
+        {fieldErrors[question.key] ? (
+          <p className="field-error" id={errorId} role="alert">
+            {fieldErrors[question.key]}
+          </p>
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <motion.section
@@ -391,13 +609,12 @@ export function ApplicantDashboard() {
     >
       <div className="application-progress" aria-label="Application progress">
         <div className="progress-step complete"><span>01</span><strong>Account</strong></div>
-        <div className={`progress-step ${submitted ? "complete" : "current"}`}><span>02</span><strong>Application</strong></div>
-        <div className={`progress-step ${decisionState === "ready" ? "complete" : submitted ? "current" : ""}`}><span>03</span><strong>Decision</strong></div>
-        <div className={`progress-step ${decision?.outcome === "accepted" ? "current" : ""}`}><span>04</span><strong>Event pass</strong></div>
+        <div className={`progress-step ${activeStep > 1 || submitted ? "complete" : "current"}`}><span>02</span><strong>Profile</strong></div>
+        <div className={`progress-step ${submitted ? "complete" : activeStep === 2 ? "current" : ""}`}><span>03</span><strong>Questions</strong></div>
+        <div className={`progress-step ${decisionState === "ready" ? "complete" : submitted ? "current" : ""}`}><span>04</span><strong>Decision</strong></div>
       </div>
       <div className="application-heading">
         <div>
-          <p className="eyebrow">Applicant field notes · {application.formVersion.toString().padStart(2, "0")}</p>
           <h1 id="application-heading">Your application</h1>
         </div>
         <motion.span
@@ -411,18 +628,17 @@ export function ApplicantDashboard() {
       <p className="application-summary">
         Form version {application.formVersion}.{" "}
         {submitted
-          ? "Your submitted application is no longer editable."
+          ? "Submitted applications cannot be edited."
           : currentForm
-            ? "Your answers are only visible to you until you submit this application."
-            : "This draft can no longer be changed or submitted because the application window is closed."}
+            ? "Save your draft before submitting."
+            : "The application window is closed."}
       </p>
 
       <div className="application-identity" aria-label="Applicant identity">
         <div>
-          <span className="coordinate-label">VERIFIED IDENTITY</span>
+          <span>Account</span>
           <strong>{currentUser?.email ?? "Verified through Clerk"}</strong>
         </div>
-        <p>Your verified account email is attached to the application when you submit.</p>
       </div>
 
       <AnimatePresence initial={false}>
@@ -469,112 +685,25 @@ export function ApplicantDashboard() {
       ) : currentForm ? (
         <form className="application-form" noValidate onSubmit={submitApplication}>
           <div className="form-intro">
-            <span className="coordinate-label">SECTION A / YOUR SIGNAL</span>
-            <p className="form-instructions">There is no perfect hacker profile. Give us a clear picture of what you&apos;re curious about and what you want to build.</p>
+            <p className="form-instructions">
+              {applicationStep === 1
+                ? "Part 1 - build your profile."
+                : "Part 2 - hackathon questions."}
+            </p>
           </div>
 
-          {questions.map((question, index) => {
-            const value = answers[question.key];
-            const helpId = `question-${index}-help`;
-            const errorId = `question-${index}-error`;
-            const describedBy = [
-              question.help ? helpId : undefined,
-              fieldErrors[question.key] ? errorId : undefined,
-            ]
-              .filter(Boolean)
-              .join(" ") || undefined;
+          <div className={applicationStep === 1 ? "profile-question-grid" : undefined}>
+            {(applicationStep === 1 ? profileQuestions : hackathonQuestions).map(
+              renderQuestion,
+            )}
+          </div>
 
-            return (
-              <div className="question-field" key={question.key}>
-                {question.type === "boolean" ? (
-                  <fieldset
-                    aria-describedby={describedBy}
-                    aria-invalid={Boolean(fieldErrors[question.key])}
-                    aria-required={question.required}
-                  >
-                    <legend>
-                      {question.label}
-                      {question.required ? <span aria-hidden="true"> *</span> : null}
-                    </legend>
-                    {question.help ? <p id={helpId}>{question.help}</p> : null}
-                    <div className="boolean-options">
-                      <label>
-                        <input
-                          checked={value === true}
-                          name={question.key}
-                          onChange={() => updateAnswer(question.key, true)}
-                          type="radio"
-                        />
-                        Yes
-                      </label>
-                      <label>
-                        <input
-                          checked={value === false}
-                          name={question.key}
-                          onChange={() => updateAnswer(question.key, false)}
-                          type="radio"
-                        />
-                        No
-                      </label>
-                    </div>
-                  </fieldset>
-                ) : (
-                  <>
-                    <label htmlFor={`question-${index}`}>
-                      {question.label}
-                      {question.required ? <span aria-hidden="true"> *</span> : null}
-                    </label>
-                    {question.help ? <p id={helpId}>{question.help}</p> : null}
-                    {question.type === "number" ? (
-                      <input
-                        aria-describedby={describedBy}
-                        aria-invalid={Boolean(fieldErrors[question.key])}
-                        aria-required={question.required}
-                        id={`question-${index}`}
-                        inputMode="decimal"
-                        onChange={(event) => {
-                          const nextValue = event.target.value;
-                          if (!nextValue) {
-                            updateAnswer(question.key, undefined);
-                            return;
-                          }
-                          const numberValue = Number(nextValue);
-                          if (Number.isFinite(numberValue)) {
-                            updateAnswer(question.key, numberValue);
-                          }
-                        }}
-                        step="any"
-                        type="number"
-                        value={typeof value === "number" ? value : ""}
-                      />
-                    ) : (
-                      <textarea
-                        aria-describedby={describedBy}
-                        aria-invalid={Boolean(fieldErrors[question.key])}
-                        aria-required={question.required}
-                        id={`question-${index}`}
-                        onChange={(event) => updateAnswer(question.key, event.target.value || undefined)}
-                        rows={4}
-                        value={typeof value === "string" ? value : ""}
-                      />
-                    )}
-                  </>
-                )}
-                {fieldErrors[question.key] ? (
-                  <p className="field-error" id={errorId} role="alert">
-                    {fieldErrors[question.key]}
-                  </p>
-                ) : null}
-              </div>
-            );
-          })}
-
-          {currentForm.resumeRequired ? (
+          {currentForm && applicationStep === 1 ? (
             <div className="question-field resume-upload-field">
               <label htmlFor="application-resume">
-                Resume <span aria-hidden="true">*</span>
+                Resume {currentForm.resumeRequired ? <span aria-hidden="true">*</span> : <span>(optional)</span>}
               </label>
-              <p>Upload one PDF, up to 5 MB. Uploading another PDF replaces the current resume.</p>
+              <p>Upload one PDF, up to 5 MB.</p>
               <input
                 accept="application/pdf,.pdf"
                 disabled={busyAction !== null}
@@ -593,7 +722,9 @@ export function ApplicantDashboard() {
                   ? "Uploading resume…"
                   : resume
                     ? `${resume.originalFilename} · ${Math.ceil(resume.byteSize / 1024)} KB`
-                    : "A PDF resume is required before submission."}
+                    : currentForm.resumeRequired
+                      ? "A PDF resume is required before submission."
+                      : "No resume uploaded."}
               </p>
             </div>
           ) : null}
@@ -620,16 +751,29 @@ export function ApplicantDashboard() {
               {busyAction === "saving" ? "Saving…" : "Save draft"}
             </button>
             <button className="button primary" disabled={busyAction !== null} type="submit">
-              {busyAction === "submitting" ? "Submitting…" : "Submit application"}
+              {applicationStep === 1
+                ? "Next"
+                : busyAction === "submitting"
+                  ? "Submitting…"
+                  : "Submit application"}
             </button>
+            {applicationStep === 2 ? (
+              <button
+                className="button secondary"
+                disabled={busyAction !== null}
+                onClick={() => setApplicationStep(1)}
+                type="button"
+              >
+                Back
+              </button>
+            ) : null}
           </div>
         </form>
       ) : (
         <div className="submitted-confirmation" aria-live="polite">
           <h2>Application window closed</h2>
           <p>
-            This draft can no longer be changed or submitted because the application
-            window is closed.
+            This draft can no longer be changed or submitted.
           </p>
         </div>
       )}
