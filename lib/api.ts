@@ -45,6 +45,7 @@ export type ApplicationFormQuestion = {
   type: ApplicationQuestionType;
   required: boolean;
   help?: string;
+  maxWords?: number;
 };
 
 export type CurrentApplicationForm = {
