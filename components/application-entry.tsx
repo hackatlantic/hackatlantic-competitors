@@ -31,12 +31,12 @@ export function ApplicationEntry({
       </h1>
       {requiresAuth ? (
         <div className="application-start-actions">
-          <SignUpButton>
+          <SignUpButton mode="modal">
             <button className="button primary" type="button">
               Start application
             </button>
           </SignUpButton>
-          <SignInButton>
+          <SignInButton mode="modal">
             <button className="button secondary" type="button">
               Sign in
             </button>
