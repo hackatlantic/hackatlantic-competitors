@@ -53,10 +53,7 @@ export default async function ReviewerApplicationsPage() {
       role="admin"
       title="Review queue"
     >
-      <p className="staff-summary">
-        Every local reviewer can review every submitted application. Assignment status
-        is auditable queue metadata and does not limit access.
-      </p>
+      <p className="staff-summary">Review submitted applications.</p>
 
       <div className="staff-metrics" aria-label="Review queue summary">
         <div><span>Submitted</span><strong>{applications.items.length.toString().padStart(2, "0")}</strong></div>
@@ -94,7 +91,7 @@ export default async function ReviewerApplicationsPage() {
                 className="staff-link"
                 href={`/reviewer/applications/${application.id}`}
               >
-                Review <span aria-hidden="true">↗</span>
+                Review
               </Link>
             </li>
           ))}

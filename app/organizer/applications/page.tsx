@@ -73,10 +73,7 @@ export default async function OrganizerApplicationsPage({
       role="admin"
       title="Applications"
     >
-      <p className="staff-summary">
-        Search applications after they have been submitted. Draft answers remain
-        private to applicants.
-      </p>
+      <p className="staff-summary">Search submitted applications.</p>
 
       <div className="staff-metrics" aria-label="Application queue summary">
         <div><span>Visible records</span><strong>{applications.items.length.toString().padStart(2, "0")}</strong></div>
@@ -139,7 +136,7 @@ export default async function OrganizerApplicationsPage({
                 className="staff-link"
                 href={`/organizer/applications/${application.id}`}
               >
-                Open <span aria-hidden="true">↗</span>
+                Open
               </Link>
             </li>
           ))}
