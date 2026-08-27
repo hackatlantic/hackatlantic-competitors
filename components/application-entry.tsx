@@ -1,6 +1,6 @@
 "use client";
 
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { SignInButton } from "@clerk/nextjs";
 import { useState } from "react";
 import { ApplicantDashboard } from "@/components/applicant-dashboard";
 
@@ -30,18 +30,11 @@ export function ApplicationEntry({
         Hack Atlantic Application?
       </h1>
       {requiresAuth ? (
-        <div className="application-start-actions">
-          <SignUpButton mode="modal">
-            <button className="button primary" type="button">
-              Start application
-            </button>
-          </SignUpButton>
-          <SignInButton mode="modal">
-            <button className="button secondary" type="button">
-              Sign in
-            </button>
-          </SignInButton>
-        </div>
+        <SignInButton mode="modal">
+          <button className="button primary" type="button">
+            Start application
+          </button>
+        </SignInButton>
       ) : (
         <button
           className="button primary"

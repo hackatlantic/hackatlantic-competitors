@@ -4777,20 +4777,6 @@ textarea:focus-visible {
   color: rgb(240 250 255 / 95%);
 }
 
-.application-start-actions {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: center;
-}
-
-.application-start-actions .button.secondary {
-  background: rgb(255 255 255 / 14%);
-  border-color: rgb(255 255 255 / 26%);
-  color: rgb(240 250 255 / 95%);
-}
-
 .application-flow-workspace .application-actions .button.primary {
   background: #0b5964;
   border-color: #0b5964;
