@@ -58,34 +58,64 @@ INSERT INTO ats.application_forms (
 SELECT
     '70000000-0000-4000-8000-000000000003',
     cycles.id,
-    1,
+    4,
     '{
-      "resumeRequired": true,
+      "resumeRequired": false,
       "questions": [
         {
-          "key": "fullName",
-          "label": "What is your full name?",
+          "key": "name",
+          "label": "Name",
           "type": "string",
-          "required": true,
-          "help": "Use the name you want organizers to use."
-        },
-        {
-          "key": "school",
-          "label": "What school do you attend?",
-          "type": "string",
-          "required": true,
-          "help": "Enter the full name of your current school, college, or university."
-        },
-        {
-          "key": "yearsCoding",
-          "label": "How many years have you been coding?",
-          "type": "number",
           "required": true
         },
         {
-          "key": "needsTravelSupport",
-          "label": "Do you need travel support?",
+          "key": "email",
+          "label": "Email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "key": "school",
+          "label": "School",
+          "type": "string",
+          "required": true
+        },
+        {
+          "key": "hackAtlanticExcitement",
+          "label": "What are you most excited about at Hack Atlantic?",
+          "type": "string",
+          "required": true,
+          "help": "Maximum 100 words.",
+          "maxWords": 100
+        },
+        {
+          "key": "priorHackathonExperience",
+          "label": "Prior Hackathon Experience",
+          "type": "string",
+          "required": true
+        },
+        {
+          "key": "desiredTeammates",
+          "label": "Desired teammate names",
+          "type": "string",
+          "required": false
+        },
+        {
+          "key": "hardwareProject",
+          "label": "Are you looking to make a hardware project?",
           "type": "boolean",
+          "required": true
+        },
+        {
+          "key": "hardwareEquipment",
+          "label": "What equipment are you looking to use?",
+          "type": "string",
+          "required": false
+        },
+        {
+          "key": "dietaryRestrictions",
+          "label": "Dietary Restrictions",
+          "type": "string",
           "required": false
         }
       ]

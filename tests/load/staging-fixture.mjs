@@ -114,7 +114,7 @@ INSERT INTO ats.application_forms (
 SELECT
   cycle.id,
   COALESCE((SELECT MAX(existing.version) + 1 FROM ats.application_forms AS existing WHERE existing.cycle_id = cycle.id), 1),
-  '{"resumeRequired":true,"questions":[{"key":"full_name","label":"Full name","type":"string","required":true},{"key":"email","label":"Email","type":"string","required":true},{"key":"school","label":"School","type":"string","required":true}]}'::jsonb,
+  '{"resumeRequired":false,"questions":[{"key":"name","label":"Name","type":"string","required":true},{"key":"email","label":"Email","type":"string","required":true},{"key":"school","label":"School","type":"string","required":true},{"key":"hackAtlanticExcitement","label":"What are you most excited about at Hack Atlantic?","type":"string","required":true,"help":"Maximum 100 words.","maxWords":100},{"key":"priorHackathonExperience","label":"Prior Hackathon Experience","type":"string","required":true},{"key":"desiredTeammates","label":"Desired teammate names","type":"string","required":false},{"key":"hardwareProject","label":"Are you looking to make a hardware project?","type":"boolean","required":true},{"key":"hardwareEquipment","label":"What equipment are you looking to use?","type":"string","required":false},{"key":"dietaryRestrictions","label":"Dietary Restrictions","type":"string","required":false}]}'::jsonb,
   CURRENT_TIMESTAMP,
   creator.id
 FROM ats.application_cycles AS cycle
