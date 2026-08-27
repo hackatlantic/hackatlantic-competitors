@@ -4767,17 +4767,6 @@ textarea:focus-visible {
   justify-items: center;
 }
 
-.application-start-copy p {
-  color: rgb(210 240 240 / 82%);
-  font-family: var(--font-sans);
-  font-size: clamp(0.82rem, 1.6vw, 0.98rem);
-  font-weight: 650;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  margin: 0;
-  text-transform: uppercase;
-}
-
 .application-start-screen h1 {
   color: rgb(160 240 235);
   font-family: var(--font-sans);
@@ -4789,15 +4778,6 @@ textarea:focus-visible {
   max-width: none;
   text-shadow: none;
   white-space: nowrap;
-}
-
-.application-start-logo {
-  border-radius: 20px;
-  display: block;
-  height: auto;
-  max-width: min(250px, 56vw);
-  object-fit: cover;
-  width: 250px;
 }
 
 .application-start-screen .button.primary {
