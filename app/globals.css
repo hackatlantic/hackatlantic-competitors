@@ -4771,6 +4771,15 @@ textarea:focus-visible {
   text-shadow: none;
 }
 
+.application-start-logo {
+  border-radius: 18px;
+  display: block;
+  height: auto;
+  max-width: min(225px, 52vw);
+  object-fit: cover;
+  width: 225px;
+}
+
 .application-start-screen .button.primary {
   background: #0b5964;
   border-color: #0b5964;

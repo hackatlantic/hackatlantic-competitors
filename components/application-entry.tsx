@@ -1,6 +1,7 @@
 "use client";
 
 import { SignInButton } from "@clerk/nextjs";
+import Image from "next/image";
 import { useState } from "react";
 import { ApplicantDashboard } from "@/components/applicant-dashboard";
 
@@ -24,6 +25,14 @@ export function ApplicationEntry({
       className="application-start-screen"
       aria-labelledby="application-start-heading"
     >
+      <Image
+        alt="Hack Atlantic logo"
+        className="application-start-logo"
+        height={180}
+        priority
+        src="/hackatlantic-starter-logo.jpg"
+        width={225}
+      />
       <h1 id="application-start-heading">
         Ready to Start your
         <br />
