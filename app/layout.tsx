@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Apply · HackAtlantic",
-  description: "HackAtlantic application portal."
+  description: "Your route into Atlantic Canada's largest student-run hackathon."
 };
 
 export default function RootLayout({
