@@ -22,9 +22,10 @@
   --panel: var(--paper-bright);
   --shadow: 0 24px 60px rgb(7 24 39 / 11%);
   --radius: 22px;
-  --font-display: "Arial Rounded MT Bold", "Avenir Next", "Trebuchet MS", sans-serif;
-  --font-body: "Avenir Next", "Segoe UI", Arial, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-sans: "Inter", "Avenir Next", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-display: var(--font-sans);
+  --font-body: var(--font-sans);
+  --font-mono: var(--font-sans);
 }
 * {
   box-sizing: border-box;
@@ -68,7 +69,7 @@ h1,
 h2,
 h3 {
   font-family: var(--font-display);
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 code {
@@ -145,7 +146,7 @@ code {
 .brand-mark strong {
   font-family: var(--font-display);
   font-size: 1.1rem;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .brand-mark small {
@@ -354,7 +355,7 @@ textarea:focus-visible {
 .portal-facts strong {
   font-family: var(--font-display);
   font-size: 1.9rem;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .portal-facts span {
@@ -716,7 +717,7 @@ textarea:focus-visible {
   font-family: var(--font-display);
   font-size: 1.1rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.35;
 }
 
@@ -996,7 +997,7 @@ textarea:focus-visible {
 .staff-metrics strong {
   font-family: var(--font-display);
   font-size: 2rem;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1;
 }
 
@@ -1096,7 +1097,7 @@ textarea:focus-visible {
 .staff-list h3 {
   font-family: var(--font-body);
   font-size: 1rem;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   margin: 0 0 3px;
 }
 
@@ -1816,7 +1817,7 @@ input[type="checkbox"] {
 
 .brand-mark strong {
   font-size: 1.08rem;
-  letter-spacing: -0.055em;
+  letter-spacing: 0;
 }
 
 .brand-mark-inverse strong {
@@ -1851,7 +1852,7 @@ input[type="checkbox"] {
 
 .workspace-switcher-heading span {
   color: var(--paper-bright);
-  font-family: "Courier New", Courier, monospace;
+  font-family: var(--font-sans);
   font-size: 0.64rem;
   font-weight: 900;
   letter-spacing: 0.1em;
@@ -1862,7 +1863,7 @@ input[type="checkbox"] {
   color: var(--paper-bright);
   font-size: 1.08rem;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   line-height: 1.1;
 }
 
@@ -1900,7 +1901,7 @@ input[type="checkbox"] {
 
 .workspace-switcher-link small {
   color: #4c4a45;
-  font-family: "Courier New", Courier, monospace;
+  font-family: var(--font-sans);
   font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -2085,7 +2086,7 @@ select {
 .scanner-field label,
 .staff-metrics span {
   color: var(--ink);
-  font-family: "Courier New", Courier, monospace;
+  font-family: var(--font-sans);
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -2144,14 +2145,14 @@ select {
   font-family: Arial, Helvetica, sans-serif;
   font-size: 1rem;
   font-weight: 950;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
   line-height: 1;
   text-transform: uppercase;
 }
 
 .brand-mark small {
   color: var(--muted);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -2217,7 +2218,7 @@ textarea:focus-visible {
 
 .text-button {
   color: inherit;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-weight: 800;
   text-decoration: underline;
   text-decoration-thickness: 2px;
@@ -2287,7 +2288,7 @@ textarea:focus-visible {
   border-bottom: 2px solid var(--ink);
   color: var(--paper-bright);
   background: var(--blue);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.73rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -2336,7 +2337,7 @@ textarea:focus-visible {
   border-radius: 50%;
   background: var(--orange);
   box-shadow: var(--hard-shadow-small);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.78rem;
   font-weight: 900;
   line-height: 1.1;
@@ -2351,7 +2352,7 @@ textarea:focus-visible {
   font-family: Arial, Helvetica, sans-serif;
   font-size: clamp(4.4rem, 8.4vw, 9rem);
   font-weight: 950;
-  letter-spacing: -0.085em;
+  letter-spacing: 0;
   line-height: 0.78;
   text-transform: uppercase;
 }
@@ -2393,12 +2394,12 @@ textarea:focus-visible {
   font-family: Arial, Helvetica, sans-serif;
   font-size: clamp(2rem, 4vw, 4.8rem);
   font-weight: 900;
-  letter-spacing: -0.07em;
+  letter-spacing: 0;
 }
 
 .portal-facts span {
   color: var(--ink);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.67rem;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -2448,7 +2449,7 @@ textarea:focus-visible {
   font-family: Arial, Helvetica, sans-serif;
   font-size: clamp(2.8rem, 5vw, 5.5rem);
   font-weight: 950;
-  letter-spacing: -0.07em;
+  letter-spacing: 0;
   line-height: 0.88;
   text-transform: uppercase;
 }
@@ -2476,7 +2477,7 @@ textarea:focus-visible {
   border-radius: 0;
   color: var(--ink);
   background: var(--lavender);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-weight: 900;
 }
 
@@ -2586,7 +2587,7 @@ textarea:focus-visible {
 
 .progress-step span {
   color: var(--ink);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.68rem;
   font-weight: 900;
 }
@@ -2637,7 +2638,7 @@ textarea:focus-visible {
   font-family: Arial, Helvetica, sans-serif;
   font-size: clamp(3rem, 7vw, 7rem);
   font-weight: 950;
-  letter-spacing: -0.08em;
+  letter-spacing: 0;
   line-height: 0.84;
   text-transform: uppercase;
 }
@@ -2804,7 +2805,7 @@ textarea:focus-visible {
 .field-error,
 .error-message {
   color: #9f1f0c;
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-weight: 800;
 }
 
@@ -2857,7 +2858,7 @@ textarea:focus-visible {
 .staff-sidebar-context strong {
   font-size: 1.4rem;
   font-weight: 900;
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -2880,7 +2881,7 @@ textarea:focus-visible {
 
 .staff-nav a span {
   color: var(--yellow);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
 }
 
 .staff-nav a:hover {
@@ -2898,7 +2899,7 @@ textarea:focus-visible {
   padding-top: 1rem;
   border-top: 2px solid var(--paper-bright);
   color: var(--paper-bright);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.74rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -2925,7 +2926,7 @@ textarea:focus-visible {
   font-family: Arial, Helvetica, sans-serif;
   font-size: clamp(3.3rem, 7vw, 8rem);
   font-weight: 950;
-  letter-spacing: -0.085em;
+  letter-spacing: 0;
   line-height: 0.78;
   text-transform: uppercase;
 }
@@ -2969,7 +2970,7 @@ textarea:focus-visible {
 .operations-section-heading h2 {
   font-family: Arial, Helvetica, sans-serif;
   font-weight: 950;
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -3006,7 +3007,7 @@ textarea:focus-visible {
   color: var(--ink);
   font-size: clamp(3rem, 6vw, 6rem);
   font-weight: 950;
-  letter-spacing: -0.08em;
+  letter-spacing: 0;
 }
 
 .staff-metrics .metric-word {
@@ -3056,12 +3057,12 @@ textarea:focus-visible {
 .staff-list h3 {
   font-size: 1.05rem;
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .staff-row-meta {
   color: var(--muted);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -3069,7 +3070,7 @@ textarea:focus-visible {
 
 .staff-link {
   color: var(--ink);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-weight: 900;
   text-decoration: underline;
   text-decoration-thickness: 2px;
@@ -3093,7 +3094,7 @@ textarea:focus-visible {
 
 .application-answers dt {
   color: var(--ink);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.05em;
@@ -3132,7 +3133,7 @@ textarea:focus-visible {
 .operations-table thead th {
   color: var(--ink);
   background: var(--yellow);
-  font-family: "Courier New", monospace;
+  font-family: var(--font-sans);
   font-size: 0.68rem;
   font-weight: 900;
   text-transform: uppercase;
@@ -3172,7 +3173,7 @@ textarea:focus-visible {
   font-family: Arial, Helvetica, sans-serif;
   font-size: clamp(3rem, 10vw, 6rem);
   font-weight: 950;
-  letter-spacing: -0.08em;
+  letter-spacing: 0;
   line-height: 0.8;
   text-transform: uppercase;
 }
@@ -4170,7 +4171,7 @@ textarea:focus-visible {
 
 .intro h1 {
   color: white;
-  font-family: "Georgia", "Times New Roman", serif;
+  font-family: var(--font-sans);
   font-size: clamp(4rem, 9vw, 7.75rem);
   font-weight: 500;
   letter-spacing: 0;
@@ -4199,7 +4200,7 @@ textarea:focus-visible {
 
 .route-card h2 {
   color: white;
-  font-family: "Georgia", "Times New Roman", serif;
+  font-family: var(--font-sans);
   font-size: clamp(2.4rem, 5vw, 4rem);
   font-weight: 500;
   text-shadow: 0 1px 12px rgb(0 180 200 / 36%);
@@ -4359,7 +4360,7 @@ textarea:focus-visible {
 
 .application-panel h1 {
   color: white;
-  font-family: "Georgia", "Times New Roman", serif;
+  font-family: var(--font-sans);
   font-size: clamp(2.4rem, 5vw, 3.8rem);
   font-weight: 500;
   letter-spacing: 0;
@@ -4562,5 +4563,378 @@ textarea:focus-visible {
   .application-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+.application-progress {
+  align-items: stretch;
+  background: var(--paper-bright);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  list-style: none;
+  margin: 0 0 32px;
+  overflow: hidden;
+  padding: 0;
+  width: 100%;
+}
+
+.progress-step {
+  align-items: center;
+  background: var(--paper-bright);
+  border: 0;
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+  min-height: 64px;
+  min-width: 0;
+  padding: 14px 16px;
+  position: relative;
+}
+
+.progress-step:not(:last-child) {
+  border-right: 1px solid var(--line);
+}
+
+.progress-step:not(:last-child)::after {
+  display: none;
+}
+
+.progress-step span {
+  align-items: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  display: inline-flex;
+  flex: 0 0 34px;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 800;
+  height: 34px;
+  justify-content: center;
+  letter-spacing: 0;
+  line-height: 1;
+  width: 34px;
+}
+
+.progress-step strong {
+  color: inherit;
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.86rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1.2;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+
+.progress-step.complete {
+  background: color-mix(in srgb, var(--ice) 42%, var(--paper-bright));
+  color: var(--sea-dark);
+}
+
+.progress-step.current {
+  background: var(--ink);
+  color: var(--paper-bright);
+}
+
+.progress-step.complete span,
+.progress-step.current span {
+  background: var(--sea);
+  border-color: var(--sea);
+  color: var(--paper-bright);
+}
+
+.application-summary {
+  margin-top: 0;
+}
+
+@media (max-width: 760px) {
+  .application-progress {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .progress-step:nth-child(2) {
+    border-right: 0;
+  }
+
+  .progress-step:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 460px) {
+  .application-progress {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-step,
+  .progress-step:nth-child(2),
+  .progress-step:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+  }
+
+  .progress-step:last-child {
+    border-bottom: 0;
+  }
+}
+
+.form-intro {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  margin-bottom: 4px;
+  margin-top: 28px;
+  padding: 0;
+}
+
+.form-instructions {
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  font-weight: 750;
+  line-height: 1.25;
+  margin: 0;
+  max-width: none;
+}
+
+.application-preview-page {
+  min-height: 100vh;
+}
+
+.application-flow-workspace {
+  align-items: center;
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  overflow: hidden;
+  padding: clamp(18px, 4vw, 56px);
+  position: fixed;
+}
+
+.application-flow-workspace .application-panel {
+  height: min(80vh, 860px);
+  margin: 0;
+  max-height: calc(100dvh - clamp(36px, 8vw, 112px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  width: min(92vw, 1120px);
+}
+
+.application-flow-workspace .application-panel *,
+.application-flow-workspace .application-start-screen * {
+  max-width: 100%;
+}
+
+.application-flow-workspace .application-heading h1 {
+  color: rgb(240 250 255 / 95%);
+  font-family: var(--font-sans);
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  font-weight: 650;
+  line-height: 1.05;
+  text-shadow: none;
+}
+
+.application-flow-workspace .application-progress {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.application-start-screen {
+  align-items: center;
+  background: rgb(220 228 235 / 18%);
+  backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 16px;
+  box-shadow: 0 8px 64px rgb(0 20 40 / 45%), inset 0 1px 0 rgb(255 255 255 / 20%);
+  display: grid;
+  gap: 24px;
+  justify-items: center;
+  min-height: min(80vh, 860px);
+  padding: clamp(42px, 8vw, 84px);
+  text-align: center;
+  width: min(92vw, 1120px);
+}
+
+.application-start-screen h1 {
+  color: rgb(160 240 235);
+  font-size: clamp(2.4rem, 6vw, 4.3rem);
+  font-weight: 650;
+  line-height: 1.05;
+  margin: 0;
+  max-width: 11.5ch;
+  text-shadow: none;
+}
+
+.application-start-screen .button.primary {
+  background: #0b5964;
+  border-color: #0b5964;
+  color: rgb(240 250 255 / 95%);
+}
+
+.application-flow-workspace .application-actions .button.primary {
+  background: #0b5964;
+  border-color: #0b5964;
+  color: rgb(240 250 255 / 95%);
+}
+
+.application-flow-workspace .application-progress {
+  background: rgb(255 255 255 / 18%);
+  border-color: rgb(255 255 255 / 28%);
+}
+
+.application-flow-workspace .progress-step,
+.application-flow-workspace .progress-step.complete,
+.application-flow-workspace .progress-step.current {
+  background: transparent;
+  color: rgb(240 250 255 / 95%);
+}
+
+.application-flow-workspace .progress-step:not(:last-child) {
+  border-right-color: rgb(255 255 255 / 22%);
+}
+
+.application-flow-workspace .progress-step span,
+.application-flow-workspace .progress-step.complete span,
+.application-flow-workspace .progress-step.current span {
+  background: rgb(255 255 255 / 18%);
+  border-color: rgb(255 255 255 / 28%);
+  color: rgb(240 250 255 / 95%);
+}
+
+.application-flow-workspace .progress-step.current {
+  background: rgb(36 116 136 / 42%);
+}
+
+.application-flow-workspace .progress-step.current span {
+  background: rgb(36 116 136 / 54%);
+  border-color: rgb(140 220 225 / 42%);
+}
+
+.button,
+.button:not(:disabled):hover,
+.button.primary,
+.button.primary:not(:disabled):hover,
+.button.secondary,
+.route-card .button.primary,
+.route-card .button.primary:not(:disabled):hover,
+.application-actions .button,
+.scanner-actions .button {
+  box-shadow: none;
+}
+
+.resume-upload-field .question-label {
+  color: rgb(160 225 225 / 90%);
+  font-family: var(--font-body);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.resume-file-input {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.resume-file-trigger {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: rgb(240 250 255 / 95%);
+  cursor: pointer;
+  display: inline-flex;
+  gap: 14px;
+  justify-content: flex-start;
+  margin-top: 4px;
+  min-height: 0;
+  padding: 0;
+  text-transform: none;
+}
+
+.resume-file-trigger span {
+  background: #0b5964;
+  border-radius: 999px;
+  color: rgb(240 250 255 / 95%);
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 10px 14px;
+  text-transform: none;
+}
+
+.resume-file-trigger small {
+  color: rgb(180 210 215 / 78%);
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.resume-file-input:focus-visible + .resume-file-trigger {
+  outline: 2px solid rgb(140 220 225 / 70%);
+  outline-offset: 3px;
+}
+
+@media (max-width: 760px) {
+  .application-flow-workspace .application-progress {
+    grid-template-columns: 1fr;
+  }
+
+  .application-flow-workspace .progress-step,
+  .application-flow-workspace .progress-step:nth-child(2),
+  .application-flow-workspace .progress-step:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+  }
+
+  .application-flow-workspace .progress-step:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .application-preview-page {
+    padding: 0;
+  }
+
+  .application-flow-workspace {
+    padding: 0;
+  }
+
+  .application-flow-workspace .application-panel {
+    border-radius: 0;
+    height: 100dvh;
+    max-height: none;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    width: 100vw;
+  }
+
+  .application-start-screen {
+    border-radius: 0;
+    min-height: 100dvh;
+    width: 100vw;
   }
 }
