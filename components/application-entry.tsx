@@ -1,13 +1,18 @@
 "use client";
 
+import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { useState } from "react";
 import { ApplicantDashboard } from "@/components/applicant-dashboard";
 
 type ApplicationEntryProps = {
   previewMode?: boolean;
+  requiresAuth?: boolean;
 };
 
-export function ApplicationEntry({ previewMode = false }: ApplicationEntryProps) {
+export function ApplicationEntry({
+  previewMode = false,
+  requiresAuth = false,
+}: ApplicationEntryProps) {
   const [started, setStarted] = useState(false);
 
   if (started) {
@@ -24,13 +29,28 @@ export function ApplicationEntry({ previewMode = false }: ApplicationEntryProps)
         <br />
         Hack Atlantic Application?
       </h1>
-      <button
-        className="button primary"
-        onClick={() => setStarted(true)}
-        type="button"
-      >
-        Start application
-      </button>
+      {requiresAuth ? (
+        <div className="application-start-actions">
+          <SignUpButton>
+            <button className="button primary" type="button">
+              Start application
+            </button>
+          </SignUpButton>
+          <SignInButton>
+            <button className="button secondary" type="button">
+              Sign in
+            </button>
+          </SignInButton>
+        </div>
+      ) : (
+        <button
+          className="button primary"
+          onClick={() => setStarted(true)}
+          type="button"
+        >
+          Start application
+        </button>
+      )}
     </section>
   );
 }
