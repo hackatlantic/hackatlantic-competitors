@@ -160,7 +160,10 @@ function ReviewerReviewFormFields({
     <form className="application-form" noValidate onSubmit={handleSave}>
       <fieldset className="review-rubric">
         <legend>Review rubric</legend>
-        <p className="staff-summary">Score and recommendation are required.</p>
+        <p className="staff-summary">
+          A score from 1 to 5 and one recommendation are required. Internal notes are
+          optional and are never shown to applicants.
+        </p>
 
         <div>
           <label htmlFor="review-score">Score</label>

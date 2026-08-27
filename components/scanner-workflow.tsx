@@ -406,8 +406,9 @@ export function ScannerWorkflow() {
     return (
       <main className="scanner-page">
         <section className="scanner-panel scanner-state" aria-busy="true" aria-live="polite">
+          <p className="eyebrow">Scanner</p>
           <h1>Preparing scanner</h1>
-          <p>Checking session…</p>
+          <p>Checking your secure session…</p>
         </section>
       </main>
     );
@@ -417,6 +418,7 @@ export function ScannerWorkflow() {
     return (
       <main className="scanner-page">
         <section className="scanner-panel scanner-state scanner-error-state" aria-live="assertive">
+          <p className="eyebrow">Scanner</p>
           <h1>Session ended</h1>
           <p role="alert">Sign in again before scanning another pass.</p>
           <Link className="button secondary scanner-session-link" href="/">
@@ -431,6 +433,7 @@ export function ScannerWorkflow() {
     return (
       <main className="scanner-page">
         <section className="scanner-panel scanner-state scanner-error-state" aria-live="assertive">
+          <p className="eyebrow">Scanner</p>
           <h1>Scanner access required</h1>
           <p role="alert">Your account is not authorized to scan entry passes.</p>
         </section>
@@ -442,8 +445,9 @@ export function ScannerWorkflow() {
     return (
       <main className="scanner-page">
         <section className="scanner-panel scanner-state" aria-busy="true" aria-live="polite">
+          <p className="eyebrow">Scanner</p>
           <h1>Loading checkpoints</h1>
-          <p>Loading active checkpoints…</p>
+          <p>Getting the active checkpoints available to your scanner account…</p>
         </section>
       </main>
     );
@@ -453,6 +457,7 @@ export function ScannerWorkflow() {
     return (
       <main className="scanner-page">
         <section className="scanner-panel scanner-state scanner-error-state" aria-live="assertive">
+          <p className="eyebrow">Scanner</p>
           <h1>Scanner unavailable</h1>
           <p role="alert">Active checkpoints could not be loaded. Check the connection and try again.</p>
           <button
@@ -471,6 +476,7 @@ export function ScannerWorkflow() {
     return (
       <main className="scanner-page">
         <section className="scanner-panel scanner-state" aria-live="polite">
+          <p className="eyebrow">Scanner</p>
           <h1>No active checkpoints</h1>
           <p>There are no checkpoints available for scanning right now.</p>
         </section>
@@ -484,7 +490,12 @@ export function ScannerWorkflow() {
         <Link className="staff-link" href="/">
           Applicant home
         </Link>
+        <p className="eyebrow">Scanner</p>
         <h1 id="scanner-heading">Verify entry pass</h1>
+        <p className="scanner-summary">
+          Select a checkpoint, then scan or enter the opaque QR code. This screen shows
+          only the verification information needed at entry.
+        </p>
 
         <form className="scanner-form" onSubmit={handleLookup}>
           <div className="scanner-field">
@@ -534,6 +545,7 @@ export function ScannerWorkflow() {
               <p className="scanner-help" aria-live="polite">{cameraMessage}</p>
             ) : null}
             <input
+              aria-describedby="scanner-qr-help"
               autoCapitalize="none"
               autoComplete="off"
               disabled={busy}
@@ -546,6 +558,9 @@ export function ScannerWorkflow() {
               type="text"
               value={qrToken}
             />
+            <p id="scanner-qr-help" className="scanner-help">
+              Manual entry remains available if camera access is unavailable.
+            </p>
           </div>
 
           <div className="scanner-actions">
