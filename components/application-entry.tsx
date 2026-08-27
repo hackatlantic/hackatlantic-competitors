@@ -36,8 +36,7 @@ export function ApplicationEntry({
       <div className="application-start-copy">
         <p>Applications are open</p>
         <h1 id="application-start-heading">
-          Ready to start your
-          <span>Hack Atlantic application?</span>
+          Ready to start your Hack Atlantic application?
         </h1>
       </div>
       {requiresAuth ? (
