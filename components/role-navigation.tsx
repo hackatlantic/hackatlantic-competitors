@@ -12,15 +12,16 @@ import {
 } from "@/lib/api";
 
 type WorkspaceLink = {
+  code: string;
   href: string;
   label: string;
   role: Exclude<CurrentUserRole, "applicant">;
 };
 
 const workspaceLinks: WorkspaceLink[] = [
-  { href: "/organizer/applications", label: "Applications", role: "admin" },
-  { href: "/reviewer/applications", label: "Reviews", role: "admin" },
-  { href: "/scanner", label: "Scanner", role: "scanner" },
+  { code: "ATS", href: "/organizer/applications", label: "Applications", role: "admin" },
+  { code: "REV", href: "/reviewer/applications", label: "Reviews", role: "admin" },
+  { code: "SCN", href: "/scanner", label: "Scanner", role: "scanner" },
 ];
 
 export function RoleNavigation() {
@@ -63,7 +64,7 @@ export function RoleNavigation() {
   }
 
   const visibleLinks = [
-    { href: "/", label: "My application" },
+    { code: "APL", href: "/", label: "My application" },
     ...availableLinks,
   ];
   const activeLink = visibleLinks.find(({ href }) =>
@@ -73,11 +74,11 @@ export function RoleNavigation() {
   return (
     <nav className="workspace-switcher" aria-label="Your HackAtlantic workspaces">
       <div className="workspace-switcher-heading">
-        <span>Workspaces</span>
+        <span>Workspace</span>
         <strong>{activeLink.label}</strong>
       </div>
       <div className="workspace-switcher-links">
-        {visibleLinks.map(({ href, label }) => {
+        {visibleLinks.map(({ code, href, label }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
@@ -93,6 +94,7 @@ export function RoleNavigation() {
                   transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               ) : null}
+              <small>{code}</small>
               <span>{label}</span>
             </Link>
           );
