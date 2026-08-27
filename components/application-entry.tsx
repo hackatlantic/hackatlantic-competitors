@@ -33,11 +33,13 @@ export function ApplicationEntry({
         src="/hackatlantic-starter-logo.jpg"
         width={225}
       />
-      <h1 id="application-start-heading">
-        Ready to Start your
-        <br />
-        Hack Atlantic Application?
-      </h1>
+      <div className="application-start-copy">
+        <p>Applications are open</p>
+        <h1 id="application-start-heading">
+          Ready to start your
+          <span>Hack Atlantic application?</span>
+        </h1>
+      </div>
       {requiresAuth ? (
         <SignInButton mode="modal">
           <button className="button primary" type="button">

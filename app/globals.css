@@ -4753,7 +4753,7 @@ textarea:focus-visible {
   border-radius: 16px;
   box-shadow: 0 8px 64px rgb(0 20 40 / 45%), inset 0 1px 0 rgb(255 255 255 / 20%);
   display: grid;
-  gap: 24px;
+  gap: 28px;
   justify-items: center;
   min-height: min(80vh, 860px);
   padding: clamp(42px, 8vw, 84px);
@@ -4761,23 +4761,48 @@ textarea:focus-visible {
   width: min(92vw, 1120px);
 }
 
+.application-start-copy {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+.application-start-copy p {
+  color: rgb(210 240 240 / 82%);
+  font-family: var(--font-sans);
+  font-size: clamp(0.82rem, 1.6vw, 0.98rem);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  margin: 0;
+  text-transform: uppercase;
+}
+
 .application-start-screen h1 {
   color: rgb(160 240 235);
-  font-size: clamp(2.4rem, 6vw, 4.3rem);
-  font-weight: 650;
-  line-height: 1.05;
+  font-family: var(--font-sans);
+  font-size: clamp(2.15rem, 5vw, 4rem);
+  font-weight: 520;
+  letter-spacing: 0;
+  line-height: 0.98;
   margin: 0;
-  max-width: 11.5ch;
+  max-width: 12.5ch;
   text-shadow: none;
 }
 
+.application-start-screen h1 span {
+  color: rgb(238 252 252 / 95%);
+  display: block;
+  font-weight: 680;
+}
+
 .application-start-logo {
-  border-radius: 18px;
+  border-radius: 20px;
   display: block;
   height: auto;
-  max-width: min(225px, 52vw);
+  max-width: min(250px, 56vw);
   object-fit: cover;
-  width: 225px;
+  width: 250px;
 }
 
 .application-start-screen .button.primary {
