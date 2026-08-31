@@ -1,0 +1,952 @@
+/* HackAtlantic brand integration.
+   This file intentionally loads after globals.css so the brand system owns the
+   final presentation without rewriting the portal's functional components. */
+
+:root {
+  --brand-navy: #142333;
+  --brand-navy-deep: #091722;
+  --brand-teal: #06bca9;
+  --brand-teal-dark: #048f82;
+  --brand-teal-soft: #c8f3ee;
+  --brand-cream: #f4f5f1;
+  --brand-white: #fcfdfb;
+  --brand-line: #bdcbc9;
+  --brand-muted: #52666b;
+  --ink: var(--brand-navy);
+  --ink-soft: #2e4550;
+  --paper: var(--brand-cream);
+  --paper-bright: var(--brand-white);
+  --ice: #e5f5f2;
+  --ice-strong: var(--brand-teal-soft);
+  --sea: var(--brand-teal);
+  --sea-dark: var(--brand-teal-dark);
+  --signal: var(--brand-teal);
+  --signal-dark: var(--brand-teal-dark);
+  --sun: var(--brand-teal-soft);
+  --line: var(--brand-line);
+  --line-dark: #71898d;
+  --muted: var(--brand-muted);
+  --blue: var(--brand-teal);
+  --yellow: var(--brand-teal-soft);
+  --orange: #f2a07f;
+  --lime: #dcf3e8;
+  --lavender: #e7e9f4;
+  --hard-shadow: 0 24px 70px rgb(1 12 21 / 24%);
+  --hard-shadow-small: 0 10px 28px rgb(1 12 21 / 18%);
+  --shadow: 0 24px 70px rgb(1 12 21 / 22%);
+  --radius: 18px;
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-body: Inter, "Avenir Next", "Segoe UI", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+html,
+body {
+  background: var(--brand-navy-deep);
+  color: var(--brand-navy);
+}
+
+body {
+  font-family: var(--font-body);
+}
+
+.route-motion-shell {
+  min-height: 100vh;
+}
+
+.static-noise {
+  opacity: 0.12;
+  mix-blend-mode: soft-light;
+}
+
+.elastic-cursor {
+  border-color: var(--brand-teal);
+  box-shadow: 0 0 0 1px var(--brand-navy-deep);
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.035em;
+}
+
+.button {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  min-height: 46px;
+  padding: 0.8rem 1.1rem;
+  text-transform: uppercase;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.button:not(:disabled):hover {
+  box-shadow: none;
+  transform: translateY(-2px);
+}
+
+.button:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.button.primary,
+.button.primary:not(:disabled):hover {
+  background: var(--brand-teal);
+  border-color: var(--brand-teal);
+  color: var(--brand-navy-deep);
+}
+
+.button.primary:not(:disabled):hover {
+  background: #36d2c2;
+  border-color: #36d2c2;
+}
+
+.button.secondary {
+  background: transparent;
+  border-color: rgb(224 248 246 / 44%);
+  color: #eefcfb;
+}
+
+.button.secondary:not(:disabled):hover {
+  background: rgb(255 255 255 / 10%);
+  border-color: rgb(224 248 246 / 72%);
+}
+
+.button:focus-visible,
+.text-button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--brand-teal);
+  outline-offset: 3px;
+}
+
+/* Public and signed-in applicant portal */
+
+.page.portal-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  margin: 0;
+  padding: 0 clamp(16px, 4vw, 56px) 28px;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(100deg, rgb(3 14 25 / 62%) 0%, rgb(4 21 32 / 35%) 54%, rgb(3 14 25 / 58%) 100%),
+    url("/hackatlantic-underwater.png") center / cover fixed;
+  box-shadow: none;
+}
+
+.portal-page::before,
+.portal-page::after,
+.route-card::after,
+.application-panel::before {
+  display: none;
+}
+
+.portal-header {
+  display: flex;
+  align-items: center;
+  width: min(1180px, 100%);
+  min-height: 72px;
+  margin: 24px auto 0;
+  padding: 0.75rem 1rem 0.75rem 1.35rem;
+  border: 1px solid rgb(219 249 245 / 28%);
+  border-radius: 16px;
+  background: rgb(13 38 53 / 76%);
+  box-shadow: 0 20px 52px rgb(1 11 19 / 28%);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.portal-header .brand-mark,
+.portal-header .brand-mark strong {
+  color: #f5fffe;
+}
+
+.portal-header .brand-mark small {
+  color: var(--brand-teal-soft);
+}
+
+.portal-header .nav {
+  margin-left: auto;
+}
+
+.portal-hero {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 430px);
+  align-items: center;
+  gap: clamp(32px, 6vw, 80px);
+  width: min(1180px, 100%);
+  min-height: calc(100vh - 122px);
+  margin: 0 auto;
+  padding: clamp(42px, 7vw, 84px) 0;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.application-logo {
+  width: clamp(92px, 11vw, 138px);
+  height: clamp(92px, 11vw, 138px);
+  margin-bottom: 1.5rem;
+  border: 1px solid rgb(222 255 252 / 34%);
+  border-radius: 50%;
+  box-shadow: 0 18px 54px rgb(0 9 18 / 36%);
+  object-fit: cover;
+}
+
+.intro h1 {
+  max-width: 8ch;
+  margin: 0;
+  color: #f7fffe;
+  font-family: var(--font-display);
+  font-size: clamp(4.4rem, 9vw, 8rem);
+  font-weight: 500;
+  letter-spacing: -0.065em;
+  line-height: 0.84;
+  text-shadow: 0 8px 38px rgb(0 11 20 / 42%);
+  text-transform: none;
+}
+
+.intro-copy {
+  margin: 1.8rem 0 0;
+  color: #c8f3ee;
+  font-family: var(--font-body);
+  font-size: clamp(1rem, 2vw, 1.45rem);
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.route-card {
+  min-height: 0;
+  margin: 0;
+  padding: clamp(1.6rem, 4vw, 2.4rem);
+  overflow: hidden;
+  border: 1px solid rgb(219 249 245 / 30%);
+  border-radius: 18px;
+  color: #f4fffe;
+  background: rgb(13 38 53 / 78%);
+  box-shadow: 0 28px 78px rgb(1 11 19 / 38%);
+  backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.route-card h2 {
+  margin: 0 0 1.15rem;
+  color: #f7fffe;
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 5vw, 4.6rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-transform: none;
+}
+
+.route-steps {
+  margin: 0;
+  border-top: 1px solid rgb(219 249 245 / 20%);
+}
+
+.route-steps li {
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 1rem 0;
+  border: 0;
+  border-bottom: 1px solid rgb(219 249 245 / 20%);
+}
+
+.route-steps li > span {
+  display: block;
+  width: auto;
+  height: auto;
+  border: 0;
+  color: var(--brand-teal);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.route-steps strong {
+  color: #f4fffe;
+  font-size: 0.94rem;
+}
+
+.route-steps small {
+  margin-top: 0.25rem;
+  color: #bdd3d5;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.route-card-actions {
+  margin-top: 1.35rem;
+}
+
+.route-card .text-button {
+  color: #d9efed;
+  text-decoration-color: rgb(200 243 238 / 42%);
+}
+
+.signed-in-home.portal-workspace {
+  display: grid;
+  flex: 1;
+  gap: 1.25rem;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 42px) 0;
+  background: transparent;
+}
+
+.workspace-switcher {
+  overflow: hidden;
+  border: 1px solid rgb(219 249 245 / 28%);
+  border-radius: 14px;
+  color: #f4fffe;
+  background: rgb(13 38 53 / 82%);
+  box-shadow: 0 18px 48px rgb(1 11 19 / 26%);
+  backdrop-filter: blur(18px);
+}
+
+.workspace-switcher-heading {
+  color: #f4fffe;
+  background: rgb(5 22 34 / 72%);
+}
+
+.workspace-switcher-heading span,
+.workspace-switcher-heading strong {
+  color: inherit;
+}
+
+.workspace-switcher-links {
+  background: transparent;
+}
+
+.workspace-switcher-link {
+  color: #d9efed;
+  background: transparent;
+}
+
+.workspace-switcher-link small {
+  color: #9fc3c4;
+}
+
+.workspace-switcher-link:hover,
+.workspace-switcher-link[aria-current="page"] {
+  color: #f7fffe;
+  background: rgb(6 188 169 / 18%);
+}
+
+.workspace-switcher-active {
+  background: var(--brand-teal);
+}
+
+.application-panel {
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+  padding: clamp(1.4rem, 4vw, 3.2rem);
+  border: 1px solid rgb(255 255 255 / 76%);
+  border-radius: 18px;
+  color: var(--brand-navy);
+  background: rgb(250 253 251 / 94%);
+  box-shadow: 0 28px 78px rgb(1 11 19 / 32%);
+  backdrop-filter: blur(20px);
+}
+
+.application-panel h1 {
+  max-width: 13ch;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 7vw, 6rem);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.93;
+  text-transform: none;
+}
+
+.application-panel .button.secondary,
+.staff-panel .button.secondary,
+.scanner-panel .button.secondary {
+  border-color: var(--brand-line);
+  color: var(--brand-navy);
+  background: var(--brand-white);
+}
+
+.application-panel .button.secondary:hover,
+.staff-panel .button.secondary:hover,
+.scanner-panel .button.secondary:hover {
+  border-color: var(--brand-teal-dark);
+  color: var(--brand-navy);
+  background: var(--brand-teal-soft);
+}
+
+.application-progress {
+  overflow: hidden;
+  border: 1px solid var(--brand-line);
+  border-radius: 12px;
+  background: var(--brand-white);
+}
+
+.progress-step {
+  min-height: 66px;
+  border-color: var(--brand-line);
+  color: var(--brand-muted);
+  background: var(--brand-white);
+}
+
+.progress-step.complete {
+  color: var(--brand-navy);
+  background: #dff3eb;
+}
+
+.progress-step.current {
+  color: #efffFD;
+  background: var(--brand-navy);
+}
+
+.progress-step.complete span,
+.progress-step.current span {
+  color: var(--brand-navy-deep);
+  background: var(--brand-teal);
+}
+
+.application-heading,
+.application-actions,
+.staff-content-header,
+.staff-metrics,
+.operations-section-heading {
+  border-color: var(--brand-line);
+}
+
+.application-identity,
+.application-notice,
+.submitted-confirmation,
+.application-decision,
+.application-pass,
+.form-intro,
+.resume-summary,
+.decision-current,
+.pass-current {
+  border: 1px solid var(--brand-line);
+  border-radius: 12px;
+  color: var(--brand-navy);
+  background: #edf7f5;
+  box-shadow: none;
+}
+
+.application-panel p,
+.question-field p,
+.form-instructions {
+  color: var(--brand-muted);
+}
+
+.question-field {
+  border-color: var(--brand-line);
+}
+
+.question-field label,
+.question-field legend,
+.question-label {
+  color: var(--brand-navy);
+}
+
+.question-field legend {
+  border: 0;
+  color: var(--brand-navy);
+  background: transparent;
+}
+
+.question-field textarea,
+.question-field input:not([type="radio"]):not([type="checkbox"]),
+.question-field select,
+.operations-field input,
+.operations-field textarea,
+.operations-field select,
+.staff-filter input,
+.staff-filter select,
+.scanner-field input,
+.scanner-field select {
+  border: 1px solid var(--brand-line);
+  border-radius: 10px;
+  color: var(--brand-navy);
+  background: var(--brand-white);
+  box-shadow: none;
+}
+
+.question-field textarea:focus,
+.question-field input:focus,
+.question-field select:focus,
+.operations-field input:focus,
+.operations-field textarea:focus,
+.operations-field select:focus,
+.staff-filter input:focus,
+.staff-filter select:focus,
+.scanner-field input:focus,
+.scanner-field select:focus {
+  border-color: var(--brand-teal-dark);
+  background: #ffffff;
+}
+
+.boolean-options label,
+.choice-options label,
+.operations-checkboxes label {
+  border: 1px solid var(--brand-line);
+  border-radius: 10px;
+  color: var(--brand-navy);
+  background: var(--brand-white);
+  box-shadow: none;
+}
+
+.boolean-options label:has(input:checked),
+.choice-options label:has(input:checked),
+.operations-checkboxes label:has(input:checked) {
+  border-color: var(--brand-teal-dark);
+  color: var(--brand-navy);
+  background: var(--brand-teal-soft);
+  box-shadow: none;
+}
+
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--brand-teal-dark);
+}
+
+.status-pill,
+.status-pill.draft,
+.status-pill.submitted {
+  border: 1px solid var(--brand-line);
+  border-radius: 999px;
+  color: var(--brand-navy);
+  background: var(--brand-teal-soft);
+  box-shadow: none;
+}
+
+.status-pill.accepted {
+  color: #075f40;
+  background: #dff4e8;
+}
+
+.status-pill.waitlisted {
+  color: #92531c;
+  background: #fff0dc;
+}
+
+.status-pill.rejected,
+.field-error,
+.error-message {
+  color: #a42d29;
+}
+
+.status-pill.rejected {
+  background: #fde9e7;
+}
+
+/* Organizer, reviewer, and scanner surfaces */
+
+.staff-page,
+.scanner-page {
+  min-height: 100vh;
+  color: var(--brand-navy);
+  background:
+    linear-gradient(100deg, rgb(3 14 25 / 68%), rgb(4 21 32 / 46%)),
+    url("/hackatlantic-underwater.png") center / cover fixed;
+}
+
+.staff-sidebar {
+  border-right: 1px solid rgb(219 249 245 / 18%);
+  color: #f3fffd;
+  background: rgb(6 24 37 / 88%);
+  backdrop-filter: blur(20px);
+}
+
+.staff-sidebar .brand-mark,
+.staff-sidebar .brand-mark strong {
+  color: #f3fffd;
+}
+
+.staff-sidebar .brand-mark small,
+.staff-sidebar-context .coordinate-label {
+  color: var(--brand-teal-soft);
+}
+
+.staff-nav {
+  border-color: rgb(219 249 245 / 18%);
+}
+
+.staff-nav a {
+  border-color: rgb(219 249 245 / 16%);
+  color: #e9faf8;
+  background: transparent;
+}
+
+.staff-nav a span {
+  color: var(--brand-teal);
+}
+
+.staff-nav a:hover {
+  color: #ffffff;
+  background: rgb(6 188 169 / 18%);
+}
+
+.staff-home-link {
+  border-color: rgb(219 249 245 / 18%);
+  color: #c7ddde;
+}
+
+.staff-content-header h1 {
+  color: #f7fffe;
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  text-shadow: 0 8px 32px rgb(1 11 19 / 38%);
+  text-transform: none;
+}
+
+.staff-content-header .eyebrow,
+.system-status {
+  border-color: rgb(219 249 245 / 28%);
+  color: #e7faf7;
+  background: rgb(13 38 53 / 72%);
+  box-shadow: none;
+}
+
+.system-status i {
+  display: block;
+  background: var(--brand-teal);
+}
+
+.staff-panel,
+.scanner-panel {
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 76%);
+  border-radius: 18px;
+  color: var(--brand-navy);
+  background: rgb(250 253 251 / 95%);
+  box-shadow: 0 28px 78px rgb(1 11 19 / 32%);
+  backdrop-filter: blur(20px);
+}
+
+.staff-summary,
+.staff-actions,
+.staff-toolbar,
+.application-detail > section,
+.operations-section,
+.staff-state {
+  border-color: var(--brand-line);
+  background: var(--brand-white);
+}
+
+.staff-panel h2,
+.staff-panel h3,
+.staff-state h2,
+.operations-section-heading h2,
+.scanner-panel h1,
+.scanner-panel h2 {
+  color: var(--brand-navy);
+}
+
+.staff-metrics div,
+.staff-metrics div:first-child,
+.staff-metrics div:nth-child(2),
+.staff-metrics div:nth-child(3),
+.staff-metrics div:last-child {
+  border-color: var(--brand-line);
+  background: var(--brand-white);
+}
+
+.staff-list > li,
+.staff-list > li:last-child,
+.application-answers div {
+  border-color: var(--brand-line);
+}
+
+.staff-list > li:hover {
+  background: #edf7f5;
+}
+
+.staff-row-index {
+  border: 1px solid var(--brand-line);
+  color: var(--brand-navy);
+  background: var(--brand-teal-soft);
+}
+
+.staff-link,
+.application-answers dt {
+  color: var(--brand-teal-dark);
+}
+
+.operations-table-wrap,
+.resume-viewer iframe,
+.scanner-camera,
+.pass-qr-code {
+  border: 1px solid var(--brand-line);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.operations-table thead th {
+  color: var(--brand-navy);
+  background: #e5f3f1;
+}
+
+.operations-table td,
+.operations-table th {
+  border-color: var(--brand-line);
+}
+
+.scanner-panel h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 7vw, 5.8rem);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  text-transform: none;
+}
+
+.scanner-result-redeemed,
+.scanner-result-valid {
+  border: 1px solid #9bcdb9;
+  border-radius: 12px;
+  color: #075f40;
+  background: #dff4e8;
+  box-shadow: none;
+}
+
+.scanner-error-state,
+.scanner-error {
+  border: 1px solid #e7b2ae;
+  border-radius: 12px;
+  color: #a42d29;
+  background: #fde9e7;
+}
+
+/* Legal routes stay quiet, public, and highly readable. */
+
+.legal-page {
+  color: var(--brand-navy);
+  background: var(--brand-white);
+  box-shadow: 8px 8px 0 var(--brand-teal);
+}
+
+.legal-header {
+  border-color: var(--brand-navy);
+  background: var(--brand-white);
+}
+
+.legal-header .brand-mark,
+.legal-header .brand-mark strong {
+  color: var(--brand-navy);
+}
+
+.legal-header .button.secondary {
+  border-color: var(--brand-navy);
+  color: var(--brand-navy);
+  background: transparent;
+}
+
+.legal-title-block,
+.legal-title-terms {
+  border-color: var(--brand-navy);
+  color: #f7fffe;
+  background: var(--brand-navy);
+  box-shadow: 6px 6px 0 var(--brand-teal);
+}
+
+.legal-title-block h1,
+.legal-title-terms h1,
+.legal-title-block .coordinate-label,
+.legal-title-terms .coordinate-label,
+.legal-title-block .legal-updated,
+.legal-title-terms .legal-updated {
+  color: #f7fffe;
+}
+
+.legal-summary {
+  border-color: var(--brand-navy);
+  background: var(--brand-teal-soft);
+  box-shadow: 3px 3px 0 var(--brand-navy);
+}
+
+.legal-document section,
+.legal-footer {
+  border-color: var(--brand-navy);
+}
+
+.legal-footer {
+  color: #f5fffe;
+  background: var(--brand-navy);
+}
+
+.legal-footer a:hover {
+  color: var(--brand-teal-soft);
+}
+
+@media (max-width: 980px) {
+  .portal-hero {
+    grid-template-columns: 1fr;
+    padding-top: 3.5rem;
+  }
+
+  .intro {
+    min-height: auto;
+    border: 0;
+  }
+
+  .route-card {
+    width: 100%;
+  }
+
+  .staff-page {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-sidebar {
+    position: relative;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid rgb(219 249 245 / 18%);
+  }
+
+  .staff-nav {
+    border-color: rgb(219 249 245 / 18%);
+  }
+}
+
+@media (max-width: 680px) {
+  .page.portal-page {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0 12px 18px;
+    border: 0;
+    box-shadow: none;
+    background-position: 58% center;
+  }
+
+  .portal-header {
+    min-height: 64px;
+    margin-top: 12px;
+    padding: 0.6rem 0.65rem 0.6rem 0.85rem;
+  }
+
+  .portal-header .brand-mark strong {
+    font-size: 0.82rem;
+  }
+
+  .portal-header .brand-mark small {
+    display: block;
+    font-size: 0.52rem;
+  }
+
+  .portal-header .nav {
+    gap: 0.45rem;
+  }
+
+  .portal-header .nav .button {
+    display: inline-flex;
+    min-height: 38px;
+    padding: 0.55rem 0.65rem;
+    font-size: 0.63rem;
+  }
+
+  .portal-hero {
+    gap: 2.25rem;
+    min-height: auto;
+    padding: 3rem 0 2rem;
+  }
+
+  .application-logo {
+    width: 84px;
+    height: 84px;
+    margin-bottom: 1rem;
+  }
+
+  .intro h1 {
+    font-size: clamp(4rem, 22vw, 6rem);
+  }
+
+  .intro-copy {
+    margin-top: 1.25rem;
+    font-size: 0.95rem;
+  }
+
+  .route-card {
+    padding: 1.35rem;
+  }
+
+  .route-card h2 {
+    font-size: 3rem;
+  }
+
+  .signed-in-home.portal-workspace {
+    padding: 18px 0;
+  }
+
+  .workspace-switcher {
+    overflow-x: auto;
+  }
+
+  .workspace-switcher-links {
+    min-width: max-content;
+  }
+
+  .application-panel,
+  .staff-content,
+  .scanner-page {
+    padding: 1rem;
+  }
+
+  .application-panel {
+    padding: 1.2rem;
+  }
+
+  .application-panel h1 {
+    font-size: clamp(2.7rem, 14vw, 4.4rem);
+  }
+
+  .application-progress {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .staff-nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .staff-nav a,
+  .staff-nav a:last-child {
+    border-color: rgb(219 249 245 / 16%);
+  }
+
+  .staff-content-header h1,
+  .scanner-panel h1 {
+    font-size: clamp(2.8rem, 14vw, 4.5rem);
+  }
+
+  .legal-page {
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}
