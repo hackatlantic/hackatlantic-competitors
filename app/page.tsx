@@ -7,6 +7,7 @@ import {
 import { ApplicantDashboard } from "@/components/applicant-dashboard";
 import { RoleNavigation } from "@/components/role-navigation";
 import { BrandMark } from "@/components/brand-mark";
+import { LegalFooter } from "@/components/legal-footer";
 
 export default function Home() {
   return (
@@ -92,6 +93,8 @@ export default function Home() {
           <ApplicantDashboard />
         </div>
       </Show>
+
+      <LegalFooter />
     </main>
   );
 }

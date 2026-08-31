@@ -2644,6 +2644,212 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
+/* Public legal pages and persistent portal footer */
+
+.legal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 64px;
+  padding: 1rem 1.25rem;
+  border-top: 2px solid var(--ink);
+  color: var(--paper-bright);
+  background: var(--ink);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.legal-footer p {
+  color: inherit;
+  font: inherit;
+}
+
+.legal-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+}
+
+.legal-footer a {
+  color: inherit;
+  text-underline-offset: 4px;
+}
+
+.legal-footer a:hover {
+  color: var(--yellow);
+}
+
+.legal-page {
+  width: min(1120px, calc(100% - 28px));
+  min-height: calc(100vh - 28px);
+  margin: 14px auto;
+  border: 2px solid var(--ink);
+  background: var(--paper-bright);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+
+.legal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 80px;
+  padding: 0.9rem 1.15rem;
+  border-bottom: 2px solid var(--ink);
+  background: var(--paper-bright);
+}
+
+.legal-document {
+  max-width: 850px;
+  margin: 0 auto;
+  padding: clamp(1.25rem, 5vw, 4.5rem);
+}
+
+.legal-title-block {
+  margin-bottom: 2.5rem;
+  padding: clamp(1.4rem, 4vw, 3rem);
+  border: 2px solid var(--ink);
+  background: var(--blue);
+  box-shadow: var(--hard-shadow);
+}
+
+.legal-title-terms {
+  background: var(--yellow);
+}
+
+.legal-title-block .coordinate-label,
+.legal-title-block .legal-updated {
+  color: var(--paper-bright);
+}
+
+.legal-title-terms .coordinate-label,
+.legal-title-terms .legal-updated {
+  color: var(--ink);
+}
+
+.legal-title-block h1 {
+  max-width: 9ch;
+  margin: 1.2rem 0;
+  color: var(--paper-bright);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(3rem, 10vw, 7rem);
+  font-weight: 950;
+  letter-spacing: -0.085em;
+  line-height: 0.82;
+  text-transform: uppercase;
+}
+
+.legal-title-terms h1 {
+  color: var(--ink);
+}
+
+.legal-updated {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.legal-summary {
+  margin: 0 0 3rem;
+  padding: 1.25rem;
+  border: 2px solid var(--ink);
+  background: var(--lime);
+  box-shadow: var(--hard-shadow-small);
+}
+
+.legal-summary strong {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.legal-summary p,
+.legal-document section p,
+.legal-document li {
+  color: var(--ink);
+  line-height: 1.7;
+}
+
+.legal-document section {
+  padding: 2rem 0;
+  border-top: 2px solid var(--ink);
+}
+
+.legal-document section h2 {
+  margin: 0 0 1rem;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.legal-document section p + p {
+  margin-top: 1rem;
+}
+
+.legal-document ul {
+  display: grid;
+  gap: 0.65rem;
+  margin: 1rem 0;
+  padding-left: 1.4rem;
+}
+
+.legal-document section a {
+  color: #064fbd;
+  font-weight: 800;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 680px) {
+  .legal-page {
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    border-right: 0;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .legal-header {
+    align-items: flex-start;
+    padding: 0.8rem;
+  }
+
+  .legal-header .button {
+    min-height: 40px;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.68rem;
+  }
+
+  .legal-document {
+    padding: 1rem;
+  }
+
+  .legal-title-block {
+    margin-bottom: 2rem;
+    box-shadow: var(--hard-shadow-small);
+  }
+
+  .legal-title-block h1 {
+    font-size: clamp(2.8rem, 16vw, 5rem);
+  }
+
+  .legal-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .application-error-panel {
   box-sizing: border-box;
   overflow: hidden;
