@@ -6,7 +6,7 @@ locals {
     "https://hackatlantic-ats-git-codex-brand-integration-10xdevvs-projects.vercel.app",
   ]
 
-  configured_cors_origins  = [
+  configured_cors_origins = [
     for origin in split(",", lookup(var.api_env, "CORS_ALLOWED_ORIGINS", "")) : trimspace(origin)
     if trimspace(origin) != ""
   ]
