@@ -83,6 +83,18 @@ function displayAnswer(value: ApplicationAnswers[string]): string {
   return String(value);
 }
 
+const applicationAnswerLabels: Record<string, string> = {
+  fullName: "Name",
+  email: "Email",
+  school: "School",
+  dietaryRestrictions: "Dietary restrictions",
+  hackAtlanticExcitement: "What are you most excited about at Hack Atlantic?",
+  priorHackathonExperience: "Prior hackathon experience",
+  desiredTeammateNames: "Desired teammate names",
+  hardwareProject: "Looking to make a hardware project?",
+  hardwareEquipment: "Requested hardware equipment",
+};
+
 type ApplicationAnswersListProps = {
   answers: ApplicationAnswers;
 };
@@ -98,7 +110,7 @@ export function ApplicationAnswersList({ answers }: ApplicationAnswersListProps)
     <dl className="application-answers">
       {entries.map(([key, value]) => (
         <div key={key}>
-          <dt>{key}</dt>
+          <dt>{applicationAnswerLabels[key] ?? key}</dt>
           <dd>{displayAnswer(value)}</dd>
         </div>
       ))}

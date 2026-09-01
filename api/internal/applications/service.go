@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -50,22 +51,36 @@ type Applicant struct {
 	Email string
 }
 
+// QuestionCondition controls whether a question is relevant to an applicant.
+// Conditions intentionally support only boolean answers until the product needs
+// a broader expression language.
+type QuestionCondition struct {
+	Key    string `json:"key"`
+	Equals bool   `json:"equals"`
+}
+
 // Question is one scalar prompt in a published application form.
 type Question struct {
-	Key      string  `json:"key"`
-	Label    string  `json:"label"`
-	Type     string  `json:"type"`
-	Required bool    `json:"required"`
-	Help     *string `json:"help,omitempty"`
+	Key      string             `json:"key"`
+	Label    string             `json:"label"`
+	Type     string             `json:"type"`
+	Required bool               `json:"required"`
+	Help     *string            `json:"help,omitempty"`
+	Section  *string            `json:"section,omitempty"`
+	Control  *string            `json:"control,omitempty"`
+	Options  []string           `json:"options,omitempty"`
+	MaxWords *int               `json:"maxWords,omitempty"`
+	ShowWhen *QuestionCondition `json:"showWhen,omitempty"`
 }
 
 // Form is the application form that is currently accepting responses.
 type Form struct {
-	ID             string     `json:"id"`
-	CycleID        string     `json:"cycleId"`
-	Version        int32      `json:"version"`
-	ResumeRequired bool       `json:"resumeRequired"`
-	Questions      []Question `json:"questions"`
+	ID                     string     `json:"id"`
+	CycleID                string     `json:"cycleId"`
+	Version                int32      `json:"version"`
+	ResumeRequired         bool       `json:"resumeRequired"`
+	ResumeAfterQuestionKey *string    `json:"resumeAfterQuestionKey,omitempty"`
+	Questions              []Question `json:"questions"`
 }
 
 // Application is the applicant-safe representation of an application record.
@@ -401,11 +416,12 @@ func formFromRow(row sqlc.GetCurrentApplicationFormRow) (Form, error) {
 		return Form{}, err
 	}
 	return Form{
-		ID:             row.FormID.String(),
-		CycleID:        row.CycleID.String(),
-		Version:        row.FormVersion,
-		ResumeRequired: form.ResumeRequired,
-		Questions:      form.Questions,
+		ID:                     row.FormID.String(),
+		CycleID:                row.CycleID.String(),
+		Version:                row.FormVersion,
+		ResumeRequired:         form.ResumeRequired,
+		ResumeAfterQuestionKey: form.ResumeAfterQuestionKey,
+		Questions:              form.Questions,
 	}, nil
 }
 
@@ -470,21 +486,32 @@ func applicationFromValues(
 }
 
 type publishedForm struct {
-	ResumeRequired bool
-	Questions      []Question
+	ResumeRequired         bool
+	ResumeAfterQuestionKey *string
+	Questions              []Question
 }
 
 func parsePublishedForm(raw []byte) (publishedForm, error) {
+	type conditionDocument struct {
+		Key    *string `json:"key"`
+		Equals *bool   `json:"equals"`
+	}
 	type questionDocument struct {
-		Key      *string `json:"key"`
-		Label    *string `json:"label"`
-		Type     *string `json:"type"`
-		Required *bool   `json:"required"`
-		Help     *string `json:"help"`
+		Key      *string            `json:"key"`
+		Label    *string            `json:"label"`
+		Type     *string            `json:"type"`
+		Required *bool              `json:"required"`
+		Help     *string            `json:"help"`
+		Section  *string            `json:"section"`
+		Control  *string            `json:"control"`
+		Options  []string           `json:"options"`
+		MaxWords *int               `json:"maxWords"`
+		ShowWhen *conditionDocument `json:"showWhen"`
 	}
 	type document struct {
-		ResumeRequired bool                `json:"resumeRequired"`
-		Questions      *[]questionDocument `json:"questions"`
+		ResumeRequired         bool                `json:"resumeRequired"`
+		ResumeAfterQuestionKey *string             `json:"resumeAfterQuestionKey"`
+		Questions              *[]questionDocument `json:"questions"`
 	}
 
 	var parsed document
@@ -506,19 +533,78 @@ func parsePublishedForm(raw []byte) (publishedForm, error) {
 		if *question.Type != "string" && *question.Type != "number" && *question.Type != "boolean" {
 			return publishedForm{}, ErrInvalidPublishedForm
 		}
+		if question.Section != nil && strings.TrimSpace(*question.Section) == "" {
+			return publishedForm{}, ErrInvalidPublishedForm
+		}
+		if question.Control != nil {
+			if *question.Type != "string" || (*question.Control != "text" && *question.Control != "email" && *question.Control != "textarea" && *question.Control != "select") {
+				return publishedForm{}, ErrInvalidPublishedForm
+			}
+		}
+		if len(question.Options) > 0 {
+			if *question.Type != "string" || question.Control == nil || *question.Control != "select" {
+				return publishedForm{}, ErrInvalidPublishedForm
+			}
+			seenOptions := make(map[string]struct{}, len(question.Options))
+			for _, option := range question.Options {
+				if strings.TrimSpace(option) == "" || strings.TrimSpace(option) != option {
+					return publishedForm{}, ErrInvalidPublishedForm
+				}
+				if _, exists := seenOptions[option]; exists {
+					return publishedForm{}, ErrInvalidPublishedForm
+				}
+				seenOptions[option] = struct{}{}
+			}
+		} else if question.Control != nil && *question.Control == "select" {
+			return publishedForm{}, ErrInvalidPublishedForm
+		}
+		if question.MaxWords != nil && (*question.Type != "string" || *question.MaxWords <= 0) {
+			return publishedForm{}, ErrInvalidPublishedForm
+		}
 		if _, exists := keys[*question.Key]; exists {
 			return publishedForm{}, ErrInvalidPublishedForm
 		}
 		keys[*question.Key] = struct{}{}
+		var showWhen *QuestionCondition
+		if question.ShowWhen != nil {
+			if question.ShowWhen.Key == nil || question.ShowWhen.Equals == nil || strings.TrimSpace(*question.ShowWhen.Key) == "" {
+				return publishedForm{}, ErrInvalidPublishedForm
+			}
+			showWhen = &QuestionCondition{Key: *question.ShowWhen.Key, Equals: *question.ShowWhen.Equals}
+		}
 		questions = append(questions, Question{
 			Key:      *question.Key,
 			Label:    *question.Label,
 			Type:     *question.Type,
 			Required: *question.Required,
 			Help:     question.Help,
+			Section:  question.Section,
+			Control:  question.Control,
+			Options:  question.Options,
+			MaxWords: question.MaxWords,
+			ShowWhen: showWhen,
 		})
 	}
-	return publishedForm{ResumeRequired: parsed.ResumeRequired, Questions: questions}, nil
+	for _, question := range questions {
+		if question.ShowWhen == nil {
+			continue
+		}
+		_, exists := keys[question.ShowWhen.Key]
+		if !exists || question.ShowWhen.Key == question.Key {
+			return publishedForm{}, ErrInvalidPublishedForm
+		}
+		for _, candidate := range questions {
+			if candidate.Key == question.ShowWhen.Key && candidate.Type != "boolean" {
+				return publishedForm{}, ErrInvalidPublishedForm
+			}
+		}
+	}
+	if parsed.ResumeAfterQuestionKey != nil {
+		if _, exists := keys[*parsed.ResumeAfterQuestionKey]; !exists {
+			return publishedForm{}, ErrInvalidPublishedForm
+		}
+	}
+	return publishedForm{ResumeRequired: parsed.ResumeRequired, ResumeAfterQuestionKey: parsed.ResumeAfterQuestionKey, Questions: questions}, nil
 }
 
 func validateAnswers(form publishedForm, answers map[string]json.RawMessage, requireRequired bool) error {
@@ -531,6 +617,7 @@ func validateAnswers(form publishedForm, answers map[string]json.RawMessage, req
 		byKey[question.Key] = question
 	}
 	nonemptyStrings := make(map[string]bool, len(answers))
+	decoded := make(map[string]any, len(answers))
 	for key, rawValue := range answers {
 		question, exists := byKey[key]
 		if !exists {
@@ -540,6 +627,7 @@ func validateAnswers(form publishedForm, answers map[string]json.RawMessage, req
 		if err != nil {
 			return ErrInvalidAnswers
 		}
+		decoded[key] = value
 		switch question.Type {
 		case "string":
 			stringValue, ok := value.(string)
@@ -547,6 +635,18 @@ func validateAnswers(form publishedForm, answers map[string]json.RawMessage, req
 				return ErrInvalidAnswers
 			}
 			nonemptyStrings[key] = strings.TrimSpace(stringValue) != ""
+			if question.MaxWords != nil && len(strings.Fields(stringValue)) > *question.MaxWords {
+				return ErrInvalidAnswers
+			}
+			if len(question.Options) > 0 && !containsString(question.Options, stringValue) {
+				return ErrInvalidAnswers
+			}
+			if question.Control != nil && *question.Control == "email" && strings.TrimSpace(stringValue) != "" {
+				address, err := mail.ParseAddress(strings.TrimSpace(stringValue))
+				if err != nil || address.Address != strings.TrimSpace(stringValue) {
+					return ErrInvalidAnswers
+				}
+			}
 		case "number":
 			if _, ok := value.(json.Number); !ok {
 				return ErrInvalidAnswers
@@ -557,9 +657,16 @@ func validateAnswers(form publishedForm, answers map[string]json.RawMessage, req
 			}
 		}
 	}
+	for _, question := range questions {
+		if question.ShowWhen != nil && !conditionMatches(*question.ShowWhen, decoded) {
+			if _, exists := answers[question.Key]; exists {
+				return ErrInvalidAnswers
+			}
+		}
+	}
 	if requireRequired {
 		for _, question := range questions {
-			if !question.Required {
+			if !question.Required || (question.ShowWhen != nil && !conditionMatches(*question.ShowWhen, decoded)) {
 				continue
 			}
 			if _, exists := answers[question.Key]; !exists ||
@@ -569,6 +676,24 @@ func validateAnswers(form publishedForm, answers map[string]json.RawMessage, req
 		}
 	}
 	return nil
+}
+
+func conditionMatches(condition QuestionCondition, answers map[string]any) bool {
+	value, exists := answers[condition.Key]
+	if !exists {
+		return false
+	}
+	boolean, ok := value.(bool)
+	return ok && boolean == condition.Equals
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func decodeScalar(raw json.RawMessage) (any, error) {

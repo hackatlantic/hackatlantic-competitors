@@ -64,14 +64,21 @@ const baseURL = __ENV.API_BASE_URL;
 const expected = http.expectedStatuses(200);
 
 function answersFor(form, email, sequence) {
-  return Object.fromEntries(form.questions.map((question) => {
+  const answers = Object.fromEntries(form.questions.map((question) => {
     const description = question.key + " " + question.label;
     if (question.type === "boolean") return [question.key, true];
     if (question.type === "number") return [question.key, sequence + 1];
+    if (question.options?.length) return [question.key, question.options[0]];
     if (/email/i.test(description)) return [question.key, email];
     if (/school/i.test(description)) return [question.key, "Synthetic Atlantic University"];
     return [question.key, "Synthetic load response " + (sequence + 1) + " for " + question.label];
   }));
+  return Object.fromEntries(
+    Object.entries(answers).filter(([key]) => {
+      const question = form.questions.find((candidate) => candidate.key === key);
+      return !question?.showWhen || answers[question.showWhen.key] === question.showWhen.equals;
+    }),
+  );
 }
 
 function accepted(response, name) {
