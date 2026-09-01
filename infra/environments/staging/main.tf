@@ -6,7 +6,7 @@ locals {
     "https://hackatlantic-ats-git-codex-brand-integration-10xdevvs-projects.vercel.app",
   ]
 
-  configured_cors_origins = [
+  configured_cors_origins  = [
     for origin in split(",", lookup(var.api_env, "CORS_ALLOWED_ORIGINS", "")) : trimspace(origin)
     if trimspace(origin) != ""
   ]
@@ -17,13 +17,13 @@ locals {
 
   database_url = "postgresql://postgres.${supabase_project.database.id}:${var.supabase_database_password}@aws-0-${var.supabase_region}.pooler.supabase.com:5432/postgres?sslmode=require"
   api_env = merge(var.api_env, {
-    DATABASE_URL              = local.database_url
-    DATABASE_ROLE             = "hackatlantic_app"
-    QR_TOKEN_PEPPER           = random_id.qr_token_pepper.b64_std
-    CLAIM_TOKEN_PEPPER        = random_id.claim_token_pepper.b64_std
-    LOAD_TEST_AUTH_SECRET     = random_id.load_test_auth_secret.b64_std
-    CORS_ALLOWED_ORIGINS      = join(",", distinct(concat(local.configured_cors_origins, local.staging_frontend_origins)))
-    CLERK_AUTHORIZED_PARTIES  = join(",", distinct(concat(local.configured_clerk_parties, local.staging_frontend_origins)))
+    DATABASE_URL             = local.database_url
+    DATABASE_ROLE            = "hackatlantic_app"
+    QR_TOKEN_PEPPER          = random_id.qr_token_pepper.b64_std
+    CLAIM_TOKEN_PEPPER       = random_id.claim_token_pepper.b64_std
+    LOAD_TEST_AUTH_SECRET    = random_id.load_test_auth_secret.b64_std
+    CORS_ALLOWED_ORIGINS     = join(",", distinct(concat(local.configured_cors_origins, local.staging_frontend_origins)))
+    CLERK_AUTHORIZED_PARTIES = join(",", distinct(concat(local.configured_clerk_parties, local.staging_frontend_origins)))
   })
 }
 
