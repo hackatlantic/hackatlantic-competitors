@@ -467,22 +467,9 @@ textarea:focus-visible {
 }
 
 .application-form-section-heading {
-  display: grid;
-  grid-template-columns: minmax(72px, auto) 1fr;
-  gap: 18px;
-  align-items: baseline;
   margin-top: 18px;
   padding: 22px 0 10px;
   border-top: 1px solid var(--brand-line);
-}
-
-.application-form-section-heading span {
-  color: var(--brand-teal-dark);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .application-form-section-heading h2 {
@@ -528,6 +515,39 @@ textarea:focus-visible {
   color: var(--brand-navy);
   background: var(--brand-white);
   box-shadow: none;
+}
+
+.question-field input:not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+.question-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.question-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.question-field.has-error input:not([type="radio"]):not([type="checkbox"]),
+.question-field.has-error select,
+.question-field.has-error textarea,
+.question-field.has-error fieldset {
+  border-color: #b42318;
+  background: #fff5f4;
+  box-shadow: 0 0 0 3px rgb(180 35 24 / 14%);
+}
+
+.question-field.has-error fieldset {
+  padding: 0.85rem;
+  border: 1px solid #b42318;
+  border-radius: 10px;
 }
 
 .question-field textarea:focus,

@@ -44,5 +44,16 @@ describe("application form rules", () => {
       hardware: true,
     }, true).equipment).toBe("This question is required.");
   });
+
+  it("reports every visible missing required field before submission", () => {
+    expect(validateApplicationAnswers(form, {
+      excitement: "   ",
+      hardware: true,
+    }, true)).toEqual({
+      excitement: "This question is required.",
+      experience: "This question is required.",
+      equipment: "This question is required.",
+    });
+  });
 });
 
