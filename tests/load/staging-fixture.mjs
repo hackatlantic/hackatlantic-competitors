@@ -114,7 +114,7 @@ INSERT INTO ats.application_forms (
 SELECT
   cycle.id,
   COALESCE((SELECT MAX(existing.version) + 1 FROM ats.application_forms AS existing WHERE existing.cycle_id = cycle.id), 1),
-  '{"resumeRequired":true,"questions":[{"key":"full_name","label":"Full name","type":"string","required":true},{"key":"email","label":"Email","type":"string","required":true},{"key":"school","label":"School","type":"string","required":true}]}'::jsonb,
+  '{"resumeRequired":false,"resumeAfterQuestionKey":"school","questions":[{"key":"fullName","label":"Name","type":"string","required":true,"section":"Build your profile","control":"text"},{"key":"email","label":"Email","type":"string","required":true,"section":"Build your profile","control":"email","help":"Verified through your signed-in account."},{"key":"school","label":"School","type":"string","required":true,"section":"Build your profile","control":"text"},{"key":"dietaryRestrictions","label":"Dietary restrictions","type":"string","required":true,"section":"Build your profile","control":"text","help":"Enter None if you do not have any."},{"key":"hackAtlanticExcitement","label":"What are you most excited about at Hack Atlantic?","type":"string","required":true,"section":"Hackathon Specific Questions","control":"textarea","maxWords":100,"help":"Maximum 100 words."},{"key":"priorHackathonExperience","label":"Prior hackathon experience","type":"string","required":true,"section":"Hackathon Specific Questions","control":"select","options":["This is my first","1–3","3+"]},{"key":"desiredTeammateNames","label":"Desired teammate names (Optional)","type":"string","required":false,"section":"Hackathon Specific Questions","control":"text"},{"key":"hardwareProject","label":"Are you looking to make a hardware project?","type":"boolean","required":true,"section":"Hackathon Specific Questions"},{"key":"hardwareEquipment","label":"What equipment are you looking to use?","type":"string","required":true,"section":"Hackathon Specific Questions","control":"textarea","showWhen":{"key":"hardwareProject","equals":true}}]}'::jsonb,
   CURRENT_TIMESTAMP,
   creator.id
 FROM ats.application_cycles AS cycle
@@ -267,14 +267,21 @@ async function issueScannerPasses(attendees, adminToken) {
 }
 
 function applicantAnswers(form, email, sequence) {
-  return Object.fromEntries(form.questions.map((question) => {
+  const answers = Object.fromEntries(form.questions.map((question) => {
     const description = question.key + " " + question.label;
     if (question.type === "boolean") return [question.key, true];
     if (question.type === "number") return [question.key, sequence + 1];
+    if (question.options?.length) return [question.key, question.options[0]];
     if (/email/i.test(description)) return [question.key, email];
     if (/school/i.test(description)) return [question.key, "Synthetic Atlantic University"];
     return [question.key, "Synthetic deadline response " + (sequence + 1)];
   }));
+  return Object.fromEntries(
+    Object.entries(answers).filter(([key]) => {
+      const question = form.questions.find((candidate) => candidate.key === key);
+      return !question?.showWhen || answers[question.showWhen.key] === question.showWhen.equals;
+    }),
+  );
 }
 
 async function prepareDeadlineApplicants(applicants, form) {

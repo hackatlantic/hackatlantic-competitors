@@ -29,33 +29,88 @@ const (
 )
 
 var fixtureFormSchema = []byte(`{
-  "resumeRequired": true,
+  "resumeRequired": false,
+  "resumeAfterQuestionKey": "school",
   "questions": [
     {
       "key": "fullName",
-      "label": "What is your full name?",
+      "label": "Name",
       "type": "string",
       "required": true,
-      "help": "Use the name you want organizers to use."
+      "section": "Build your profile",
+      "control": "text"
+    },
+    {
+      "key": "email",
+      "label": "Email",
+      "type": "string",
+      "required": true,
+      "section": "Build your profile",
+      "control": "email",
+      "help": "Verified through your signed-in account."
     },
     {
       "key": "school",
-      "label": "What school do you attend?",
+      "label": "School",
       "type": "string",
       "required": true,
-      "help": "Enter the full name of your current school, college, or university."
+      "section": "Build your profile",
+      "control": "text"
     },
     {
-      "key": "yearsCoding",
-      "label": "How many years have you been coding?",
-      "type": "number",
-      "required": true
+      "key": "dietaryRestrictions",
+      "label": "Dietary restrictions",
+      "type": "string",
+      "required": true,
+      "section": "Build your profile",
+      "control": "text",
+      "help": "Enter None if you do not have any."
     },
     {
-      "key": "needsTravelSupport",
-      "label": "Do you need travel support?",
+      "key": "hackAtlanticExcitement",
+      "label": "What are you most excited about at Hack Atlantic?",
+      "type": "string",
+      "required": true,
+      "section": "Hackathon Specific Questions",
+      "control": "textarea",
+      "maxWords": 100,
+      "help": "Maximum 100 words."
+    },
+    {
+      "key": "priorHackathonExperience",
+      "label": "Prior hackathon experience",
+      "type": "string",
+      "required": true,
+      "section": "Hackathon Specific Questions",
+      "control": "select",
+      "options": ["This is my first", "1–3", "3+"]
+    },
+    {
+      "key": "desiredTeammateNames",
+      "label": "Desired teammate names (Optional)",
+      "type": "string",
+      "required": false,
+      "section": "Hackathon Specific Questions",
+      "control": "text"
+    },
+    {
+      "key": "hardwareProject",
+      "label": "Are you looking to make a hardware project?",
       "type": "boolean",
-      "required": false
+      "required": true,
+      "section": "Hackathon Specific Questions"
+    },
+    {
+      "key": "hardwareEquipment",
+      "label": "What equipment are you looking to use?",
+      "type": "string",
+      "required": true,
+      "section": "Hackathon Specific Questions",
+      "control": "textarea",
+      "showWhen": {
+        "key": "hardwareProject",
+        "equals": true
+      }
     }
   ]
 }`)
