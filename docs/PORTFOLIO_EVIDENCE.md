@@ -13,7 +13,7 @@ Store redacted artifacts under `docs/evidence/` with a date and commit SHA.
 - [ ] Broken staging deployment alert and measured rollback duration
 - [ ] API and ATS Grafana dashboard screenshots
 - [ ] Discord and email test alerts
-- [ ] k6 summary at 25 concurrent scanners
+- [ ] k6 release-gate summary at 20 concurrent scanners, plus separate 100-pass spike and same-pass contention reports
 - [ ] Backup inventory and redacted monthly restore report
 - [ ] Cloudflare DNS parity and DNSSEC validation
 

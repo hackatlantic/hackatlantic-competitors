@@ -54,6 +54,11 @@ func main() {
 	if deploymentEnvironment == "" {
 		deploymentEnvironment = "development"
 	}
+	loadTestAuthSecret := strings.TrimSpace(os.Getenv("LOAD_TEST_AUTH_SECRET"))
+	if err := validateLoadTestAuthentication(deploymentEnvironment, loadTestAuthSecret); err != nil {
+		logger.Error("configure staging load-test authentication", "error", err)
+		os.Exit(1)
+	}
 	if configuredVersion := strings.TrimSpace(os.Getenv("APP_VERSION")); configuredVersion != "" {
 		version = configuredVersion
 	}
@@ -164,10 +169,17 @@ func main() {
 		Resumes:        resumes.NewService(pool.Pool, resumeStore, durationEnv("DATABASE_QUERY_TIMEOUT", 5*time.Second)),
 		AllowedOrigins: commaSeparatedEnv("CORS_ALLOWED_ORIGINS"),
 	}
-	if verifier, resolver, err := clerkDependencies(lifecycleCtx, configureCtx, pool.Pool); err != nil {
+	if verifier, resolver, err := clerkDependencies(lifecycleCtx, configureCtx, pool.Pool, loadTestAuthSecret != ""); err != nil {
 		logger.Error("configure Clerk authentication", "error", err)
 		os.Exit(1)
 	} else if verifier != nil {
+		if loadTestAuthSecret != "" {
+			verifier, err = auth.NewLoadTestVerifier(verifier, loadTestAuthSecret)
+			if err != nil {
+				logger.Error("configure staging load-test authentication", "error", err)
+				os.Exit(1)
+			}
+		}
 		dependencies.Verifier = verifier
 		dependencies.Users = resolver
 		dependencies.StaffRoles = resolver
@@ -205,6 +217,13 @@ func main() {
 	}
 }
 
+func validateLoadTestAuthentication(environment, secret string) error {
+	if strings.TrimSpace(secret) != "" && strings.TrimSpace(environment) != "staging" {
+		return fmt.Errorf("LOAD_TEST_AUTH_SECRET is permitted only when DEPLOYMENT_ENVIRONMENT=staging")
+	}
+	return nil
+}
+
 func loadResumeStore(getenv func(string) string) (resumes.Store, error) {
 	endpoint := strings.TrimSpace(getenv("SPACES_ENDPOINT"))
 	region := strings.TrimSpace(getenv("SPACES_REGION"))
@@ -228,7 +247,7 @@ type clerkSettings struct {
 	JWKSURL           string
 }
 
-func clerkDependencies(lifecycleCtx context.Context, initialCtx context.Context, pool *pgxpool.Pool) (auth.Verifier, *users.Service, error) {
+func clerkDependencies(lifecycleCtx context.Context, initialCtx context.Context, pool *pgxpool.Pool, loadTestProfiles bool) (auth.Verifier, *users.Service, error) {
 	settings, enabled, err := loadClerkSettings(os.Getenv)
 	if err != nil {
 		return nil, nil, err
@@ -248,7 +267,14 @@ func clerkDependencies(lifecycleCtx context.Context, initialCtx context.Context,
 	if err != nil {
 		return nil, nil, err
 	}
-	return verifier, users.NewService(pool, profiles, durationEnv("DATABASE_QUERY_TIMEOUT", 5*time.Second)), nil
+	var profileSource users.ProfileSource = profiles
+	if loadTestProfiles {
+		profileSource, err = users.NewLoadTestProfileSource(profileSource)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	return verifier, users.NewService(pool, profileSource, durationEnv("DATABASE_QUERY_TIMEOUT", 5*time.Second)), nil
 }
 
 func loadClerkSettings(getenv func(string) string) (clerkSettings, bool, error) {

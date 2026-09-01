@@ -18,21 +18,39 @@ trap 'rm -rf "$workdir"' EXIT
 dump_path="$workdir/ats-${backup_date}.dump"
 encrypted_path="${dump_path}.age"
 
-pg_dump "$DATABASE_URL" \
-  --schema=ats \
-  --format=custom \
-  --compress=9 \
-  --no-owner \
-  --no-acl \
-  --file="$dump_path"
+if [[ -n "${POSTGRES_CLIENT_IMAGE:-}" ]]; then
+  export DUMP_FILE="$(basename "$dump_path")"
+  docker run --rm \
+    --env DATABASE_URL \
+    --env DUMP_FILE \
+    --volume "$workdir:/backup" \
+    "$POSTGRES_CLIENT_IMAGE" \
+    sh -euc 'pg_dump "$DATABASE_URL" --schema=ats --format=custom --compress=9 --no-owner --no-acl --file="/backup/${DUMP_FILE}"'
+else
+  pg_dump "$DATABASE_URL" \
+    --schema=ats \
+    --format=custom \
+    --compress=9 \
+    --no-owner \
+    --no-acl \
+    --file="$dump_path"
+fi
+test -s "$dump_path"
 
 age --recipient "$AGE_RECIPIENT" --output "$encrypted_path" "$dump_path"
 rm -f "$dump_path"
+test -s "$encrypted_path"
 
 daily_key="daily/ats-${backup_date}.dump.age"
 aws --endpoint-url "$SPACES_ENDPOINT" s3 cp "$encrypted_path" "s3://${BACKUP_BUCKET}/${daily_key}" \
   --only-show-errors \
   --metadata "schema=ats,created=${backup_date}"
+uploaded_size="$(aws --endpoint-url "$SPACES_ENDPOINT" s3api head-object \
+  --bucket "$BACKUP_BUCKET" --key "$daily_key" --query ContentLength --output text)"
+if [[ ! "$uploaded_size" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Uploaded backup object is missing or empty" >&2
+  exit 1
+fi
 
 if [[ "$(date -u +%u)" == "7" ]]; then
   aws --endpoint-url "$SPACES_ENDPOINT" s3 cp "$encrypted_path" "s3://${BACKUP_BUCKET}/weekly/ats-${backup_date}.dump.age" --only-show-errors
@@ -62,4 +80,3 @@ prune_prefix monthly 186
 
 checksum="$(sha256sum "$encrypted_path" | cut -d ' ' -f 1)"
 echo "Encrypted ATS backup uploaded: ${daily_key} (${checksum})"
-

@@ -19,6 +19,11 @@ import {
   type CurrentUser,
 } from "@/lib/api";
 import {
+  applicationWordCount,
+  isApplicationQuestionVisible,
+  validateApplicationAnswers,
+} from "@/lib/application-form";
+import {
   type FormEvent,
   useCallback,
   useEffect,
@@ -187,6 +192,13 @@ export function ApplicantDashboard() {
 
       setCurrentForm(form);
       replaceApplication(nextApplication);
+      if (
+        form.questions.some((question) => question.key === "email") &&
+        nextApplication.answers.email === undefined
+      ) {
+        setAnswers({ ...nextApplication.answers, email: user.email });
+        setIsDirty(true);
+      }
       await Promise.all([
         loadReleasedDecision(nextApplication.id),
         loadResume(nextApplication.id),
@@ -240,6 +252,14 @@ export function ApplicantDashboard() {
       } else {
         next[key] = value;
       }
+      for (const question of currentForm?.questions ?? []) {
+        if (
+          question.showWhen?.key === key &&
+          next[key] !== question.showWhen.equals
+        ) {
+          delete next[question.key];
+        }
+      }
       return next;
     });
     setFieldErrors((current) => {
@@ -256,6 +276,13 @@ export function ApplicantDashboard() {
 
   const saveDraft = async () => {
     if (!currentForm || !application || application.status !== "draft") {
+      return;
+    }
+
+    const clientErrors = validateApplicationAnswers(currentForm, answers, false);
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      setNotice("Fix the highlighted responses before saving.");
       return;
     }
 
@@ -301,6 +328,12 @@ export function ApplicantDashboard() {
     }
     if (currentForm.resumeRequired && !resume) {
       setNotice("Upload your PDF resume before submitting your application.");
+      return;
+    }
+    const clientErrors = validateApplicationAnswers(currentForm, answers, true);
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      setNotice("Complete the highlighted questions before submitting.");
       return;
     }
 
@@ -381,6 +414,39 @@ export function ApplicantDashboard() {
 
   const questions = currentForm?.questions ?? [];
   const submitted = application.status === "submitted";
+  const resumeUploadField = currentForm ? (
+    <div className="question-field resume-upload-field">
+      <label htmlFor="application-resume">
+        Resume{currentForm.resumeRequired ? <span aria-hidden="true"> *</span> : " (Optional)"}
+      </label>
+      <p>Upload one PDF, up to 5 MB. Uploading another PDF replaces the current resume.</p>
+      <input
+        accept="application/pdf,.pdf"
+        disabled={busyAction !== null}
+        id="application-resume"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) {
+            void uploadResume(file);
+          }
+          event.target.value = "";
+        }}
+        type="file"
+      />
+      <p
+        aria-live="polite"
+        className={resume || !currentForm.resumeRequired ? "resume-summary" : "field-error"}
+      >
+        {busyAction === "uploading-resume"
+          ? "Uploading resume…"
+          : resume
+            ? `${resume.originalFilename} · ${Math.ceil(resume.byteSize / 1024)} KB`
+            : currentForm.resumeRequired
+              ? "A PDF resume is required before submission."
+              : "No resume uploaded."}
+      </p>
+    </div>
+  ) : null;
 
   return (
     <motion.section
@@ -416,14 +482,6 @@ export function ApplicantDashboard() {
             ? "Your answers are only visible to you until you submit this application."
             : "This draft can no longer be changed or submitted because the application window is closed."}
       </p>
-
-      <div className="application-identity" aria-label="Applicant identity">
-        <div>
-          <span className="coordinate-label">VERIFIED IDENTITY</span>
-          <strong>{currentUser?.email ?? "Verified through Clerk"}</strong>
-        </div>
-        <p>Your verified account email is attached to the application when you submit.</p>
-      </div>
 
       <AnimatePresence initial={false}>
         {notice ? (
@@ -469,23 +527,41 @@ export function ApplicantDashboard() {
       ) : currentForm ? (
         <form className="application-form" noValidate onSubmit={submitApplication}>
           <div className="form-intro">
-            <span className="coordinate-label">SECTION A / YOUR SIGNAL</span>
-            <p className="form-instructions">There is no perfect hacker profile. Give us a clear picture of what you&apos;re curious about and what you want to build.</p>
+            <span className="coordinate-label">HACK ATLANTIC APPLICATION</span>
+            <p className="form-instructions">Tell us who you are and what you want to explore at Hack Atlantic.</p>
           </div>
 
           {questions.map((question, index) => {
+            if (!isApplicationQuestionVisible(question, answers)) {
+              return null;
+            }
             const value = answers[question.key];
             const helpId = `question-${index}-help`;
             const errorId = `question-${index}-error`;
+            const wordCount =
+              question.maxWords && typeof value === "string"
+                ? applicationWordCount(value)
+                : 0;
+            const startsSection =
+              Boolean(question.section) &&
+              (index === 0 || questions[index - 1]?.section !== question.section);
             const describedBy = [
               question.help ? helpId : undefined,
+              question.maxWords ? `${helpId}-word-count` : undefined,
               fieldErrors[question.key] ? errorId : undefined,
             ]
               .filter(Boolean)
               .join(" ") || undefined;
 
             return (
-              <div className="question-field" key={question.key}>
+              <div className="application-question-group" key={question.key}>
+                {startsSection ? (
+                  <div className="application-form-section-heading">
+                    <span>Part {question.section?.startsWith("Build") ? "1" : "2"}</span>
+                    <h2>{question.section}</h2>
+                  </div>
+                ) : null}
+              <div className="question-field">
                 {question.type === "boolean" ? (
                   <fieldset
                     aria-describedby={describedBy}
@@ -518,6 +594,27 @@ export function ApplicantDashboard() {
                       </label>
                     </div>
                   </fieldset>
+                ) : question.options?.length ? (
+                  <>
+                    <label htmlFor={`question-${index}`}>
+                      {question.label}
+                      {question.required ? <span aria-hidden="true"> *</span> : null}
+                    </label>
+                    {question.help ? <p id={helpId}>{question.help}</p> : null}
+                    <select
+                      aria-describedby={describedBy}
+                      aria-invalid={Boolean(fieldErrors[question.key])}
+                      aria-required={question.required}
+                      id={`question-${index}`}
+                      onChange={(event) => updateAnswer(question.key, event.target.value || undefined)}
+                      value={typeof value === "string" ? value : ""}
+                    >
+                      <option value="">Select an option</option>
+                      {question.options.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </>
                 ) : (
                   <>
                     <label htmlFor={`question-${index}`}>
@@ -547,6 +644,18 @@ export function ApplicantDashboard() {
                         type="number"
                         value={typeof value === "number" ? value : ""}
                       />
+                    ) : question.control === "text" || question.control === "email" ? (
+                      <input
+                        aria-describedby={describedBy}
+                        aria-invalid={Boolean(fieldErrors[question.key])}
+                        aria-required={question.required}
+                        autoComplete={question.control === "email" ? "email" : question.key === "fullName" ? "name" : undefined}
+                        id={`question-${index}`}
+                        onChange={(event) => updateAnswer(question.key, event.target.value || undefined)}
+                        readOnly={question.key === "email"}
+                        type={question.control}
+                        value={question.key === "email" ? currentUser?.email ?? "" : typeof value === "string" ? value : ""}
+                      />
                     ) : (
                       <textarea
                         aria-describedby={describedBy}
@@ -558,6 +667,14 @@ export function ApplicantDashboard() {
                         value={typeof value === "string" ? value : ""}
                       />
                     )}
+                    {question.maxWords ? (
+                      <p
+                        className={wordCount > question.maxWords ? "field-error" : "word-count"}
+                        id={`${helpId}-word-count`}
+                      >
+                        {wordCount}/{question.maxWords} words
+                      </p>
+                    ) : null}
                   </>
                 )}
                 {fieldErrors[question.key] ? (
@@ -566,37 +683,12 @@ export function ApplicantDashboard() {
                   </p>
                 ) : null}
               </div>
+              {currentForm.resumeAfterQuestionKey === question.key ? resumeUploadField : null}
+              </div>
             );
           })}
 
-          {currentForm.resumeRequired ? (
-            <div className="question-field resume-upload-field">
-              <label htmlFor="application-resume">
-                Resume <span aria-hidden="true">*</span>
-              </label>
-              <p>Upload one PDF, up to 5 MB. Uploading another PDF replaces the current resume.</p>
-              <input
-                accept="application/pdf,.pdf"
-                disabled={busyAction !== null}
-                id="application-resume"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) {
-                    void uploadResume(file);
-                  }
-                  event.target.value = "";
-                }}
-                type="file"
-              />
-              <p aria-live="polite" className={resume ? "resume-summary" : "field-error"}>
-                {busyAction === "uploading-resume"
-                  ? "Uploading resume…"
-                  : resume
-                    ? `${resume.originalFilename} · ${Math.ceil(resume.byteSize / 1024)} KB`
-                    : "A PDF resume is required before submission."}
-              </p>
-            </div>
-          ) : null}
+          {!currentForm.resumeAfterQuestionKey ? resumeUploadField : null}
 
           <div className="application-actions">
             <div aria-live="polite" className="save-state">

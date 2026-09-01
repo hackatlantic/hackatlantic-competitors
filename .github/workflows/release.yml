@@ -66,7 +66,9 @@ jobs:
           exit-code: "1"
           format: table
           version: v0.70.0
-      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+      - name: Export standalone SPDX SBOM (best effort)
+        continue-on-error: true
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           image: ghcr.io/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           format: spdx-json
@@ -193,26 +195,45 @@ jobs:
           E2E_ADMIN_EMAIL: ${{ vars.E2E_ADMIN_EMAIL }}
           E2E_SCANNER_EMAIL: ${{ vars.E2E_SCANNER_EMAIL }}
           E2E_FULL_LIFECYCLE: "true"
-      - name: Report deferred authenticated load gate
-        if: ${{ vars.K6_SCANNER_USER_ID == '' || vars.K6_CHECKPOINT_ID == '' || vars.K6_CLERK_JWT_TEMPLATE == '' }}
+      - name: Materialize realistic scanner release-gate fixture inputs
+        shell: bash
         run: |
-          echo "::notice::Scanner load testing is deferred until the staging scanner identity and checkpoint variables are bootstrapped."
-          echo "### Deferred staging gate" >> "$GITHUB_STEP_SUMMARY"
-          echo "Scanner concurrency testing requires K6_SCANNER_USER_ID, K6_CHECKPOINT_ID, and K6_CLERK_JWT_TEMPLATE." >> "$GITHUB_STEP_SUMMARY"
-      - name: Enforce scanner concurrency and latency objectives
-        if: ${{ vars.K6_SCANNER_USER_ID != '' && vars.K6_CHECKPOINT_ID != '' && vars.K6_CLERK_JWT_TEMPLATE != '' }}
-        uses: grafana/run-k6-action@de51a7390bdf0ac85a3bef493691bd71d4c7c158 # v1
-        with:
-          path: tests/load/scanner.js
+          set +x
+          database_password="$(jq -er '.supabase_database_password' <<<"${TF_VARS_JSON}")"
+          echo "::add-mask::${database_password}"
+          load_test_auth_secret="$(terraform -chdir=infra/environments/staging output -raw load_test_auth_secret)"
+          test -n "${load_test_auth_secret}"
+          echo "::add-mask::${load_test_auth_secret}"
+          {
+            echo "API_BASE_URL=${STAGING_API_URL}"
+            echo "DATABASE_URL=postgresql://postgres.ovzrhurmiwqthfgycamx:${database_password}@aws-0-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require"
+            echo "LOAD_TEST_AUTH_SECRET=${load_test_auth_secret}"
+            echo "K6_FIXTURE_PATH=.tmp/k6-staging-fixture.json"
+            echo "K6_SCANNER_FIXTURES=../../.tmp/k6-staging-fixture.json"
+            echo "K6_SCANNER_PROFILE=release"
+            echo "K6_SCANNER_IDENTITIES=20"
+            echo "K6_SCANNER_PASS_COUNT=1500"
+            echo "K6_SCANNER_VUS=20"
+            echo "K6_SCANNER_ITERATIONS=1500"
+            echo "K6_APPLICANT_COUNT=0"
+          } >> "$GITHUB_ENV"
+      - name: Prepare realistic scanner release-gate fixture
+        run: node tests/load/staging-fixture.mjs prepare
+      - name: Refresh short-lived scanner authentication
+        run: node tests/load/staging-fixture.mjs refresh-scanner
+      - name: Export release-gate checkpoint
+        shell: bash
+        run: echo "CHECKPOINT_ID=$(jq -er '.scanner.checkpointId' "${K6_FIXTURE_PATH}")" >> "$GITHUB_ENV"
+      - name: Enforce realistic scanner release gate
+        run: k6 run --summary-export .tmp/scanner-release-summary.json tests/load/scanner.js
         env:
           API_BASE_URL: ${{ env.STAGING_API_URL }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          SCANNER_USER_ID: ${{ vars.K6_SCANNER_USER_ID }}
-          CLERK_JWT_TEMPLATE: ${{ vars.K6_CLERK_JWT_TEMPLATE }}
-          QR_TOKEN: ${{ secrets.K6_QR_TOKEN }}
-          CHECKPOINT_ID: ${{ vars.K6_CHECKPOINT_ID }}
-          K6_SCANNER_VUS: "25"
-          K6_SCANNER_DURATION: 5m
+      - name: Verify scanner release-gate ledger correctness
+        if: ${{ always() && hashFiles('.tmp/k6-staging-fixture.json') != '' }}
+        run: node tests/load/staging-fixture.mjs verify-scanner
+      - name: Remove temporary staging staff access
+        if: ${{ always() && env.LOAD_TEST_AUTH_SECRET != '' }}
+        run: node tests/load/staging-fixture.mjs cleanup
 
   production:
     name: Promote production
@@ -345,4 +366,5 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
-      - run: bash scripts/notify-incident.sh
+      - continue-on-error: true
+        run: bash scripts/notify-incident.sh

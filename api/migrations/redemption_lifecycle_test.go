@@ -17,11 +17,13 @@ import (
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/checkpoints"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/decisions"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/httpapi"
+	"github.com/hackatlantic/hackatlantic-competitors/api/internal/operations"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/passes"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/redemptions"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/reviews"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/users"
 	"github.com/hackatlantic/hackatlantic-competitors/api/migrations"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -77,10 +79,11 @@ func TestScannerRedemptionsAreAtomicIdempotentAndMinimal(t *testing.T) {
 	}
 	checkpointService := checkpoints.NewService(pool, 5*time.Second)
 	redemptionService := redemptions.NewService(pool, 15*time.Second, passService)
+	organizerUser := decisionTestUser(organizerID, "clerk-redemption-organizer", users.RoleOrganizer)
 	server := httptest.NewServer(httpapi.NewHandlerWithDependencies("test", httpapi.Dependencies{
 		Readiness: pool, Verifier: intakeVerifier{},
 		Users: intakeUserResolver{users: map[string]users.User{
-			"clerk-redemption-organizer":  decisionTestUser(organizerID, "clerk-redemption-organizer", users.RoleOrganizer),
+			"clerk-redemption-organizer":  organizerUser,
 			"clerk-redemption-scanner":    decisionTestUser(scannerID, "clerk-redemption-scanner", users.RoleScanner),
 			"clerk-redemption-applicant":  decisionTestUser(applicantID, "clerk-redemption-applicant", users.RoleApplicant),
 			"clerk-redemption-revoked":    decisionTestUser(revokedApplicantID, "clerk-redemption-revoked", users.RoleApplicant),
@@ -116,6 +119,8 @@ func TestScannerRedemptionsAreAtomicIdempotentAndMinimal(t *testing.T) {
 	closedCheckpointID := insertRedemptionCheckpoint(t, ctx, pool, cycleID, "closed", "Closed workshop", true, 1, true, nil, &alreadyClosed)
 	inactiveCheckpointID := insertRedemptionCheckpoint(t, ctx, pool, cycleID, "inactive", "Inactive checkpoint", true, 1, false, nil, nil)
 	concurrentCheckpointID := insertRedemptionCheckpoint(t, ctx, pool, cycleID, "concurrent", "Concurrent entrance", true, 1, true, nil, nil)
+	parallelCheckpointID := insertRedemptionCheckpoint(t, ctx, pool, cycleID, "parallel", "Parallel entrance", true, 1, true, nil, nil)
+	policyCheckpointID := insertRedemptionCheckpoint(t, ctx, pool, cycleID, "policy", "Policy entrance", true, 1, true, nil, nil)
 	insertRedemptionEntitlement(t, ctx, pool, mainAttendeeID, overrideAllowedID, cycleID, true, 1)
 	insertRedemptionEntitlement(t, ctx, pool, mainAttendeeID, overrideDeniedID, cycleID, false, 99)
 
@@ -130,7 +135,7 @@ func TestScannerRedemptionsAreAtomicIdempotentAndMinimal(t *testing.T) {
 		NextCursor *string                     `json:"nextCursor"`
 	}
 	decodeIntakeResponse(t, checkpointList, &listPayload)
-	if len(listPayload.Items) != 6 || listPayload.NextCursor != nil {
+	if len(listPayload.Items) != 8 || listPayload.NextCursor != nil {
 		t.Fatalf("scanner did not receive every active checkpoint globally: %+v", listPayload)
 	}
 	assertPassStatus(t, intakeRequest(t, server.URL, http.MethodGet, "/v1/checkpoints", "clerk-redemption-applicant", nil), http.StatusForbidden)
@@ -215,7 +220,288 @@ func TestScannerRedemptionsAreAtomicIdempotentAndMinimal(t *testing.T) {
 		t.Fatalf("committed redemptions exceeded maximum: %d", concurrentCount)
 	}
 
+	// A transaction paused after taking its checkpoint/pass locks must not prevent
+	// an unrelated pass from redeeming at the same checkpoint.
+	parallelFirstKey := redemptionKey(30)
+	parallelRelease, parallelCleanup := holdRedemptionRequestAtInsert(t, ctx, pool, parallelFirstKey)
+	parallelFirst := redeemLifecyclePassAsync(server.URL, mainPass.QRToken, parallelCheckpointID, parallelFirstKey)
+	waitForAdvisoryBlockedRedemption(t, ctx, pool)
+	parallelSecond := redeemLifecyclePassAsync(server.URL, concurrentPass.QRToken, parallelCheckpointID, redemptionKey(31))
+	var secondWhileFirstBlocked asyncRedemptionResult
+	secondCompletedWhileFirstBlocked := false
+	select {
+	case secondWhileFirstBlocked = <-parallelSecond:
+		secondCompletedWhileFirstBlocked = true
+	case <-time.After(time.Second):
+	}
+	parallelRelease()
+	firstParallelResult := awaitRedemptionResult(t, parallelFirst)
+	if !secondCompletedWhileFirstBlocked {
+		secondWhileFirstBlocked.result = awaitRedemptionResult(t, parallelSecond)
+	}
+	parallelCleanup()
+	if !secondCompletedWhileFirstBlocked {
+		t.Fatal("a different pass could not redeem while the first pass held the same checkpoint lock")
+	}
+	if secondWhileFirstBlocked.err != nil {
+		t.Fatalf("redeem different pass concurrently: %v", secondWhileFirstBlocked.err)
+	}
+	assertRedemptionOutcome(t, firstParallelResult, redemptions.OutcomeRedeemed, "Parallel entrance", true)
+	assertRedemptionOutcome(t, secondWhileFirstBlocked.result, redemptions.OutcomeRedeemed, "Parallel entrance", true)
+
+	// Organizer policy changes retain an exclusive checkpoint lock. They must wait
+	// for an in-flight redemption and take effect only after that transaction ends.
+	policyKey := redemptionKey(32)
+	policyRelease, policyCleanup := holdRedemptionRequestAtInsert(t, ctx, pool, policyKey)
+	policyRedemption := redeemLifecyclePassAsync(server.URL, mainPass.QRToken, policyCheckpointID, policyKey)
+	waitForAdvisoryBlockedRedemption(t, ctx, pool)
+	operationService := operations.NewService(pool, 5*time.Second, 15*time.Second)
+	type updateResult struct {
+		checkpoint operations.Checkpoint
+		err        error
+	}
+	policyUpdate := make(chan updateResult, 1)
+	go func() {
+		updated, err := operationService.UpdateCheckpoint(context.Background(), organizerUser, policyCheckpointID, operations.CheckpointInput{
+			CycleID: cycleID, Slug: "policy", Name: "Policy entrance closed", DefaultAllowed: false, DefaultMaxRedemptions: 0, Active: false,
+		})
+		policyUpdate <- updateResult{checkpoint: updated, err: err}
+	}()
+	updateCompletedDuringRedemption := false
+	var updatedPolicy updateResult
+	select {
+	case updatedPolicy = <-policyUpdate:
+		updateCompletedDuringRedemption = true
+	case <-time.After(300 * time.Millisecond):
+	}
+	policyRelease()
+	policyResult := awaitRedemptionResult(t, policyRedemption)
+	if !updateCompletedDuringRedemption {
+		select {
+		case updatedPolicy = <-policyUpdate:
+		case <-time.After(5 * time.Second):
+			t.Fatal("checkpoint update did not finish after the redemption committed")
+		}
+	}
+	policyCleanup()
+	if updateCompletedDuringRedemption {
+		t.Fatal("checkpoint configuration update raced with an in-flight redemption")
+	}
+	if updatedPolicy.err != nil {
+		t.Fatalf("update checkpoint after redemption: %v", updatedPolicy.err)
+	}
+	assertRedemptionOutcome(t, policyResult, redemptions.OutcomeRedeemed, "Policy entrance", true)
+	if updatedPolicy.checkpoint.Active || updatedPolicy.checkpoint.DefaultAllowed || updatedPolicy.checkpoint.Name != "Policy entrance closed" {
+		t.Fatalf("checkpoint update was not applied after redemption: %+v", updatedPolicy.checkpoint)
+	}
+
 	assertRedemptionPersistence(t, ctx, pool, scannerID, mainAttendeeID, mainPass.ID, defaultCheckpointID, firstKey, *first.RedemptionID, mainPass.QRToken)
+}
+
+func TestDistinctPassRedemptionsSustainTwentyConcurrentScanners(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), integrationTimeout)
+	defer cancel()
+	pool, cleanup := disposableDatabase(t, ctx)
+	defer cleanup()
+	if err := migrations.Apply(ctx, pool); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	organizerID := createUser(t, ctx, pool, "clerk-redemption-load-organizer")
+	cycleID := insertCycle(t, ctx, pool, "redemption-load", true)
+	formID := insertWorkflowForm(t, ctx, pool, cycleID, organizerID)
+	checkpointID := insertRedemptionCheckpoint(t, ctx, pool, cycleID, "load", "Load entrance", true, 1, true, nil, nil)
+	organizer := decisionTestUser(organizerID, "clerk-redemption-load-organizer", users.RoleOrganizer)
+
+	passService, err := passes.NewService(pool, 5*time.Second, 15*time.Second, passes.Config{
+		QRTokenPepper: encodedTestPepper(0x51), ClaimTokenPepper: encodedTestPepper(0x52), AppBaseURL: "https://app.example",
+	})
+	if err != nil {
+		t.Fatalf("create pass service: %v", err)
+	}
+	redemptionService := redemptions.NewService(pool, 15*time.Second, passService)
+
+	const scannerCount = 20
+	const passCount = 100
+	scanners := make([]users.User, scannerCount)
+	for index := range scanners {
+		clerkID := fmt.Sprintf("clerk-redemption-load-scanner-%02d", index)
+		id := createUser(t, ctx, pool, clerkID)
+		scanners[index] = decisionTestUser(id, clerkID, users.RoleScanner)
+	}
+
+	issued := make([]passes.Issuance, passCount)
+	for index := range issued {
+		clerkID := fmt.Sprintf("clerk-redemption-load-attendee-%03d", index)
+		userID := createUser(t, ctx, pool, clerkID)
+		applicationID := insertDraftWorkflowApplication(t, ctx, pool, cycleID, formID, userID, fmt.Sprintf("Load attendee %03d", index))
+		if _, err := pool.Exec(ctx, `UPDATE ats.applications SET status = 'accepted', submitted_at = CURRENT_TIMESTAMP,
+			current_decision = 'accepted', decision_released_at = CURRENT_TIMESTAMP WHERE id = $1`, applicationID); err != nil {
+			t.Fatalf("accept load application %d: %v", index, err)
+		}
+		var attendeeID string
+		if err := pool.QueryRow(ctx, `INSERT INTO ats.attendees (cycle_id, application_id, user_id, display_name, email)
+			VALUES ($1, $2, $3, $4, $5) RETURNING id::text`, cycleID, applicationID, userID,
+			fmt.Sprintf("Load attendee %03d", index), clerkID+"@example.test").Scan(&attendeeID); err != nil {
+			t.Fatalf("create load attendee %d: %v", index, err)
+		}
+		issued[index], err = passService.Issue(ctx, organizer, attendeeID)
+		if err != nil {
+			t.Fatalf("issue load pass %d: %v", index, err)
+		}
+	}
+
+	start := make(chan struct{})
+	work := make(chan int)
+	errorsByPass := make([]error, passCount)
+	results := make([]redemptions.Result, passCount)
+	var workers sync.WaitGroup
+	workers.Add(scannerCount)
+	for scannerIndex := range scanners {
+		go func(scanner users.User) {
+			defer workers.Done()
+			<-start
+			for passIndex := range work {
+				results[passIndex], errorsByPass[passIndex] = redemptionService.Redeem(ctx, scanner, redemptions.RedeemInput{
+					QRToken: issued[passIndex].QRToken, CheckpointID: checkpointID,
+					IdempotencyKey: fmt.Sprintf("10000000-0000-4000-8000-%012d", passIndex),
+				})
+			}
+		}(scanners[scannerIndex])
+	}
+	close(start)
+	for index := range issued {
+		work <- index
+	}
+	close(work)
+	workers.Wait()
+
+	for index, err := range errorsByPass {
+		if err != nil {
+			t.Errorf("redeem distinct pass %d: %v", index, err)
+			continue
+		}
+		if results[index].Outcome != redemptions.OutcomeRedeemed || results[index].RedemptionID == nil {
+			t.Errorf("distinct pass %d returned unexpected result: %+v", index, results[index])
+		}
+	}
+	var redemptionCount, distinctAttendeeCount int
+	if err := pool.QueryRow(ctx, `SELECT count(*), count(DISTINCT attendee_id) FROM ats.redemptions WHERE checkpoint_id = $1`, checkpointID).
+		Scan(&redemptionCount, &distinctAttendeeCount); err != nil {
+		t.Fatalf("count load redemptions: %v", err)
+	}
+	if redemptionCount != passCount || distinctAttendeeCount != passCount {
+		t.Fatalf("distinct-pass load lost or duplicated redemptions: rows=%d attendees=%d", redemptionCount, distinctAttendeeCount)
+	}
+}
+
+type asyncRedemptionResult struct {
+	result redemptionOutcomeResponse
+	err    error
+}
+
+func redeemLifecyclePassAsync(baseURL, qrToken, checkpointID, idempotencyKey string) <-chan asyncRedemptionResult {
+	result := make(chan asyncRedemptionResult, 1)
+	go func() {
+		payload, err := json.Marshal(map[string]any{"qrToken": qrToken, "checkpointId": checkpointID, "idempotencyKey": idempotencyKey})
+		if err != nil {
+			result <- asyncRedemptionResult{err: fmt.Errorf("encode redemption: %w", err)}
+			return
+		}
+		request, err := http.NewRequest(http.MethodPost, baseURL+"/v1/redemptions", strings.NewReader(string(payload)))
+		if err != nil {
+			result <- asyncRedemptionResult{err: fmt.Errorf("create redemption request: %w", err)}
+			return
+		}
+		request.Header.Set("Authorization", "Bearer clerk-redemption-scanner")
+		request.Header.Set("Content-Type", "application/json")
+		response, err := http.DefaultClient.Do(request)
+		if err != nil {
+			result <- asyncRedemptionResult{err: fmt.Errorf("perform redemption: %w", err)}
+			return
+		}
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusOK {
+			result <- asyncRedemptionResult{err: fmt.Errorf("redemption status: got %d", response.StatusCode)}
+			return
+		}
+		var decoded redemptionOutcomeResponse
+		if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
+			result <- asyncRedemptionResult{err: fmt.Errorf("decode redemption: %w", err)}
+			return
+		}
+		result <- asyncRedemptionResult{result: decoded}
+	}()
+	return result
+}
+
+func awaitRedemptionResult(t *testing.T, result <-chan asyncRedemptionResult) redemptionOutcomeResponse {
+	t.Helper()
+	select {
+	case completed := <-result:
+		if completed.err != nil {
+			t.Fatalf("await redemption: %v", completed.err)
+		}
+		return completed.result
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for redemption")
+		return redemptionOutcomeResponse{}
+	}
+}
+
+const redemptionTestAdvisoryLock int64 = 712026
+
+func holdRedemptionRequestAtInsert(t *testing.T, ctx context.Context, pool *pgxpool.Pool, idempotencyKey string) (release func(), cleanup func()) {
+	t.Helper()
+	if _, err := pool.Exec(ctx, fmt.Sprintf(`CREATE OR REPLACE FUNCTION ats.test_hold_redemption_request() RETURNS trigger AS $$
+		BEGIN
+			IF NEW.idempotency_key = '%s'::uuid THEN
+				PERFORM pg_advisory_xact_lock(%d);
+			END IF;
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;
+		CREATE TRIGGER test_hold_redemption_request
+		BEFORE INSERT ON ats.redemption_requests
+		FOR EACH ROW EXECUTE FUNCTION ats.test_hold_redemption_request()`, idempotencyKey, redemptionTestAdvisoryLock)); err != nil {
+		t.Fatalf("install redemption test gate: %v", err)
+	}
+	blocker, err := pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		t.Fatalf("begin redemption test gate: %v", err)
+	}
+	if _, err := blocker.Exec(ctx, `SELECT pg_advisory_xact_lock($1)`, redemptionTestAdvisoryLock); err != nil {
+		_ = blocker.Rollback(ctx)
+		t.Fatalf("hold redemption test gate: %v", err)
+	}
+	return func() {
+			if err := blocker.Commit(ctx); err != nil {
+				t.Errorf("release redemption test gate: %v", err)
+			}
+		}, func() {
+			if _, err := pool.Exec(ctx, `DROP TRIGGER IF EXISTS test_hold_redemption_request ON ats.redemption_requests;
+			DROP FUNCTION IF EXISTS ats.test_hold_redemption_request()`); err != nil {
+				t.Errorf("remove redemption test gate: %v", err)
+			}
+		}
+}
+
+func waitForAdvisoryBlockedRedemption(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		var blocked bool
+		if err := pool.QueryRow(ctx, `SELECT EXISTS (
+			SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted = false
+		)`).Scan(&blocked); err != nil {
+			t.Fatalf("inspect blocked redemption: %v", err)
+		}
+		if blocked {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("redemption did not reach the post-lock test gate")
 }
 
 func issueRedemptionPass(t *testing.T, baseURL, attendeeID string) lifecyclePassResponse {

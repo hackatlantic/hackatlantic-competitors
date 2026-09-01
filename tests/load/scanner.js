@@ -1,94 +1,174 @@
 import http from "k6/http";
-import { check } from "k6";
+import { check, sleep } from "k6";
+import { Counter, Rate } from "k6/metrics";
+import { SharedArray } from "k6/data";
 import exec from "k6/execution";
+import { loadTestOperationID } from "./idempotency.js";
 
-const virtualUsers = Number(__ENV.K6_SCANNER_VUS ?? 25);
-const iterations = Number(__ENV.K6_SCANNER_ITERATIONS ?? 0);
+const profile = __ENV.K6_SCANNER_PROFILE ?? "release";
+const fixturePath = __ENV.K6_SCANNER_FIXTURES;
+const scannerFixture = new SharedArray("synthetic scanner fixture", () => {
+  if (!fixturePath) throw new Error("K6_SCANNER_FIXTURES is required");
+  const fixture = JSON.parse(open(fixturePath));
+  const scanner = fixture.scanner;
+  return [{ runID: fixture.runID, passes: scanner.passes, tokens: scanner.tokens }];
+})[0];
+const virtualUsers = Number(__ENV.K6_SCANNER_VUS ?? (profile === "release" ? 20 : 100));
+const iterations = Number(__ENV.K6_SCANNER_ITERATIONS ?? scannerFixture.passes.length);
+
+function scannerScenario() {
+  switch (profile) {
+    case "release":
+      return {
+        executor: "shared-iterations",
+        vus: virtualUsers,
+        iterations,
+        maxDuration: __ENV.K6_SCANNER_MAX_DURATION ?? "10m",
+      };
+    case "spike":
+      return {
+        executor: "constant-arrival-rate",
+        rate: Number(__ENV.K6_SCANNER_RATE ?? 5),
+        timeUnit: "1s",
+        duration: __ENV.K6_SCANNER_DURATION ?? "20s",
+        preAllocatedVUs: Math.min(virtualUsers, 20),
+        maxVUs: virtualUsers,
+      };
+    case "contention":
+      return {
+        executor: "shared-iterations",
+        vus: virtualUsers,
+        iterations,
+        maxDuration: __ENV.K6_SCANNER_MAX_DURATION ?? "2m",
+      };
+    default:
+      throw new Error("K6_SCANNER_PROFILE must be release, spike, or contention");
+  }
+}
+
+function scannerThresholds() {
+  const common = {
+    scanner_system_failures: ["rate<0.01"],
+    http_req_failed: ["rate<0.01"],
+  };
+  if (profile === "release") {
+    return {
+      ...common,
+      checks: ["rate>0.99"],
+      scanner_domain_failures: ["rate==0"],
+      "http_req_duration{operation:lookup}": ["p(95)<750"],
+      "http_req_duration{operation:redemption}": ["p(95)<1000"],
+    };
+  }
+  if (profile === "contention") {
+    return {
+      ...common,
+      scanner_idempotency_mismatches: ["rate==0"],
+      scanner_redeemed: ["count==1"],
+      scanner_already_exhausted: [`count==${iterations - 1}`],
+    };
+  }
+  return { ...common, dropped_iterations: ["count==0"] };
+}
 
 export const options = {
-  scenarios: {
-    scanner_lookup: iterations > 0
-      ? {
-          executor: "per-vu-iterations",
-          vus: virtualUsers,
-          iterations,
-          maxDuration: __ENV.K6_SCANNER_MAX_DURATION ?? "2m",
-        }
-      : {
-          executor: "constant-vus",
-          vus: virtualUsers,
-          duration: __ENV.K6_SCANNER_DURATION ?? "5m",
-        },
-  },
-  thresholds: {
-    "http_req_duration{operation:lookup}": ["p(95)<500"],
-    "http_req_duration{operation:redemption}": ["p(95)<750"],
-    http_req_failed: ["rate<0.01"],
-  },
+  scenarios: { ["scanner_" + profile]: scannerScenario() },
+  thresholds: scannerThresholds(),
 };
 
+const systemFailures = new Rate("scanner_system_failures");
+const domainFailures = new Rate("scanner_domain_failures");
+const idempotencyMismatches = new Rate("scanner_idempotency_mismatches");
+const redeemed = new Counter("scanner_redeemed");
+const alreadyExhausted = new Counter("scanner_already_exhausted");
+const unauthorized = new Counter("scanner_http_401");
+const forbidden = new Counter("scanner_http_403");
+const rateLimited = new Counter("scanner_http_429");
+const conflicts = new Counter("scanner_http_409");
+const unprocessable = new Counter("scanner_http_422");
+const serverErrors = new Counter("scanner_http_5xx");
+const otherHTTPFailures = new Counter("scanner_http_other_failures");
 const baseURL = __ENV.API_BASE_URL;
-const qrToken = __ENV.QR_TOKEN;
 const checkpointID = __ENV.CHECKPOINT_ID;
-const acceptedDomainStatuses = http.expectedStatuses(200, 409, 422);
-
-export function setup() {
-  if (__ENV.SCANNER_TOKEN) return { scannerToken: __ENV.SCANNER_TOKEN };
-  if (!__ENV.CLERK_SECRET_KEY || !__ENV.SCANNER_USER_ID || !__ENV.CLERK_JWT_TEMPLATE) {
-    exec.test.abort(
-      "Set SCANNER_TOKEN, or CLERK_SECRET_KEY, SCANNER_USER_ID and CLERK_JWT_TEMPLATE",
-    );
-  }
-
-  const clerkHeaders = {
-    Authorization: `Bearer ${__ENV.CLERK_SECRET_KEY}`,
-    "Content-Type": "application/json",
-  };
-  const sessions = http.get(
-    `https://api.clerk.com/v1/sessions?user_id=${encodeURIComponent(__ENV.SCANNER_USER_ID)}&status=active&limit=1`,
-    { headers: clerkHeaders, responseCallback: http.expectedStatuses(200) },
-  );
-  const sessionID = sessions.json("data.0.id");
-  if (!sessionID) exec.test.abort("The synthetic scanner user has no active Clerk session");
-
-  const token = http.post(
-    `https://api.clerk.com/v1/sessions/${sessionID}/tokens/${encodeURIComponent(__ENV.CLERK_JWT_TEMPLATE)}`,
-    null,
-    { headers: clerkHeaders, responseCallback: http.expectedStatuses(200) },
-  );
-  const scannerToken = token.json("jwt");
-  if (!scannerToken) exec.test.abort("Clerk did not issue the scanner load-test JWT");
-  return { scannerToken };
-}
+const expectedHTTP = http.expectedStatuses(200);
 
 function operationID() {
-  const vu = String(exec.vu.idInTest).padStart(3, "0").slice(-3);
-  const iteration = String(exec.scenario.iterationInTest).padStart(9, "0").slice(-9);
-  return `00000000-0000-4000-8000-${vu}${iteration}`;
+  return loadTestOperationID(scannerFixture.runID, exec.vu.idInTest, exec.scenario.iterationInTest);
 }
 
-export default function scannerLoad(data) {
-  if (!baseURL || !data.scannerToken || !qrToken || !checkpointID) {
-    exec.test.abort("API_BASE_URL, scanner authentication, QR_TOKEN and CHECKPOINT_ID are required");
+function recordSystemResult(response) {
+  const failed = response.status !== 200;
+  systemFailures.add(failed);
+  if (failed) {
+    if (response.status === 401) unauthorized.add(1);
+    else if (response.status === 403) forbidden.add(1);
+    else if (response.status === 429) rateLimited.add(1);
+    else if (response.status === 409) conflicts.add(1);
+    else if (response.status === 422) unprocessable.add(1);
+    else if (response.status >= 500) serverErrors.add(1);
+    else otherHTTPFailures.add(1);
   }
-  const headers = { Authorization: `Bearer ${data.scannerToken}`, "Content-Type": "application/json" };
-  const lookup = http.post(`${baseURL}/v1/scans/lookup`, JSON.stringify({ qrToken }), {
+  return !failed;
+}
+
+function releasePacing() {
+  if (profile === "release") sleep(2 + Math.random() * 3);
+}
+
+function selectedPass() {
+  if (profile === "contention") return scannerFixture.passes[0];
+  return scannerFixture.passes[exec.scenario.iterationInTest];
+}
+
+export default function scannerLoad() {
+  if (!baseURL || !checkpointID || scannerFixture.tokens.length === 0) {
+    exec.test.abort("API_BASE_URL, CHECKPOINT_ID, and scanner tokens are required");
+  }
+  const pass = selectedPass();
+  if (!pass) exec.test.abort("The profile scheduled more scans than distinct fixture passes");
+  const token = scannerFixture.tokens[(exec.vu.idInTest - 1) % scannerFixture.tokens.length];
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  const lookup = http.post(`${baseURL}/v1/scans/lookup`, JSON.stringify({ qrToken: pass.qrToken }), {
     headers,
     tags: { operation: "lookup" },
-    responseCallback: http.expectedStatuses(200),
+    responseCallback: expectedHTTP,
   });
-  check(lookup, { "lookup is accepted": (response) => response.status === 200 });
+  const lookupOK = recordSystemResult(lookup);
+  check(lookup, { "lookup is HTTP 200": () => lookupOK });
+  if (!lookupOK) {
+    releasePacing();
+    return;
+  }
 
-  const redemption = http.post(
-    `${baseURL}/v1/redemptions`,
-    JSON.stringify({ qrToken, checkpointId: checkpointID, idempotencyKey: operationID() }),
-    {
-      headers,
-      tags: { operation: "redemption" },
-      responseCallback: acceptedDomainStatuses,
-    },
-  );
-  check(redemption, {
-    "redemption has a domain outcome": (response) => [200, 409, 422].includes(response.status),
+  const idempotencyKey = operationID();
+  const requestBody = JSON.stringify({ qrToken: pass.qrToken, checkpointId: checkpointID, idempotencyKey });
+  const redemption = http.post(`${baseURL}/v1/redemptions`, requestBody, {
+    headers,
+    tags: { operation: "redemption" },
+    responseCallback: expectedHTTP,
   });
+  const redemptionOK = recordSystemResult(redemption);
+  const outcome = redemptionOK ? redemption.json("outcome") : null;
+  if (profile === "contention") {
+    if (outcome === "redeemed") redeemed.add(1);
+    if (outcome === "already_exhausted") alreadyExhausted.add(1);
+    check(redemption, {
+      "contention returns an allowed domain outcome": () => redemptionOK && ["redeemed", "already_exhausted"].includes(outcome),
+    });
+    const replay = http.post(`${baseURL}/v1/redemptions`, requestBody, {
+      headers,
+      tags: { operation: "idempotency_replay" },
+      responseCallback: expectedHTTP,
+    });
+    const replayOK = recordSystemResult(replay);
+    const mismatch = !replayOK || replay.json("outcome") !== outcome || replay.json("redemptionId") !== redemption.json("redemptionId");
+    idempotencyMismatches.add(mismatch);
+    check(replay, { "idempotency replay is identical": () => !mismatch });
+  } else {
+    const domainFailed = !redemptionOK || outcome !== "redeemed";
+    domainFailures.add(domainFailed);
+    check(redemption, { "distinct pass is redeemed": () => !domainFailed });
+  }
+
+  releasePacing();
 }

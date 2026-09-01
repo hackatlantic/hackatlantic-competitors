@@ -146,7 +146,7 @@ func assertSchemaBoundary(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM ats.schema_migrations WHERE checksum IS NOT NULL`).Scan(&ledgerCount); err != nil {
 		t.Fatalf("inspect migration ledger: %v", err)
 	}
-	if atsCount != len(tables) || publicCount != 0 || ledgerCount != 12 {
+	if atsCount != len(tables) || publicCount != 0 || ledgerCount != 13 {
 		t.Fatalf("unexpected schema boundary: ats=%d public=%d checksummed=%d", atsCount, publicCount, ledgerCount)
 	}
 

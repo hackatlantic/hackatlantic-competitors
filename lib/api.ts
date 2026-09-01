@@ -38,6 +38,12 @@ export type CurrentUser = {
 };
 
 export type ApplicationQuestionType = "string" | "number" | "boolean";
+export type ApplicationQuestionControl = "text" | "email" | "textarea" | "select";
+
+export type ApplicationQuestionCondition = {
+  key: string;
+  equals: boolean;
+};
 
 export type ApplicationFormQuestion = {
   key: string;
@@ -45,6 +51,11 @@ export type ApplicationFormQuestion = {
   type: ApplicationQuestionType;
   required: boolean;
   help?: string;
+  section?: string;
+  control?: ApplicationQuestionControl;
+  options?: string[];
+  maxWords?: number;
+  showWhen?: ApplicationQuestionCondition;
 };
 
 export type CurrentApplicationForm = {
@@ -52,6 +63,7 @@ export type CurrentApplicationForm = {
   cycleId: string;
   version: number;
   resumeRequired: boolean;
+  resumeAfterQuestionKey?: string;
   questions: ApplicationFormQuestion[];
 };
 

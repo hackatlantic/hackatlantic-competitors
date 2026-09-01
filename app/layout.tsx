@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { MotionSystem } from "@/components/motion-system";
 import "./globals.css";
+import "./brand.css";
 
 export const metadata: Metadata = {
   title: "Apply · HackAtlantic",
-  description: "Your route into Atlantic Canada's largest student-run hackathon."
+  description: "Apply to HackAtlantic and manage your application, decision, and event pass."
 };
 
 export default function RootLayout({

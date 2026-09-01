@@ -51,14 +51,13 @@ jobs:
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with: { terraform_version: 1.14.3 }
       - id: inputs
-        name: Materialize protected Terraform inputs
+        name: Require and materialize protected Terraform inputs
         shell: bash
         working-directory: ${{ matrix.directory }}
         run: |
           if [[ -z "${TF_VARS_JSON}" ]]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::${{ matrix.environment }} is not activated; configure ${{ matrix.tfvars_secret }} to enable drift detection"
-            exit 0
+            echo "::error::${{ matrix.environment }} drift detection is not configured; add ${{ matrix.tfvars_secret }} to the terraform-drift environment"
+            exit 1
           fi
           echo "configured=true" >> "$GITHUB_OUTPUT"
           umask 077

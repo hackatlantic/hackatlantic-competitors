@@ -36,11 +36,14 @@ The import is accepted only when:
 
 ## Protected workflow inputs
 
-Because these workspaces use local execution, HCP stores only state and locks. Protected GitHub environments supply provider credentials and one JSON tfvars document per root. Plan and drift credentials are read-only where the provider supports that scope. Providers that expose only account-level automation tokens use short-lived credentials isolated in the protected `terraform-plan` and `terraform-drift` environments; deployment environments receive mutation credentials only for their own environment.
+Because these workspaces use local execution, HCP stores only state and locks. Protected GitHub environments supply provider credentials and one JSON tfvars document per root. Plan and drift credentials are read-only where the provider supports that scope. Providers that expose only account-level automation tokens use short-lived credentials isolated in the protected `terraform-plan` and `terraform-drift` environments; deployment environments receive mutation credentials only for their own environment. Missing root payloads are hard failures during scheduled drift detection so an unconfigured root cannot report false-green status.
 
 The root payload secrets are `TFVARS_GLOBAL_JSON`, `TFVARS_STAGING_JSON`, `TFVARS_PRODUCTION_JSON`, and `TFVARS_OBSERVABILITY_JSON`. Provider secrets are `DIGITALOCEAN_TOKEN`, `SUPABASE_ACCESS_TOKEN`, `CLOUDFLARE_API_TOKEN`, `VERCEL_API_TOKEN`, and `TERRAFORM_GITHUB_TOKEN`. The workflow materializes the selected root payload with mode `0600` on the ephemeral runner and removes it after the plan or apply.
 
-During phased activation, a root without its `TFVARS_*_JSON` payload is reported as an explicit skipped notice. Configured roots still plan independently, so pending Grafana or Cloudflare onboarding does not conceal drift in the active application infrastructure.
+Pull-request plans may skip a root whose `TFVARS_*_JSON` payload has not yet
+been activated. Scheduled drift detection is intentionally stricter: every
+root must be configured, and a missing payload fails that root rather than
+producing a false-green scheduled run.
 
 `api_env` must include the values documented in `.env.production.example`, including database, Clerk, pass peppers, Spaces, CORS, and OTLP configuration. Staging uses a Clerk development instance and synthetic identities only.
 
