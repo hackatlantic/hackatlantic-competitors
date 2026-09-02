@@ -123,6 +123,7 @@ jobs:
       TF_IN_AUTOMATION: "true"
       GH_TOKEN: ${{ github.token }}
       TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
+      TF_VAR_api_observability_env: ${{ secrets.API_OBSERVABILITY_ENV_JSON }}
       DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
       SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
       SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
@@ -241,7 +242,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment:
-      name: production
+      # This exact GitHub Environment has the required-reviewer gate. Do not
+      # rename it to a lowercase variant: GitHub would create an unprotected
+      # environment and let production promotion bypass the approval policy.
+      name: Production
       url: https://apply.hackatlantic.ca
     env:
       TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
@@ -251,6 +255,7 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       TF_VARS_JSON: ${{ secrets.TFVARS_PRODUCTION_JSON }}
+      TF_VAR_api_observability_env: ${{ secrets.API_OBSERVABILITY_ENV_JSON }}
       DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
       SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}

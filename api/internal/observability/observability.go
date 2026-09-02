@@ -15,13 +15,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -68,7 +69,9 @@ func New(ctx context.Context, config Config) (*Telemetry, error) {
 		semconv.ServiceName(serviceName),
 		semconv.ServiceVersion(config.Version),
 		attribute.String("deployment.environment.name", config.Environment),
-		attribute.String("service.instance.id", strings.TrimSpace(config.GitSHA)),
+		// Each process owns its cumulative counters, including during rolling deployments.
+		attribute.String("service.instance.id", newRequestID()),
+		attribute.String("vcs.ref.head.revision", strings.TrimSpace(config.GitSHA)),
 	))
 	if err != nil {
 		return nil, fmt.Errorf("build telemetry resource: %w", err)
@@ -139,7 +142,8 @@ func (t *Telemetry) createInstruments() error {
 	if err != nil {
 		return fmt.Errorf("create request counter: %w", err)
 	}
-	t.duration, err = t.meter.Float64Histogram("http.server.duration", metric.WithUnit("ms"))
+	t.duration, err = t.meter.Float64Histogram("http.server.duration", metric.WithUnit("ms"),
+		metric.WithExplicitBucketBoundaries(25, 50, 100, 250, 500, 750, 1000, 1500, 2500, 5000, 10000))
 	if err != nil {
 		return fmt.Errorf("create request duration histogram: %w", err)
 	}
@@ -150,6 +154,17 @@ func (t *Telemetry) createInstruments() error {
 	t.businessEvents, err = t.meter.Int64Counter("ats.lifecycle.events", metric.WithUnit("{event}"))
 	if err != nil {
 		return fmt.Errorf("create lifecycle event counter: %w", err)
+	}
+	up, err := t.meter.Int64ObservableGauge("hackatlantic.telemetry.up")
+	if err != nil {
+		return err
+	}
+	_, err = t.meter.RegisterCallback(func(_ context.Context, observer metric.Observer) error {
+		observer.ObserveInt64(up, 1)
+		return nil
+	}, up)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -223,12 +238,17 @@ func (t *Telemetry) RegisterPoolMetrics(pool *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
+	maximum, err := t.meter.Int64ObservableGauge("db.client.connections.max", metric.WithUnit("{connection}"))
+	if err != nil {
+		return err
+	}
 	_, err = t.meter.RegisterCallback(func(_ context.Context, observer metric.Observer) error {
 		stats := pool.Stat()
 		observer.ObserveInt64(open, int64(stats.TotalConns()))
 		observer.ObserveInt64(inUse, int64(stats.AcquiredConns()))
+		observer.ObserveInt64(maximum, int64(stats.MaxConns()))
 		return nil
-	}, open, inUse)
+	}, open, inUse, maximum)
 	return err
 }
 
@@ -239,9 +259,19 @@ type statusWriter struct {
 }
 
 func (w *statusWriter) WriteHeader(status int) {
+	if w.status != 0 {
+		return
+	}
+	if status >= 100 && status < 200 {
+		w.ResponseWriter.WriteHeader(status)
+		return
+	}
 	w.status = status
 	w.ResponseWriter.WriteHeader(status)
 }
+
+// Preserve access to optional HTTP features through http.ResponseController.
+func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 
 func (w *statusWriter) Write(data []byte) (int, error) {
 	if w.status == 0 {
@@ -253,14 +283,11 @@ func (w *statusWriter) Write(data []byte) (int, error) {
 }
 
 // HTTPMiddleware provides low-cardinality RED metrics and structured logs.
-// Claim routes are excluded from tracing so bearer material cannot enter URL
-// span attributes.
+// Only explicitly selected attributes are exported: never URLs, query strings,
+// headers, bodies, IPs, or User-Agent. Do not wrap the mux in an automatic HTTP
+// instrumenter: it clones requests (losing the matched Pattern here) and may
+// capture raw URLs containing applicant or claim data.
 func (t *Telemetry) HTTPMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
-	instrumented := otelhttp.NewHandler(next, serviceName,
-		otelhttp.WithFilter(func(request *http.Request) bool {
-			return !strings.HasPrefix(request.URL.Path, "/v1/claim/")
-		}),
-	)
 	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		started := time.Now()
 		requestID := safeRequestID(request.Header.Get("X-Request-ID"))
@@ -269,11 +296,25 @@ func (t *Telemetry) HTTPMiddleware(logger *slog.Logger, next http.Handler) http.
 		}
 		w.Header().Set("X-Request-ID", requestID)
 		request = request.WithContext(context.WithValue(request.Context(), requestIDKey{}, requestID))
+		method := safeMethod(request.Method)
+		var span trace.Span
+		// TraceContext deliberately excludes baggage, which can contain user data.
+		if !strings.HasPrefix(request.URL.Path, "/v1/claim/") {
+			ctx := propagation.TraceContext{}.Extract(request.Context(), propagation.HeaderCarrier(request.Header))
+			ctx, span = otel.Tracer(serviceName).Start(ctx, method,
+				trace.WithSpanKind(trace.SpanKindServer), trace.WithAttributes(attribute.String("http.request.method", method)))
+			request = request.WithContext(ctx)
+		}
 
 		writer := &statusWriter{ResponseWriter: w}
 		t.active.Add(request.Context(), 1)
-		instrumented.ServeHTTP(writer, request)
-		t.active.Add(request.Context(), -1)
+		defer func() {
+			t.active.Add(request.Context(), -1)
+			if span != nil {
+				span.End()
+			}
+		}()
+		next.ServeHTTP(writer, request)
 		if writer.status == 0 {
 			writer.status = http.StatusOK
 		}
@@ -283,7 +324,7 @@ func (t *Telemetry) HTTPMiddleware(logger *slog.Logger, next http.Handler) http.
 			route = "unmatched"
 		}
 		attrs := metric.WithAttributes(
-			attribute.String("http.request.method", request.Method),
+			attribute.String("http.request.method", method),
 			attribute.String("http.route", route),
 			attribute.String("http.response.status_class", strconv.Itoa(writer.status/100)+"xx"),
 		)
@@ -293,17 +334,33 @@ func (t *Telemetry) HTTPMiddleware(logger *slog.Logger, next http.Handler) http.
 			t.businessEvents.Add(request.Context(), 1, metric.WithAttributes(attribute.String("event.name", event)))
 		}
 
-		span := trace.SpanFromContext(request.Context()).SpanContext()
-		logger.Info("http request",
+		if span != nil {
+			span.SetName(route)
+			span.SetAttributes(attribute.String("http.route", route), attribute.Int("http.response.status_code", writer.status))
+			if writer.status >= 500 {
+				span.SetStatus(codes.Error, "server error")
+			}
+		}
+		spanContext := trace.SpanFromContext(request.Context()).SpanContext()
+		logger.InfoContext(request.Context(), "http request",
 			"request_id", requestID,
-			"trace_id", span.TraceID().String(),
-			"method", request.Method,
+			"trace_id", spanContext.TraceID().String(),
+			"method", method,
 			"route", route,
 			"status", writer.status,
 			"response_bytes", writer.bytes,
 			"duration_ms", float64(time.Since(started).Microseconds())/1000,
 		)
 	})
+}
+
+func safeMethod(method string) string {
+	switch method {
+	case "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE":
+		return method
+	default:
+		return "OTHER"
+	}
 }
 
 func lifecycleEvent(method, route string, status int) string {

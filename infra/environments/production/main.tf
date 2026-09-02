@@ -50,7 +50,7 @@ module "platform" {
   resume_bucket_name              = "hackatlantic-resumes-2026"
   backup_bucket_name              = "hackatlantic-ats-backups"
   spaces_region                   = var.spaces_region
-  api_env                         = var.api_env
+  api_env                         = merge(var.api_env, var.api_observability_env)
   migration_database_url          = var.migration_database_url
   alert_emails                    = var.alert_emails
 }

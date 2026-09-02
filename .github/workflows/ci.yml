@@ -139,6 +139,10 @@ jobs:
             tflint --chdir="$directory" --init
             tflint --chdir="$directory"
           done
+      - name: Test minimal Grafana plan without cloud credentials
+        run: terraform -chdir=infra/observability test
+      - name: Check Grafana dashboard queries and routes
+        run: node --test tests/observability/dashboard.test.mjs
 
   security:
     name: Security
