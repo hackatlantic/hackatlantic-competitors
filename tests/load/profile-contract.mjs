@@ -70,10 +70,9 @@ export function fixedResume() {
     "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>",
   ];
   objects.forEach((body, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${body}\nendobj\n`; });
-  const xrefOffset = pdf.length;
-  pdf += "xref\n0 4\n0000000000 65535 f \n";
-  pdf += offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
-  pdf += `trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n`;
-  // Whitespace before the EOF marker keeps xref offsets unchanged.
-  return pdf + " ".repeat(RESUME_BYTES - pdf.length - 6) + "%%EOF\n";
+  const xref = "xref\n0 4\n0000000000 65535 f \n" + offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`).join("");
+  const tail = (offset) => xref + `trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n${String(offset).padStart(10, "0")}\n%%EOF\n`;
+  const xrefOffset = RESUME_BYTES - tail(0).length;
+  // Pad before xref so its pointer and EOF remain adjacent for real PDF readers.
+  return pdf + " ".repeat(xrefOffset - pdf.length) + tail(xrefOffset);
 }

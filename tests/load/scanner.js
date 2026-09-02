@@ -14,40 +14,8 @@ const scannerFixture = new SharedArray("synthetic scanner fixture", () => {
   const scanner = fixture.scanner;
   return [{ runID: fixture.runID, passes: scanner.passes, tokens: scanner.tokens, sessions: scanner.sessions }];
 })[0];
-const virtualUsers = Number(__ENV.K6_SCANNER_VUS ?? (profile === "release" ? 20 : 100));
+const virtualUsers = Number(__ENV.K6_SCANNER_VUS ?? (["release", "repeatability"].includes(profile) ? 20 : 100));
 const iterations = Number(__ENV.K6_SCANNER_ITERATIONS ?? scannerFixture.passes.length);
-
-function scannerScenario() {
-  switch (profile) {
-    case "repeatability":
-      return scenarioFor(profile, virtualUsers, iterations, __ENV);
-    case "release":
-      return {
-        executor: "shared-iterations",
-        vus: virtualUsers,
-        iterations,
-        maxDuration: __ENV.K6_SCANNER_MAX_DURATION ?? "10m",
-      };
-    case "spike":
-      return {
-        executor: "constant-arrival-rate",
-        rate: Number(__ENV.K6_SCANNER_RATE ?? 5),
-        timeUnit: "1s",
-        duration: __ENV.K6_SCANNER_DURATION ?? "20s",
-        preAllocatedVUs: Math.min(virtualUsers, 20),
-        maxVUs: virtualUsers,
-      };
-    case "contention":
-      return {
-        executor: "shared-iterations",
-        vus: virtualUsers,
-        iterations,
-        maxDuration: __ENV.K6_SCANNER_MAX_DURATION ?? "2m",
-      };
-    default:
-      throw new Error("K6_SCANNER_PROFILE must be release, spike, or contention");
-  }
-}
 
 function scannerThresholds() {
   const common = {
@@ -77,7 +45,7 @@ function scannerThresholds() {
 
 export const options = {
   maxRedirects: 0,
-  scenarios: { ["scanner_" + profile]: scannerScenario() },
+  scenarios: { ["scanner_" + profile]: scenarioFor(profile, virtualUsers, iterations, __ENV) },
   thresholds: scannerThresholds(),
 };
 

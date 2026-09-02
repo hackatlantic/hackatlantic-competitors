@@ -486,7 +486,8 @@ async function cleanup() {
     return;
   }
   requireConfiguration();
-  const scannerIdentities = fixture.scanner?.identities ?? [];
+  const scannerIdentities = fixture.scanner?.identities ?? fixture.identities.filter((identity) => /_scanner_\d+$/.test(identity.userId));
+  let cleanupFailed = false;
   if (scannerIdentities.length > 0) {
     try {
       psql(`DELETE FROM ats.user_roles
@@ -498,6 +499,7 @@ async function cleanup() {
               ON ats.users.clerk_user_id = ids.clerk_user_id
           )`, { clerk_user_ids: JSON.stringify(scannerIdentities.map((identity) => identity.userId)) });
     } catch {
+      cleanupFailed = true;
       console.warn("Could not remove the temporary scanner role; manual staging cleanup is required.");
     }
   }
@@ -506,9 +508,11 @@ async function cleanup() {
     try {
       psql("DELETE FROM ats.admin_email_allowlist WHERE normalized_email = lower(:'email')", { email: adminEmail });
     } catch {
+      cleanupFailed = true;
       console.warn("Could not remove the temporary admin allowlist entry; manual staging cleanup is required.");
     }
   }
+  if (cleanupFailed) throw new Error("Synthetic staff-access cleanup needs attention");
   console.log("Removed temporary staging admin and scanner privileges. Append-only synthetic redemption records remain isolated by their hat_load run identifiers.");
 }
 
