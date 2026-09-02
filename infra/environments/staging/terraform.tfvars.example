@@ -21,7 +21,15 @@ api_env = {
   SPACES_SECRET_ACCESS_KEY         = "replace-me"
   APP_VERSION                      = "staging"
   DEPLOYMENT_ENVIRONMENT           = "staging"
-  OTEL_EXPORTER_OTLP_ENDPOINT      = "replace-me"
-  OTEL_EXPORTER_OTLP_HEADERS       = "Authorization=Basic replace-me"
-  OTEL_EXPORTER_OTLP_PROTOCOL      = "http/protobuf"
+}
+
+# Keep exporter credentials outside the main api_env payload. This exact map is
+# supplied through the protected API_OBSERVABILITY_ENV_JSON environment secret.
+api_observability_env = {
+  OTEL_EXPORTER_OTLP_METRICS_ENDPOINT = ""
+  OTEL_EXPORTER_OTLP_METRICS_HEADERS  = ""
+  OTEL_EXPORTER_OTLP_PROTOCOL         = "http/protobuf"
+  OTEL_EXPORTER_OTLP_ENDPOINT         = ""
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT  = ""
+  OTEL_EXPORTER_OTLP_LOGS_ENDPOINT    = ""
 }

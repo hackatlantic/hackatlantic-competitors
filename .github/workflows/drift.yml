@@ -38,6 +38,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
       TF_VARS_JSON: ${{ secrets[matrix.tfvars_secret] }}
+      TF_VAR_api_observability_env: ${{ secrets.API_OBSERVABILITY_ENV_JSON }}
       DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
       SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
       SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}

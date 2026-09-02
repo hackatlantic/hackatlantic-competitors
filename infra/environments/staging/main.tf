@@ -16,7 +16,7 @@ locals {
   ]
 
   database_url = "postgresql://postgres.${supabase_project.database.id}:${var.supabase_database_password}@aws-0-${var.supabase_region}.pooler.supabase.com:5432/postgres?sslmode=require"
-  api_env = merge(var.api_env, {
+  api_env = merge(var.api_env, var.api_observability_env, {
     DATABASE_URL             = local.database_url
     DATABASE_ROLE            = "hackatlantic_app"
     QR_TOKEN_PEPPER          = random_id.qr_token_pepper.b64_std

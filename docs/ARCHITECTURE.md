@@ -120,12 +120,13 @@ network access.
 
 ## Observability
 
-Every request should eventually include:
+Each request includes or records only the operational data needed to debug and measure the service:
 
-- a generated or accepted request ID;
-- structured logs;
-- route, status, duration, and authenticated user ID when applicable;
-- no raw claim token, QR credential, Clerk token, or database password.
+- a generated or accepted request ID in the response and structured application logs;
+- low-cardinality route template, status class, and duration metrics;
+- deployment and build information.
+
+Authenticated user IDs, raw request URLs, query strings, resumes, answers, JWTs, and QR/claim credentials are deliberately excluded from telemetry labels and metric attributes.
 
 Health endpoints:
 

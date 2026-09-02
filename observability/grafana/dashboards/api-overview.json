@@ -1,87 +1,508 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": false,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "links": [],
   "panels": [
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "noValue": "No traffic / no data"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
       "id": 1,
-      "options": { "colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "expr": "1 - (sum(rate(http_server_requests_total{deployment_environment_name=~\"$environment\",http_response_status_class=\"5xx\"}[5m])) / clamp_min(sum(rate(http_server_requests_total{deployment_environment_name=~\"$environment\"}[5m])), 0.001))", "refId": "A" }],
-      "title": "Request success ratio",
-      "type": "stat"
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "1 - ((sum(rate(http_server_requests_total{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\",http_response_status_class=\"5xx\"}[5m])) or 0 * sum(rate(http_server_requests_total{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"}[5m]))) / sum(rate(http_server_requests_total{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"}[5m])))",
+          "refId": "A"
+        }
+      ],
+      "title": "Requests without a server error",
+      "type": "stat",
+      "description": "Non-5xx HTTP responses, not uptime or business success. No traffic or missing telemetry displays No data, not a fabricated 100%."
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
       "id": 2,
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "expr": "sum(rate(http_server_requests_total{deployment_environment_name=~\"$environment\"}[5m]))", "refId": "A" }],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_total{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"}[5m]))",
+          "refId": "A"
+        }
+      ],
       "title": "Request rate",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
       "id": 3,
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\"}[5m])))", "refId": "A" }],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\",http_route!~\"GET /(healthz|readyz|versionz)\"}[5m])))",
+          "refId": "A"
+        }
+      ],
       "title": "API p95 latency",
-      "type": "stat"
+      "type": "stat",
+      "description": "Excludes health/version probes. Percentiles are histogram estimates; use k6 for exact controlled benchmark comparisons."
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
       "id": 4,
-      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "expr": "max(db_client_connections_open{deployment_environment_name=~\"$environment\"})", "refId": "A" }],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(db_client_connections_open{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"})",
+          "refId": "A"
+        }
+      ],
       "title": "Open database connections",
       "type": "stat"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 5 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
       "id": 5,
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
-      "targets": [{ "expr": "sum by (http_route, http_response_status_class) (rate(http_server_requests_total{deployment_environment_name=~\"$environment\"}[5m]))", "legendFormat": "{{http_route}} {{http_response_status_class}}", "refId": "A" }],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (http_route, http_response_status_class) (rate(http_server_requests_total{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"}[5m]))",
+          "legendFormat": "{{http_route}} {{http_response_status_class}}",
+          "refId": "A"
+        }
+      ],
       "title": "Traffic and errors by route template",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 5 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
       "id": 6,
-      "options": { "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\"}[5m])))", "legendFormat": "p50", "refId": "A" },
-        { "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\"}[5m])))", "legendFormat": "p95", "refId": "B" },
-        { "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\"}[5m])))", "legendFormat": "p99", "refId": "C" }
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\",http_route!~\"GET /(healthz|readyz|versionz)\"}[5m])))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\",http_route!~\"GET /(healthz|readyz|versionz)\"}[5m])))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\",http_route!~\"GET /(healthz|readyz|versionz)\"}[5m])))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
       ],
       "title": "Latency percentiles",
-      "type": "timeseries"
+      "type": "timeseries",
+      "description": "Excludes health/version probes. Percentiles are histogram estimates; use k6 for exact controlled benchmark comparisons."
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Scanner lookup and redemption p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "description": "No scans = no data. Ordinary conflict/limit responses are not transport/server errors.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\",http_route=\"POST /v1/scans/lookup\"}[5m])))",
+          "legendFormat": "Lookup"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\",http_route=\"POST /v1/redemptions\"}[5m])))",
+          "legendFormat": "Redemption"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Database connections — API pool",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "description": "Counts only; no SQL statements or applicant data are exported.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(db_client_connections_in_use{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"})",
+          "legendFormat": "in_use"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(db_client_connections_open{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"})",
+          "legendFormat": "open"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(db_client_connections_max{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"})",
+          "legendFormat": "max"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Last telemetry received",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 22
+      },
+      "description": "Age of the most recent heartbeat. This tests telemetry delivery, not public website availability.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0,
+          "noValue": "No telemetry",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time() - max(timestamp(hackatlantic_telemetry_up{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"}))",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Requests currently in flight",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 8,
+        "y": 22
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(http_server_active_requests{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"})",
+          "legendFormat": "Active"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Reporting builds",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 16,
+        "y": 22
+      },
+      "description": "Confirms which versions are actually reporting, including during a rolling release.",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service_version) (hackatlantic_telemetry_up{deployment_environment_name=~\"$environment\",service_name=\"hackatlantic-ats-api\"})",
+          "instant": true,
+          "format": "table"
+        }
+      ]
     }
   ],
   "refresh": "30s",
   "schemaVersion": 40,
-  "tags": ["hackatlantic", "sre", "api"],
+  "tags": [
+    "hackatlantic",
+    "sre",
+    "api"
+  ],
   "templating": {
     "list": [
-      { "current": { "selected": true, "text": "production", "value": "production" }, "hide": 0, "includeAll": false, "label": "Environment", "name": "environment", "options": [{ "selected": false, "text": "staging", "value": "staging" }, { "selected": true, "text": "production", "value": "production" }], "query": "staging,production", "type": "custom" },
-      { "name": "DS_PROMETHEUS", "query": "prometheus", "type": "datasource" }
+      {
+        "current": {
+          "selected": true,
+          "text": "production",
+          "value": "production"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Environment",
+        "name": "environment",
+        "options": [
+          {
+            "selected": false,
+            "text": "staging",
+            "value": "staging"
+          },
+          {
+            "selected": true,
+            "text": "production",
+            "value": "production"
+          }
+        ],
+        "query": "staging,production",
+        "type": "custom"
+      }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timezone": "browser",
   "title": "HackAtlantic API Overview",
   "uid": "hackatlantic-api",
-  "version": 1
+  "version": 2
 }
