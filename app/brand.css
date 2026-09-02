@@ -668,6 +668,7 @@ input[type="checkbox"] {
 .scanner-access-manager {
   display: grid;
   gap: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
 }
 
 .scanner-access-result {
