@@ -1,9 +1,16 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApplicantDashboard } from "@/components/applicant-dashboard";
-import { ApiError } from "@/lib/api";
+import { ApiError, type ApplicantApplication } from "@/lib/api";
 
 const authGetToken = vi.hoisted(() => vi.fn());
+const motionPreference = vi.hoisted(() => ({ reduced: false }));
+const scrollIntoView = vi.fn();
+
+vi.mock("framer-motion", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("framer-motion")>()),
+  useReducedMotion: () => motionPreference.reduced,
+}));
 const api = vi.hoisted(() => ({
   createApplication: vi.fn(),
   getApplicationDecision: vi.fn(),
@@ -38,6 +45,11 @@ describe("ApplicantDashboard", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    motionPreference.reduced = false;
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
     Object.defineProperty(window, "scrollTo", {
       configurable: true,
       value: vi.fn(),
@@ -59,6 +71,7 @@ describe("ApplicantDashboard", () => {
         { key: "email", label: "Email", type: "string", required: true, section: "Build your profile", control: "email" },
         { key: "school", label: "School", type: "string", required: true, section: "Build your profile", control: "text" },
         { key: "hardwareProject", label: "Are you looking to make a hardware project?", type: "boolean", required: true, section: "Hackathon Specific Questions" },
+        { key: "hardwareEquipment", label: "What equipment are you looking to use?", type: "string", required: true, showWhen: { key: "hardwareProject", equals: true } },
       ],
     });
     api.getMyApplications.mockResolvedValue({
@@ -105,5 +118,65 @@ describe("ApplicantDashboard", () => {
     expect(screen.getByText("Complete the highlighted fields before submitting.")).toBeTruthy();
     expect(api.saveApplicationDraft).not.toHaveBeenCalled();
     expect(api.submitApplication).not.toHaveBeenCalled();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/Name/)));
+  });
+
+  it("reveals hardware details and immediately removes hidden controls and stale errors", async () => {
+    render(<ApplicantDashboard />);
+    await screen.findByRole("heading", { name: "Your application" });
+    expect(screen.queryByLabelText(/What equipment/)).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("Yes"));
+    const equipment = screen.getByLabelText(/What equipment/);
+    expect(equipment.closest(".conditional-question")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Submit application" }));
+    expect(equipment.getAttribute("aria-invalid")).toBe("true");
+    fireEvent.change(equipment, { target: { value: "Microcontroller" } });
+    expect(equipment.getAttribute("aria-invalid")).toBe("false");
+
+    fireEvent.click(screen.getByLabelText("No"));
+    // No exit animation may leave an irrelevant field focusable or submitted.
+    expect(screen.queryByLabelText(/What equipment/)).toBeNull();
+    expect(equipment.isConnected).toBe(false);
+    fireEvent.click(screen.getByLabelText("Yes"));
+    expect((screen.getByLabelText(/What equipment/) as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByLabelText(/What equipment/).getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it("shows pending feedback, blocks duplicate saves, and confirms the saved state", async () => {
+    const draft = (await api.getMyApplications()).items[0] as ApplicantApplication;
+    let finishSave!: (value: ApplicantApplication) => void;
+    api.saveApplicationDraft.mockImplementationOnce(() => new Promise<ApplicantApplication>((resolve) => {
+      finishSave = resolve;
+    }));
+    render(<ApplicantDashboard />);
+    await screen.findByRole("heading", { name: "Your application" });
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "Test Applicant" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    const saving = screen.getByRole("button", { name: "Saving…" });
+    expect(saving.getAttribute("aria-busy")).toBe("true");
+    expect((saving as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Submit application" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(saving);
+    expect(api.saveApplicationDraft).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("Saving your changes…")).toBeTruthy();
+
+    await act(async () => finishSave({ ...draft, lockVersion: 2, answers: { fullName: "Test Applicant", email: "applicant@example.com" } }));
+    expect(await screen.findByText("All changes saved")).toBeTruthy();
+    expect(screen.getByText("Draft saved.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Save draft" }).getAttribute("aria-busy")).toBeNull();
+  });
+
+  it("keeps validation and conditional fields usable without motion", async () => {
+    motionPreference.reduced = true;
+    render(<ApplicantDashboard />);
+    await screen.findByRole("heading", { name: "Your application" });
+    fireEvent.click(screen.getByLabelText("Yes"));
+    const group = screen.getByLabelText(/What equipment/).closest(".conditional-question") as HTMLElement;
+    expect(group.style.opacity).toBe("1");
+    expect(group.style.transform).toBe("none");
+    fireEvent.click(screen.getByRole("button", { name: "Submit application" }));
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "instant", block: "center" }));
+    expect(document.activeElement).toBe(screen.getByLabelText(/Name/));
   });
 });

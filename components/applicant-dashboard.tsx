@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ApplicationButton } from "@/components/application-motion";
 import { ApplicantPass } from "@/components/applicant-pass";
 import {
   ApplicantDecisionStatus,
@@ -100,6 +101,7 @@ function displayTimestamp(value: string): string {
 function focusFirstInvalidField(
   form: CurrentApplicationForm,
   errors: FieldErrors,
+  reducedMotion: boolean,
 ): void {
   const questionIndex = form.questions.findIndex(
     (question) => errors[question.key],
@@ -117,7 +119,7 @@ function focusFirstInvalidField(
 
   window.requestAnimationFrame(() => {
     const field = document.getElementById(fieldId);
-    field?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    field?.scrollIntoView?.({ behavior: reducedMotion ? "instant" : "smooth", block: "center" });
     field
       ?.querySelector<HTMLElement>("input:not([type='hidden']), select, textarea")
       ?.focus({ preventScroll: true });
@@ -126,6 +128,8 @@ function focusFirstInvalidField(
 
 export function ApplicantDashboard() {
   const { getToken, isLoaded } = useAuth();
+  const reducedMotion = Boolean(useReducedMotion());
+  const feedbackTransition = { duration: reducedMotion ? 0 : 0.18 };
   const client = useMemo(() => createApiClient({ getToken }), [getToken]);
   const [currentForm, setCurrentForm] = useState<CurrentApplicationForm | null>(
     null,
@@ -328,7 +332,7 @@ export function ApplicantDashboard() {
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
       setNotice("Fix the highlighted responses before saving.");
-      focusFirstInvalidField(currentForm, clientErrors);
+      focusFirstInvalidField(currentForm, clientErrors, reducedMotion);
       return;
     }
 
@@ -379,7 +383,7 @@ export function ApplicantDashboard() {
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
       setNotice("Complete the highlighted fields before submitting.");
-      focusFirstInvalidField(currentForm, clientErrors);
+      focusFirstInvalidField(currentForm, clientErrors, reducedMotion);
       return;
     }
 
@@ -402,7 +406,7 @@ export function ApplicantDashboard() {
       const serverErrors = validationErrors(error);
       setFieldErrors(serverErrors);
       setNotice(errorMessage(error, "Unable to submit your application."));
-      focusFirstInvalidField(currentForm, serverErrors);
+      focusFirstInvalidField(currentForm, serverErrors, reducedMotion);
 
       if (error instanceof ApiError && error.status === 409) {
         try {
@@ -446,8 +450,8 @@ export function ApplicantDashboard() {
         <p className="error-message" role="alert">
           {loadError || "Your application could not be loaded."}
         </p>
-        <button
-          className="button secondary"
+        <ApplicationButton
+          className="secondary"
           onClick={() => {
             setLoading(true);
             void loadDashboard();
@@ -455,7 +459,7 @@ export function ApplicantDashboard() {
           type="button"
         >
           Try again
-        </button>
+        </ApplicationButton>
       </section>
     );
   }
@@ -503,11 +507,9 @@ export function ApplicantDashboard() {
   ) : null;
 
   return (
-    <motion.section
+    <section
       className="application-panel"
       aria-labelledby="application-heading"
-      layout
-      transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
     >
       <div className="application-progress" aria-label="Application progress">
         <div className="progress-step complete"><span>01</span><strong>Account</strong></div>
@@ -533,7 +535,8 @@ export function ApplicantDashboard() {
             animate={{ height: "auto", opacity: 1, y: 0 }}
             className="application-notice"
             exit={{ height: 0, opacity: 0, y: -8 }}
-            initial={{ height: 0, opacity: 0, y: -8 }}
+            initial={reducedMotion ? false : { height: 0, opacity: 0, y: -8 }}
+            transition={feedbackTransition}
             key={notice}
             role="status"
           >
@@ -544,7 +547,13 @@ export function ApplicantDashboard() {
 
       {submitted ? (
         <>
-          <div className="submitted-confirmation" aria-live="polite">
+          <motion.div
+            className="submitted-confirmation"
+            aria-live="polite"
+            initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={feedbackTransition}
+          >
             <h2>Application submitted</h2>
             {application.submittedAt ? (
               <p>
@@ -553,7 +562,7 @@ export function ApplicantDashboard() {
             ) : (
               <p>Your application was submitted successfully.</p>
             )}
-          </div>
+          </motion.div>
           <ApplicantDecisionStatus
             decision={decision}
             onRetry={() => void loadReleasedDecision(application.id)}
@@ -598,7 +607,13 @@ export function ApplicantDashboard() {
               .join(" ") || undefined;
 
             return (
-              <div className="application-question-group" key={question.key}>
+              <motion.div
+                className={`application-question-group${question.showWhen ? " conditional-question" : ""}`}
+                key={question.key}
+                initial={question.showWhen && !reducedMotion ? { opacity: 0, y: 6 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={feedbackTransition}
+              >
                 {startsSection ? (
                   <div className="application-form-section-heading">
                     <h2>{question.section}</h2>
@@ -724,13 +739,20 @@ export function ApplicantDashboard() {
                   </>
                 )}
                 {fieldErrors[question.key] ? (
-                  <p className="field-error" id={errorId} role="alert">
+                  <motion.p
+                    className="field-error"
+                    id={errorId}
+                    role="alert"
+                    initial={reducedMotion ? false : { opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={feedbackTransition}
+                  >
                     {fieldErrors[question.key]}
-                  </p>
+                  </motion.p>
                 ) : null}
               </div>
               {currentForm.resumeAfterQuestionKey === question.key ? resumeUploadField : null}
-              </div>
+              </motion.div>
             );
           })}
 
@@ -742,24 +764,29 @@ export function ApplicantDashboard() {
                 <motion.span
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  initial={{ opacity: 0, y: 5 }}
-                  key={isDirty ? "dirty" : "saved"}
+                  initial={reducedMotion ? false : { opacity: 0, y: 5 }}
+                  transition={feedbackTransition}
+                  key={busyAction ?? (isDirty ? "dirty" : "saved")}
                 >
-                  {isDirty ? "Unsaved changes" : "All changes saved"}
+                  {busyAction === "saving" ? "Saving your changes…"
+                    : busyAction === "submitting" ? "Submitting your application…"
+                      : busyAction === "uploading-resume" ? "Uploading your resume…"
+                        : isDirty ? "Unsaved changes" : "All changes saved"}
                 </motion.span>
               </AnimatePresence>
             </div>
-            <button
-              className="button secondary"
+            <ApplicationButton
+              className="secondary"
               disabled={busyAction !== null}
+              pending={busyAction === "saving"}
               onClick={() => void saveDraft()}
               type="button"
             >
               {busyAction === "saving" ? "Saving…" : "Save draft"}
-            </button>
-            <button className="button primary" disabled={busyAction !== null} type="submit">
+            </ApplicationButton>
+            <ApplicationButton className="primary" disabled={busyAction !== null} pending={busyAction === "submitting"} type="submit">
               {busyAction === "submitting" ? "Submitting…" : "Submit application"}
-            </button>
+            </ApplicationButton>
           </div>
         </form>
       ) : (
@@ -771,6 +798,6 @@ export function ApplicantDashboard() {
           </p>
         </div>
       )}
-    </motion.section>
+    </section>
   );
 }

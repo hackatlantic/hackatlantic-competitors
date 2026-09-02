@@ -55,6 +55,7 @@ type UserResolver interface {
 }
 
 type staffRoleService interface {
+	LookupScannerUser(context.Context, users.User, string) (users.ScannerAccessUser, error)
 	GrantScannerRole(context.Context, users.User, string) error
 	RevokeScannerRole(context.Context, users.User, string) error
 }
@@ -186,6 +187,7 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	mux.HandleFunc("GET /v1/admin/applications/{applicationId}/resume", getAdminResumeHandler(dependencies))
 	mux.HandleFunc("POST /v1/admin/applications/{applicationId}/assignments", assignReviewerHandler(dependencies))
 	mux.HandleFunc("PUT /v1/admin/users/{userId}/roles/reviewer", grantReviewerRoleHandler(dependencies))
+	mux.HandleFunc("POST /v1/admin/users/scanner-access/lookup", lookupScannerUserHandler(dependencies))
 	mux.HandleFunc("PUT /v1/admin/users/{userId}/roles/scanner", grantScannerRoleHandler(dependencies))
 	mux.HandleFunc("DELETE /v1/admin/users/{userId}/roles/scanner", revokeScannerRoleHandler(dependencies))
 	mux.HandleFunc("POST /v1/admin/applications/{applicationId}/decisions", recordDecisionHandler(dependencies))

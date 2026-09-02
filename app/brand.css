@@ -466,6 +466,51 @@ textarea:focus-visible {
   display: contents;
 }
 
+/* Conditional controls enter gently but unmount immediately when irrelevant,
+   so an exiting field can never remain in the keyboard tab order. */
+.application-question-group.conditional-question {
+  display: block;
+}
+
+.application-motion-button {
+  gap: 0.55rem;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+/* Motion owns this transform; don't combine it with the global hover rule. */
+.button.application-motion-button:not(:disabled):hover,
+.button.application-motion-button:not(:disabled):active {
+  transform: none;
+}
+
+.application-busy-indicator {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: application-pending-spin 800ms linear infinite;
+}
+
+@keyframes application-pending-spin {
+  to { transform: rotate(360deg); }
+}
+
+.application-form .save-state {
+  color: var(--brand-muted);
+}
+
+.application-form :is(input, textarea, select),
+.application-form :is(.boolean-options, .choice-options) label {
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.application-form :is(.boolean-options, .choice-options) label:has(input:focus-visible) {
+  outline: 3px solid var(--brand-teal);
+  outline-offset: 3px;
+}
+
 .application-form-section-heading {
   margin-top: 18px;
   padding: 22px 0 10px;
@@ -619,6 +664,32 @@ input[type="checkbox"] {
 }
 
 /* Organizer, reviewer, and scanner surfaces */
+
+.scanner-access-manager {
+  display: grid;
+  gap: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.scanner-access-result {
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--brand-line);
+  border-radius: 12px;
+  background: #edf7f5;
+}
+
+.scanner-access-result h2 {
+  margin-top: 0;
+}
+
+.scanner-access-email {
+  overflow-wrap: anywhere;
+}
+
+.scanner-access-result .button.secondary {
+  border-color: var(--brand-line);
+  color: var(--brand-navy);
+}
 
 .staff-page,
 .scanner-page {
@@ -1005,7 +1076,13 @@ input[type="checkbox"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .button {
+  .button,
+  .application-form :is(input, textarea, select),
+  .application-form :is(.boolean-options, .choice-options) label {
     transition: none;
+  }
+
+  .application-busy-indicator {
+    animation: none;
   }
 }

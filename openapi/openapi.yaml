@@ -509,6 +509,52 @@ paths:
           $ref: "#/components/responses/UserNotFound"
         "503":
           $ref: "#/components/responses/IdentityUnavailable"
+  /v1/admin/users/scanner-access/lookup:
+    post:
+      operationId: lookupScannerUser
+      summary: Find an existing volunteer by exact verified primary email (admin only)
+      description: Read-only lookup. Emails are sent in the body to avoid URL logging. Refuses ambiguous or stale identities; never creates an account or grants access.
+      tags: [Organizer]
+      security:
+        - clerkBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email]
+              properties:
+                email: { type: string, format: email, maxLength: 254 }
+      responses:
+        "200":
+          description: Matching account and scanner-access state; Cache-Control no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, email, displayName, scannerAccess, canManage]
+                properties:
+                  id: { type: string, format: uuid }
+                  email: { type: string, format: email }
+                  displayName: { type: [string, "null"] }
+                  scannerAccess: { type: boolean }
+                  canManage: { type: boolean, description: False for admins and the caller's own account }
+        "400":
+          description: Malformed request
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/UserNotFound"
+        "409":
+          description: Multiple local accounts match the email; no account selected
+        "422":
+          description: Invalid email address
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
   /v1/admin/users/{userId}/roles/scanner:
     put:
       operationId: grantScannerRole

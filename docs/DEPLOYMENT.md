@@ -85,6 +85,16 @@ DELETE FROM ats.admin_email_allowlist
 WHERE normalized_email = lower(btrim('former-admin@example.com'));
 ```
 
+## Granting scanner access
+
+The volunteer first signs up, verifies their primary email, and opens the portal
+once. An admin then opens `/organizer/reviewers` (Scanner access), enters that
+email, and selects **Find volunteer**. Confirm the displayed account and choose
+**Grant scanner role**, or **Revoke scanner role** to remove existing access.
+No database lookup or UUID entry is needed. Admins already inherit scanning
+privileges. The lookup is admin-only, exact-email, read-only, and rejects
+ambiguous or stale identities; grants and revocations retain their audit trail.
+
 ## Secrets and runtime configuration
 
 Start from `.env.production.example`, but store values in the hosting
