@@ -2619,9 +2619,7 @@ textarea:focus-visible {
 .submitted-confirmation,
 .application-decision,
 .application-pass,
-.form-intro,
-.application-form,
-.application-actions {
+.application-form {
   margin-left: clamp(1rem, 4vw, 3.5rem);
   margin-right: clamp(1rem, 4vw, 3.5rem);
 }

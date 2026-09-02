@@ -37,6 +37,14 @@ export type CurrentUser = {
   roles: CurrentUserRole[];
 };
 
+export type ScannerAccessUser = {
+  id: string;
+  email: string;
+  displayName: string | null;
+  scannerAccess: boolean;
+  canManage: boolean;
+};
+
 export type ApplicationQuestionType = "string" | "number" | "boolean";
 export type ApplicationQuestionControl = "text" | "email" | "textarea" | "select";
 
@@ -517,6 +525,7 @@ export type ApiClient = {
   ): Promise<OrganizerDecision>;
   releaseOrganizerDecision(decisionId: string): Promise<OrganizerDecision>;
   grantReviewerRole(userId: string): Promise<void>;
+  lookupScannerUser(email: string): Promise<ScannerAccessUser>;
   grantScannerRole(userId: string): Promise<void>;
   revokeScannerRole(userId: string): Promise<void>;
   assignReviewer(
@@ -818,6 +827,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     grantReviewerRole: (userId) =>
       request<void>(`/v1/admin/users/${userId}/roles/reviewer`, {
         method: "PUT",
+      }),
+    lookupScannerUser: (email) =>
+      request<ScannerAccessUser>("/v1/admin/users/scanner-access/lookup", {
+        method: "POST",
+        body: JSON.stringify({ email }),
       }),
     grantScannerRole: (userId) =>
       request<void>(`/v1/admin/users/${userId}/roles/scanner`, {
