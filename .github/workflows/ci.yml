@@ -142,7 +142,7 @@ jobs:
       - name: Test minimal Grafana plan without cloud credentials
         run: terraform -chdir=infra/observability test
       - name: Check Grafana dashboard queries and routes
-        run: node --test tests/observability/dashboard.test.mjs
+        run: node --test tests/observability/dashboard.test.mjs tests/observability/promotion.test.mjs
 
   security:
     name: Security

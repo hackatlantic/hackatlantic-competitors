@@ -242,9 +242,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     environment:
-      # This exact GitHub Environment has the required-reviewer gate. Do not
-      # rename it to a lowercase variant: GitHub would create an unprotected
-      # environment and let production promotion bypass the approval policy.
+      # Use the existing protected environment. GitHub environment names are
+      # case-insensitive; a genuinely different name needs its own protection.
       name: Production
       url: https://apply.hackatlantic.ca
     env:
@@ -340,7 +339,9 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 20 }
       - name: Promote staged frontend without rebuilding
-        run: npx --yes vercel@58.1.0 promote "${{ needs.frontend-stage.outputs.deployment_url }}" --yes --token="$VERCEL_TOKEN"
+        env:
+          FRONTEND_DEPLOYMENT_URL: ${{ needs.frontend-stage.outputs.deployment_url }}
+        run: node scripts/promote-frontend.mjs
       - name: Release summary
         shell: bash
         run: |
