@@ -4,6 +4,7 @@ import { Counter, Rate } from "k6/metrics";
 import { SharedArray } from "k6/data";
 import exec from "k6/execution";
 import { loadTestOperationID } from "./idempotency.js";
+import { assertStagingTarget, tokenAt, scannerPause, scannerScenario as scenarioFor } from "./profile-contract.mjs";
 
 const profile = __ENV.K6_SCANNER_PROFILE ?? "release";
 const fixturePath = __ENV.K6_SCANNER_FIXTURES;
@@ -11,13 +12,15 @@ const scannerFixture = new SharedArray("synthetic scanner fixture", () => {
   if (!fixturePath) throw new Error("K6_SCANNER_FIXTURES is required");
   const fixture = JSON.parse(open(fixturePath));
   const scanner = fixture.scanner;
-  return [{ runID: fixture.runID, passes: scanner.passes, tokens: scanner.tokens }];
+  return [{ runID: fixture.runID, passes: scanner.passes, tokens: scanner.tokens, sessions: scanner.sessions }];
 })[0];
 const virtualUsers = Number(__ENV.K6_SCANNER_VUS ?? (profile === "release" ? 20 : 100));
 const iterations = Number(__ENV.K6_SCANNER_ITERATIONS ?? scannerFixture.passes.length);
 
 function scannerScenario() {
   switch (profile) {
+    case "repeatability":
+      return scenarioFor(profile, virtualUsers, iterations, __ENV);
     case "release":
       return {
         executor: "shared-iterations",
@@ -51,11 +54,12 @@ function scannerThresholds() {
     scanner_system_failures: ["rate<0.01"],
     http_req_failed: ["rate<0.01"],
   };
-  if (profile === "release") {
+  if (profile === "release" || profile === "repeatability") {
     return {
       ...common,
       checks: ["rate>0.99"],
       scanner_domain_failures: ["rate==0"],
+      scanner_completed: ["count>0"],
       "http_req_duration{operation:lookup}": ["p(95)<750"],
       "http_req_duration{operation:redemption}": ["p(95)<1000"],
     };
@@ -72,6 +76,7 @@ function scannerThresholds() {
 }
 
 export const options = {
+  maxRedirects: 0,
   scenarios: { ["scanner_" + profile]: scannerScenario() },
   thresholds: scannerThresholds(),
 };
@@ -80,6 +85,7 @@ const systemFailures = new Rate("scanner_system_failures");
 const domainFailures = new Rate("scanner_domain_failures");
 const idempotencyMismatches = new Rate("scanner_idempotency_mismatches");
 const redeemed = new Counter("scanner_redeemed");
+const completed = new Counter("scanner_completed");
 const alreadyExhausted = new Counter("scanner_already_exhausted");
 const unauthorized = new Counter("scanner_http_401");
 const forbidden = new Counter("scanner_http_403");
@@ -89,6 +95,7 @@ const unprocessable = new Counter("scanner_http_422");
 const serverErrors = new Counter("scanner_http_5xx");
 const otherHTTPFailures = new Counter("scanner_http_other_failures");
 const baseURL = __ENV.API_BASE_URL;
+assertStagingTarget(baseURL);
 const checkpointID = __ENV.CHECKPOINT_ID;
 const expectedHTTP = http.expectedStatuses(200);
 
@@ -112,6 +119,7 @@ function recordSystemResult(response) {
 }
 
 function releasePacing() {
+  if (profile === "repeatability") sleep(scannerPause(exec.vu.idInTest, exec.vu.iterationInScenario));
   if (profile === "release") sleep(2 + Math.random() * 3);
 }
 
@@ -126,7 +134,8 @@ export default function scannerLoad() {
   }
   const pass = selectedPass();
   if (!pass) exec.test.abort("The profile scheduled more scans than distinct fixture passes");
-  const token = scannerFixture.tokens[(exec.vu.idInTest - 1) % scannerFixture.tokens.length];
+  const scannerIndex = (exec.vu.idInTest - 1) % scannerFixture.tokens.length;
+  const token = scannerFixture.sessions ? tokenAt(scannerFixture.sessions[scannerIndex]) : scannerFixture.tokens[scannerIndex];
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
   const lookup = http.post(`${baseURL}/v1/scans/lookup`, JSON.stringify({ qrToken: pass.qrToken }), {
     headers,
@@ -167,6 +176,7 @@ export default function scannerLoad() {
   } else {
     const domainFailed = !redemptionOK || outcome !== "redeemed";
     domainFailures.add(domainFailed);
+    if (!domainFailed) completed.add(1);
     check(redemption, { "distinct pass is redeemed": () => !domainFailed });
   }
 
