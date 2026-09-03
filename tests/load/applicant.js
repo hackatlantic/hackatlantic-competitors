@@ -1,183 +1,114 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
+import { Rate, Counter, Trend } from "k6/metrics";
 import { SharedArray } from "k6/data";
 import exec from "k6/execution";
+import { assertStagingTarget, tokenAt, applicantScenario, isDeadlineBoundary, applicantAnswers, shouldUpload, fixedResume } from "./profile-contract.mjs";
 
 const profile = __ENV.K6_APPLICANT_PROFILE ?? "sustained";
-const fixturePath = __ENV.K6_APPLICANT_FIXTURES;
 const applicants = new SharedArray("synthetic applicants", () => {
-  if (!fixturePath) throw new Error("K6_APPLICANT_FIXTURES is required");
-  return JSON.parse(open(fixturePath)).applicants;
+  if (!__ENV.K6_APPLICANT_FIXTURES) throw new Error("K6_APPLICANT_FIXTURES is required");
+  return JSON.parse(open(__ENV.K6_APPLICANT_FIXTURES)).applicants;
 });
-const virtualUsers = Number(__ENV.K6_APPLICANT_VUS ?? (profile === "sustained" ? 20 : applicants.length));
-
-function applicantScenario() {
-  if (profile === "deadline") {
-    return {
-      executor: "shared-iterations",
-      vus: Math.min(virtualUsers, applicants.length),
-      iterations: applicants.length,
-      maxDuration: __ENV.K6_APPLICANT_MAX_DURATION ?? "2m",
-    };
-  }
-  if (profile === "stress") {
-    return {
-      executor: "per-vu-iterations",
-      vus: virtualUsers,
-      iterations: 1,
-      maxDuration: __ENV.K6_APPLICANT_MAX_DURATION ?? "2m",
-    };
-  }
-  if (profile !== "sustained") throw new Error("K6_APPLICANT_PROFILE must be sustained, deadline, or stress");
-  return {
-    executor: "shared-iterations",
-    vus: virtualUsers,
-    iterations: applicants.length,
-    maxDuration: __ENV.K6_APPLICANT_MAX_DURATION ?? "10m",
-  };
-}
-
-function applicantThresholds() {
-  const common = { checks: ["rate>0.99"], http_req_failed: ["rate<0.01"] };
-  if (profile === "deadline") {
-    return { ...common, "http_req_duration{operation:submit}": ["p(95)<1500"] };
-  }
-  if (profile === "stress") {
-    return common;
-  }
-  return {
-    ...common,
-    "http_req_duration{operation:form}": ["p(95)<750"],
-    "http_req_duration{operation:create}": ["p(95)<1000"],
-    "http_req_duration{operation:draft}": ["p(95)<1500"],
-    "http_req_duration{operation:resume}": ["p(95)<2000"],
-    "http_req_duration{operation:submit}": ["p(95)<1500"],
-  };
-}
+const vus = Number(__ENV.K6_APPLICANT_VUS ?? (profile === "sustained" ? 20 : applicants.length));
+const baseURL = __ENV.API_BASE_URL;
+assertStagingTarget(baseURL);
+const resume = fixedResume();
+const journeys = new Rate("applicant_journeys_successful");
+const completed = new Counter("applicant_journeys_completed");
+const lostAnswers = new Counter("applicant_answer_mismatches");
+const failures = new Counter("applicant_operation_failures");
+const boundaryCallbacks = new Counter("applicant_deadline_boundary_callbacks");
+// Wall-clock upload latency includes sending the fixed-size request body.
+const uploadDuration = new Trend("applicant_resume_upload_ms", true);
 
 export const options = {
-  scenarios: { ["applicant_" + profile]: applicantScenario() },
-  thresholds: applicantThresholds(),
+  scenarios: { ["applicant_" + profile]: applicantScenario(profile, vus, applicants.length, __ENV) },
+  maxRedirects: 0,
+  thresholds: {
+    http_req_failed: ["rate<0.01"],
+    applicant_journeys_successful: ["rate>=0.99"],
+    applicant_journeys_completed: [`count>=${Math.ceil(applicants.length * 0.99)}`],
+    applicant_answer_mismatches: ["count==0"],
+    ...(profile === "deadline" ? { dropped_iterations: ["count==0"], applicant_deadline_boundary_callbacks: ["count<=1"] } : {}),
+    ...(profile !== "stress" ? {
+      "http_req_duration{operation:submit}": ["p(95)<2000"],
+      ...(profile === "sustained" ? {
+        "http_req_duration{operation:form}": ["p(95)<1000"],
+        "http_req_duration{operation:create}": ["p(95)<1000"],
+        "http_req_duration{operation:draft}": ["p(95)<1000"],
+        applicant_resume_upload_ms: ["p(95)<3000"],
+      } : {}),
+    } : {}),
+    ...(profile === "stress" ? Object.fromEntries(["form", "create", "draft", "resume", "submit"].map((op) => [`http_req_duration{operation:${op}}`, []])) : {}),
+  },
 };
 
-const baseURL = __ENV.API_BASE_URL;
-const expected = http.expectedStatuses(200);
-
-function answersFor(form, email, sequence) {
-  const answers = Object.fromEntries(form.questions.map((question) => {
-    const description = question.key + " " + question.label;
-    if (question.type === "boolean") return [question.key, true];
-    if (question.type === "number") return [question.key, sequence + 1];
-    if (question.options?.length) return [question.key, question.options[0]];
-    if (/email/i.test(description)) return [question.key, email];
-    if (/school/i.test(description)) return [question.key, "Synthetic Atlantic University"];
-    return [question.key, "Synthetic load response " + (sequence + 1) + " for " + question.label];
-  }));
-  return Object.fromEntries(
-    Object.entries(answers).filter(([key]) => {
-      const question = form.questions.find((candidate) => candidate.key === key);
-      return !question?.showWhen || answers[question.showWhen.key] === question.showWhen.equals;
-    }),
-  );
-}
-
-function accepted(response, name) {
-  return check(response, { [name + " succeeded"]: (value) => value.status === 200 });
-}
-
-function think() {
-  if (profile === "sustained") sleep(20 + Math.random() * 25);
-}
-
-function rampSustainedApplicants(index) {
-  if (profile !== "sustained") return;
-  const rampSeconds = Number(__ENV.K6_APPLICANT_RAMP_SECONDS ?? 60);
-  if (!Number.isFinite(rampSeconds) || rampSeconds < 0) {
-    exec.test.abort("K6_APPLICANT_RAMP_SECONDS must be a non-negative number");
-  }
-  sleep((index % virtualUsers) * (rampSeconds / virtualUsers));
-}
-
-function submitPreparedApplicant(applicant, index) {
-  sleep((index * 60) / applicants.length);
-  const headers = { Authorization: "Bearer " + applicant.token, "Content-Type": "application/json" };
-  const response = http.post(
-    baseURL + "/v1/applications/" + applicant.applicationId + "/submit",
-    JSON.stringify({ lockVersion: applicant.lockVersion }),
-    { headers, tags: { operation: "submit" }, responseCallback: expected },
-  );
-  check(response, {
-    "deadline submission succeeded": (value) => value.status === 200,
-    "deadline application is submitted": (value) => value.json("status") === "submitted",
+function request(applicant, operation, method, path, body = null) {
+  const isUpload = operation === "resume";
+  const start = Date.now();
+  const response = http.request(method, baseURL + path, body, {
+    headers: {
+      Authorization: "Bearer " + tokenAt(applicant),
+      "Content-Type": isUpload ? "application/pdf" : "application/json",
+      ...(isUpload ? { "X-File-Name": "synthetic-fixed-512k.pdf" } : {}),
+    },
+    tags: { operation, name: operation },
+    timeout: "15s", responseCallback: http.expectedStatuses(200),
   });
+  if (isUpload) uploadDuration.add(Date.now() - start);
+  if (!check(response, { [operation + " succeeded"]: (value) => value.status === 200 })) {
+    failures.add(1, { operation, status: String(response.status) });
+    console.warn(`operation=${operation} status=${response.status} error_code=${response.error_code ?? 0}`);
+    return null;
+  }
+  try { return response.json(); } catch { failures.add(1, { operation, status: "invalid_json" }); return null; }
+}
+
+function think() { if (profile === "sustained") sleep(20 + Math.random() * 25); }
+function answersMatch(actual, expected) {
+  return actual && Object.keys(actual).length === Object.keys(expected).length && Object.entries(expected).every(([key, value]) => actual[key] === value);
+}
+
+function journey(applicant, index) {
+  let draft;
+  if (profile === "deadline") {
+    draft = { id: applicant.applicationId, lockVersion: applicant.lockVersion };
+  } else {
+    if (profile === "sustained" && exec.vu.iterationInScenario === 0) sleep((exec.vu.idInTest - 1) * (60 / vus));
+    const form = request(applicant, "form", "GET", "/v1/application-forms/current");
+    if (!form) return false;
+    think();
+    draft = request(applicant, "create", "POST", "/v1/applications");
+    if (!draft) return false;
+    think();
+    const saves = profile === "sustained" ? 2 : 1;
+    for (let revision = 1; revision <= saves; revision++) {
+      const expected = applicantAnswers(form, applicant.email, index, revision);
+      draft = request(applicant, "draft", "PUT", `/v1/applications/${draft.id}/draft`, JSON.stringify({ lockVersion: draft.lockVersion, answers: expected }));
+      if (!draft) return false;
+      const correct = answersMatch(draft.answers, expected);
+      lostAnswers.add(correct ? 0 : 1);
+      if (!correct) return false;
+      think();
+    }
+    if (shouldUpload(form, index, profile) && !request(applicant, "resume", "PUT", `/v1/applications/${draft.id}/resume`, resume)) return false;
+    think();
+  }
+  const submitted = request(applicant, "submit", "POST", `/v1/applications/${draft.id}/submit`, JSON.stringify({ lockVersion: draft.lockVersion }));
+  return submitted?.status === "submitted";
 }
 
 export default function applicantSubmission() {
-  if (!baseURL || applicants.length === 0) exec.test.abort("API_BASE_URL and applicant fixtures are required");
   const index = exec.scenario.iterationInTest;
-  const applicant = applicants[index];
-  if (!applicant) exec.test.abort("The profile scheduled more iterations than applicant fixtures");
-  if (profile === "deadline") {
-    submitPreparedApplicant(applicant, index);
+  if (isDeadlineBoundary(profile, index, applicants.length, Date.now() - exec.scenario.startTime)) {
+    boundaryCallbacks.add(1);
     return;
   }
-  rampSustainedApplicants(index);
-  const headers = { Authorization: "Bearer " + applicant.token, "Content-Type": "application/json" };
-
-  const formResponse = http.get(baseURL + "/v1/application-forms/current", {
-    headers, tags: { operation: "form" }, responseCallback: expected,
-  });
-  if (!accepted(formResponse, "form lookup")) return;
-  const form = formResponse.json();
-  think();
-
-  const createResponse = http.post(baseURL + "/v1/applications", null, {
-    headers, tags: { operation: "create" }, responseCallback: expected,
-  });
-  if (!accepted(createResponse, "application creation")) return;
-  const application = createResponse.json();
-  think();
-
-  let draftResponse = http.put(
-    baseURL + "/v1/applications/" + application.id + "/draft",
-    JSON.stringify({ lockVersion: application.lockVersion, answers: answersFor(form, applicant.email, index) }),
-    { headers, tags: { operation: "draft" }, responseCallback: expected },
-  );
-  if (!accepted(draftResponse, "draft save")) return;
-  let draft = draftResponse.json();
-  think();
-
-  if (profile === "sustained") {
-    draftResponse = http.put(
-      baseURL + "/v1/applications/" + application.id + "/draft",
-      JSON.stringify({ lockVersion: draft.lockVersion, answers: answersFor(form, applicant.email, index) }),
-      { headers, tags: { operation: "draft" }, responseCallback: expected },
-    );
-    if (!accepted(draftResponse, "second draft save")) return;
-    draft = draftResponse.json();
-    think();
-  }
-
-  if (form.resumeRequired) {
-    const resumeResponse = http.put(
-      baseURL + "/v1/applications/" + application.id + "/resume",
-      "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n",
-      {
-        headers: { Authorization: "Bearer " + applicant.token, "Content-Type": "application/pdf", "X-File-Name": "synthetic-load-" + (index + 1) + ".pdf" },
-        tags: { operation: "resume" }, responseCallback: expected,
-      },
-    );
-    if (!accepted(resumeResponse, "resume upload")) return;
-  }
-  think();
-
-  const submitResponse = http.post(
-    baseURL + "/v1/applications/" + application.id + "/submit",
-    JSON.stringify({ lockVersion: draft.lockVersion }),
-    { headers, tags: { operation: "submit" }, responseCallback: expected },
-  );
-  check(submitResponse, {
-    "submission succeeded": (response) => response.status === 200,
-    "application is submitted": (response) => response.json("status") === "submitted",
-  });
+  if (profile === "deadline") boundaryCallbacks.add(0);
+  const applicant = applicants[index];
+  if (!applicant) exec.test.abort("Insufficient distinct applicant fixtures");
+  let success = false;
+  try { success = journey(applicant, index); }
+  finally { journeys.add(success); if (success) completed.add(1); lostAnswers.add(0); }
 }

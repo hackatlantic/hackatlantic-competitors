@@ -209,7 +209,7 @@ func TestScannerRedemptionsAreAtomicIdempotentAndMinimal(t *testing.T) {
 	for _, result := range concurrentResults {
 		outcomes[result.Outcome]++
 	}
-	if outcomes[redemptions.OutcomeRedeemed] != 1 || outcomes[redemptions.OutcomeAlreadyExhausted] != 1 {
+	if outcomes[redemptions.OutcomeRedeemed] != 1 || outcomes[redemptions.OutcomeAlreadyExhausted] != 99 {
 		t.Fatalf("concurrent scans exceeded or failed capacity: %+v", outcomes)
 	}
 	var concurrentCount int
@@ -571,15 +571,17 @@ func assertRedemptionOutcome(t *testing.T, result redemptionOutcomeResponse, out
 	}
 }
 
-func concurrentlyRedeemLifecyclePasses(t *testing.T, baseURL, qrToken, checkpointID string) [2]redemptionOutcomeResponse {
+func concurrentlyRedeemLifecyclePasses(t *testing.T, baseURL, qrToken, checkpointID string) [100]redemptionOutcomeResponse {
 	t.Helper()
-	var results [2]redemptionOutcomeResponse
+	var results [100]redemptionOutcomeResponse
+	start := make(chan struct{})
 	var wait sync.WaitGroup
 	wait.Add(len(results))
 	for index := range results {
 		go func(index int) {
 			defer wait.Done()
-			payload, err := json.Marshal(map[string]any{"qrToken": qrToken, "checkpointId": checkpointID, "idempotencyKey": redemptionKey(20 + index)})
+			<-start
+			payload, err := json.Marshal(map[string]any{"qrToken": qrToken, "checkpointId": checkpointID, "idempotencyKey": redemptionKey(1000 + index)})
 			if err != nil {
 				t.Errorf("encode concurrent redemption: %v", err)
 				return
@@ -606,6 +608,7 @@ func concurrentlyRedeemLifecyclePasses(t *testing.T, baseURL, qrToken, checkpoin
 			}
 		}(index)
 	}
+	close(start)
 	wait.Wait()
 	return results
 }
