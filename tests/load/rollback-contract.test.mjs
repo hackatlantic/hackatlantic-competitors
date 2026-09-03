@@ -42,7 +42,7 @@ test("drill rejects a health-check failure and restores the exact original diges
     else if (url === STAGING_API + "/versionz") response = { gitSha: "known-test-sha" };
     else if (url.endsWith("/v2/apps?per_page=200")) response = { apps: [app()] };
     else if (method === "PUT") { assert.deepEqual(JSON.parse(options.body).spec, faultySpec(spec)); injected = true; response = { app: app() }; }
-    else if (url.endsWith("/rollback")) { assert.deepEqual(JSON.parse(options.body), { deployment_id: "original" }); restored = true; response = { deployment: { id: "restored" } }; }
+    else if (url.endsWith("/rollback")) { assert.deepEqual(JSON.parse(options.body), { deployment_id: "original", skip_pin: true }); restored = true; response = { deployment: { id: "restored" } }; }
     else if (url.endsWith("/deployments?per_page=20")) response = { deployments: [{ id: "candidate", phase: "ERROR", spec: faultySpec(spec), created_at: new Date().toISOString(), progress: { steps: [{ reason: { code: "ContainerHealthChecksFailed" } }] } }] };
     else if (url.endsWith("/v2/apps/staging-only")) response = { app: app() };
     else throw new Error("Unexpected cloud request in drill contract");

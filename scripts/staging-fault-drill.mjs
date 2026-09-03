@@ -102,7 +102,8 @@ export async function runDrill(phase) {
     let current = app.in_progress_deployment ?? app.pending_deployment;
     if (current && !current.spec) current = (await cloud(`/${state.appID}/deployments/${current.id}`)).deployment;
     if (current && apiService(current.spec)?.health_check?.http_path === FAULT_PATH) await cloud(`/${state.appID}/deployments/${current.id}/cancel`, "POST", {});
-    try { await cloud(`/${state.appID}/rollback`, "POST", { deployment_id: state.originalID }); }
+    // A rehearsal must not leave deployments disabled by a rollback pin.
+    try { await cloud(`/${state.appID}/rollback`, "POST", { deployment_id: state.originalID, skip_pin: true }); }
     catch {
       await cloud("/" + state.appID, "PUT", { spec: state.originalSpec });
       throw new Error("Rollback request failed; original spec resubmitted and operator verification required");
