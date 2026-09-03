@@ -18,7 +18,8 @@ The campaign is in progress. Only completed results below are achieved results.
 
 | Test | Configuration | Result |
 | --- | --- | --- |
-| Scanner repetitions 1–3 | 20 identities, 10 min each, fresh distinct passes, 2–5 s pacing | Pending |
+| Scanner repetition 1 | 20 identities, 10 min, fresh distinct passes, 2–5 s pacing | Passed: 2,857 passes; lookup 278 ms / redemption 517 ms p95; zero failures in 5,714 requests |
+| Scanner repetitions 2–3 | Same workload and deployed API; fresh passes | Running / queued |
 | Applicant sustained | 50 applicants / 20 VUs; 512 KiB PDF uploads | Passed: 50/50 complete; form 281 ms, draft 468 ms, submit 443 ms, upload 425 ms p95 |
 | Deadline | 25 submissions/min for 10 min; 250 prepared drafts | Passed: 250/250 submitted; 418 ms submit p95; no dropped arrivals |
 | HTTP contention | 100 attempts, one pass, same-key replays | Pending |
@@ -41,6 +42,11 @@ the original `main` and `staging` policies.
 - Active staging form required a resume: **all** sustained applicants uploaded,
   rather than the optional-upload half selected when the form permits it.
   Deadline drafts and uploads were prepared before the measured submit window.
+- Subsequent scanner context exposed the existing staging form as version 1,
+  **three questions**, resume required. These applicant results validate the
+  staging API journeys, **not parity with the current nine-question, optional-
+  resume production form**. Publishing the current form to staging and repeating
+  applicant measurements requires separate approval; do not hide this gap.
 - Grafana 30-second samples: sustained max in-use 1/5 (20%), deadline 4/5 (80%).
   These are sampled maxima, not proof of instantaneous peak utilization or
   attribution of every connection to k6.
@@ -61,6 +67,15 @@ status or error code. That root cause cannot be established retrospectively
 from the available summary. Its workload and PDF size differ from this campaign;
 the new passing results are **not** a before/after optimization claim and do not
 prove that old instantaneous stress case was fixed.
+
+### Scanner repetition evidence
+
+[Run 33707641714](https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33707641714)
+uses the same deployed API and size as the applicant runs. Repetition 1 completed
+2,857 scans at 282.35 scans/minute over a 607.123-second recorded window (including
+graceful completion/verification). SQL verified 2,857 distinct attendees and no
+over-limit redemptions. Lookup p95 was 277.895 ms and redemption p95 516.944 ms.
+These are per-repetition percentiles, not a pooled campaign percentile.
 
 ## Required evidence before making claims
 

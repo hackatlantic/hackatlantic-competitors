@@ -42,6 +42,7 @@ export async function runDrill(phase) {
     if (apps.length !== 1) throw new Error("Expected exactly one staging application");
     const app = apps[0];
     if (app.in_progress_deployment || app.pending_deployment) throw new Error("A deployment is already in progress; refusing to interfere");
+    if (app.pinned_deployment) throw new Error("Staging is already pinned to a rollback; resolve that state before a drill");
     const original = app.active_deployment;
     if (original?.phase !== "ACTIVE") throw new Error("Staging must have an active healthy deployment");
     if (!isDeepStrictEqual(app.spec, original.spec)) throw new Error("Desired and active app configuration differ; reconcile before a drill");
@@ -112,13 +113,14 @@ export async function runDrill(phase) {
     while (Date.now() < limit) {
       const restored = (await cloud("/" + state.appID)).app;
       const active = restored.active_deployment;
-      if (active?.phase === "ACTIVE" && active.id !== state.originalID && apiService(active.spec)?.image?.digest === state.originalDigest && apiService(active.spec)?.health_check?.http_path === "/readyz" && apiService(restored.spec)?.health_check?.http_path === "/readyz") {
+      if (active?.phase === "ACTIVE" && !restored.pinned_deployment && active.id !== state.originalID && apiService(active.spec)?.image?.digest === state.originalDigest && apiService(active.spec)?.health_check?.http_path === "/readyz" && apiService(restored.spec)?.health_check?.http_path === "/readyz") {
         try {
           if ((await publicJSON("/readyz")).status !== "ready" || (await publicJSON("/versionz")).gitSha !== state.originalSHA) throw new Error("Readiness or version differs");
           report.restoredAt = new Date().toISOString();
           report.recoverySeconds = (Date.parse(report.restoredAt) - Date.parse(report.rollbackRequestedAt)) / 1000;
           report.originalDigestRestored = true;
           report.readinessPassed = true;
+          report.deploymentUnpinned = true;
           save(reportPath, report);
           console.log(JSON.stringify(report));
           return;

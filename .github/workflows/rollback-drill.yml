@@ -135,7 +135,7 @@ jobs:
       - name: Record promotion eligibility
         id: result
         run: |
-          jq -e '.healthCheckFailure == true and .originalDigestRestored == true and .readinessPassed == true and .candidateHealthy == false and .recoverySeconds < 300' .tmp/staging-fault-report.json
+          jq -e '.healthCheckFailure == true and .originalDigestRestored == true and .readinessPassed == true and .deploymentUnpinned == true and .candidateHealthy == false and .recoverySeconds < 300' .tmp/staging-fault-report.json
           echo 'candidate_healthy=false' >> "$GITHUB_OUTPUT"
           {
             echo '### Unhealthy staging candidate drill'

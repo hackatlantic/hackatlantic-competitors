@@ -31,8 +31,8 @@ test("drill rejects a health-check failure and restores the exact original diges
   const originalFetch = globalThis.fetch;
   const environment = { API_BASE_URL: process.env.API_BASE_URL, DRILL_CONFIRMATION: process.env.DRILL_CONFIRMATION, DIGITALOCEAN_TOKEN: process.env.DIGITALOCEAN_TOKEN };
   const requests = [];
-  let injected = false, restored = false;
-  const app = () => ({ id: "staging-only", spec: injected && !restored ? faultySpec(spec) : spec, active_deployment: { id: restored ? "restored" : "original", phase: "ACTIVE", spec } });
+  let injected = false, restored = false, pinned = true;
+  const app = () => ({ id: "staging-only", ...(pinned ? { pinned_deployment: { id: "existing-pin" } } : {}), spec: injected && !restored ? faultySpec(spec) : spec, active_deployment: { id: restored ? "restored" : "original", phase: "ACTIVE", spec } });
   globalThis.fetch = async (url, options = {}) => {
     const method = options.method ?? "GET";
     requests.push({ method, url });
@@ -51,10 +51,14 @@ test("drill rejects a health-check failure and restores the exact original diges
   try {
     process.chdir(directory);
     Object.assign(process.env, { API_BASE_URL: STAGING_API, DRILL_CONFIRMATION: "ROLLBACK STAGING", DIGITALOCEAN_TOKEN: "fake-unit-test-token" });
+    await assert.rejects(runDrill("inject"), /already pinned/);
+    assert.equal(requests.filter((request) => request.method !== "GET").length, 0);
+    pinned = false;
     await runDrill("inject"); await runDrill("detect"); await runDrill("restore");
     const report = JSON.parse(readFileSync(".tmp/staging-fault-report.json", "utf8"));
     assert.equal(report.healthCheckFailure, true); assert.equal(report.originalDigestRestored, true);
     assert.equal(report.candidateHealthy, false); assert.equal(report.readinessPassed, true);
+    assert.equal(report.deploymentUnpinned, true);
     assert.ok(report.recoverySeconds < 300);
     assert.equal(requests.filter((request) => request.method === "PUT").length, 1);
     assert.equal(JSON.stringify(report).includes("fake-unit-test-token"), false);
