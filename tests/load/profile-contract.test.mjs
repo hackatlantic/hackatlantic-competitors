@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { STAGING_API, RESUME_BYTES, assertStagingTarget, tokenAt, scannerPause, scannerScenario, applicantScenario, applicantAnswers, shouldUpload, fixedResume } from "./profile-contract.mjs";
+import { STAGING_API, RESUME_BYTES, assertStagingTarget, tokenAt, scannerPause, scannerScenario, applicantScenario, isDeadlineBoundary, applicantAnswers, shouldUpload, fixedResume } from "./profile-contract.mjs";
 
 test("load target rejects production, lookalike hosts, redirects and paths", () => {
   assert.doesNotThrow(() => assertStagingTarget(STAGING_API));
@@ -25,6 +25,16 @@ test("token rotation never selects future or nearly expired tokens", () => {
   const identity = { tokenWindows: [{ iat: 100, exp: 700, token: "first" }, { iat: 640, exp: 1240, token: "second" }] };
   assert.equal(tokenAt(identity, 639), "first"); assert.equal(tokenAt(identity, 640), "second");
   assert.throws(() => tokenAt(identity, 99)); assert.throws(() => tokenAt(identity, 1210));
+});
+
+test("deadline skips only the extra end-boundary callback, never missing work", () => {
+  assert.equal(isDeadlineBoundary("deadline", 250, 250, 600000), true);
+  assert.equal(isDeadlineBoundary("deadline", 250, 250, 599999), true);
+  for (const args of [
+    ["deadline", 249, 250, 600000], ["deadline", 251, 250, 600000],
+    ["deadline", 250, 249, 600000], ["deadline", 250, 250, 590000],
+    ["sustained", 250, 250, 600000],
+  ]) assert.equal(isDeadlineBoundary(...args), false);
 });
 test("optional uploads cannot silently skip the resume workload", () => {
   assert.equal(Array.from({ length: 50 }, (_, i) => shouldUpload({ resumeRequired: false }, i, "sustained")).filter(Boolean).length, 25);

@@ -3,7 +3,7 @@ import { check, sleep } from "k6";
 import { Rate, Counter, Trend } from "k6/metrics";
 import { SharedArray } from "k6/data";
 import exec from "k6/execution";
-import { assertStagingTarget, tokenAt, applicantScenario, applicantAnswers, shouldUpload, fixedResume } from "./profile-contract.mjs";
+import { assertStagingTarget, tokenAt, applicantScenario, isDeadlineBoundary, applicantAnswers, shouldUpload, fixedResume } from "./profile-contract.mjs";
 
 const profile = __ENV.K6_APPLICANT_PROFILE ?? "sustained";
 const applicants = new SharedArray("synthetic applicants", () => {
@@ -18,6 +18,7 @@ const journeys = new Rate("applicant_journeys_successful");
 const completed = new Counter("applicant_journeys_completed");
 const lostAnswers = new Counter("applicant_answer_mismatches");
 const failures = new Counter("applicant_operation_failures");
+const boundaryCallbacks = new Counter("applicant_deadline_boundary_callbacks");
 // Wall-clock upload latency includes sending the fixed-size request body.
 const uploadDuration = new Trend("applicant_resume_upload_ms", true);
 
@@ -29,7 +30,7 @@ export const options = {
     applicant_journeys_successful: ["rate>=0.99"],
     applicant_journeys_completed: [`count>=${Math.ceil(applicants.length * 0.99)}`],
     applicant_answer_mismatches: ["count==0"],
-    ...(profile === "deadline" ? { dropped_iterations: ["count==0"] } : {}),
+    ...(profile === "deadline" ? { dropped_iterations: ["count==0"], applicant_deadline_boundary_callbacks: ["count<=1"] } : {}),
     ...(profile !== "stress" ? {
       "http_req_duration{operation:submit}": ["p(95)<2000"],
       ...(profile === "sustained" ? {
@@ -100,6 +101,11 @@ function journey(applicant, index) {
 
 export default function applicantSubmission() {
   const index = exec.scenario.iterationInTest;
+  if (isDeadlineBoundary(profile, index, applicants.length, Date.now() - exec.scenario.startTime)) {
+    boundaryCallbacks.add(1);
+    return;
+  }
+  if (profile === "deadline") boundaryCallbacks.add(0);
   const applicant = applicants[index];
   if (!applicant) exec.test.abort("Insufficient distinct applicant fixtures");
   let success = false;

@@ -40,6 +40,13 @@ export function applicantScenario(profile, vus, count, env = {}) {
   return { executor: "shared-iterations", vus, iterations: count, maxDuration: env.K6_APPLICANT_MAX_DURATION ?? "15m", gracefulStop: "30s" };
 }
 
+// k6's arrival scheduler may enter iteration 250 at exactly the 600s boundary.
+// That is outside the 250-arrival workload, not a 251st applicant. Only this
+// one boundary callback is ignored; early exhaustion and further callbacks fail.
+export function isDeadlineBoundary(profile, index, count, elapsedMilliseconds) {
+  return profile === "deadline" && count === 250 && index === 250 && elapsedMilliseconds >= 599900;
+}
+
 export function applicantAnswers(form, email, sequence, revision = 1) {
   const answers = Object.fromEntries(form.questions.map((question) => {
     const description = question.key + " " + question.label;

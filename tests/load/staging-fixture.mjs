@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { assertStagingTarget, applicantAnswers as expectedAnswers, fixedResume, RESUME_BYTES, shouldUpload } from "./profile-contract.mjs";
 import { currentIntakeSchema, CURRENT_SCHEMA_SHA256, FORM_SOURCE, schemaFingerprint, assertCurrentIntake, assertAlignmentScope, PUBLISH_CURRENT_FORM_SQL } from "./current-intake-form.mjs";
+import { jsonbInput } from "./sql-json-input.mjs";
 
 const command = process.argv[2];
 const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json";
@@ -471,7 +472,7 @@ function verifyApplicants() {
     upload: shouldUpload(fixture.form, index, applicantProfile),
   }));
   const report = JSON.parse(psql(`
-WITH expected AS (SELECT * FROM jsonb_to_recordset(:'expected'::jsonb) AS e(user_id text, answers jsonb, upload boolean)),
+WITH expected AS (SELECT * FROM jsonb_to_recordset(${jsonbInput(expected)}) AS e(user_id text, answers jsonb, upload boolean)),
 actual AS (
   SELECT e.*, a.id, a.form_id, a.status, a.submitted_at,
     (SELECT jsonb_object_agg(question_key, value_json) FROM ats.application_answers WHERE application_id = a.id) AS saved_answers,
@@ -495,7 +496,7 @@ SELECT jsonb_build_object(
       OR (NOT upload AND byte_size IS NOT NULL))),
   'persistedResumes', count(byte_size)
 ) FROM actual`, {
-    expected: JSON.stringify(expected), cycle_id: fixture.form.cycleId, form_id: fixture.form.id, resume_bytes: RESUME_BYTES,
+    cycle_id: fixture.form.cycleId, form_id: fixture.form.id, resume_bytes: RESUME_BYTES,
     resume_hash: createHash("sha256").update(fixedResume()).digest("hex"),
   }));
   writeEvidence("applicant-ledger", report);
