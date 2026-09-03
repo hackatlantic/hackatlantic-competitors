@@ -22,6 +22,11 @@ on:
         default: "1"
         type: choice
         options: ["1", "3"]
+      align_current_form:
+        description: Publish the current nine-question optional-resume form to staging (applicant sustained/deadline only; existing applications unchanged)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -51,6 +56,7 @@ jobs:
       DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
       K6_REPETITION: ${{ matrix.repetition }}
       K6_SUMMARY_PATH: .tmp/profile-summary.json
+      K6_ALIGN_CURRENT_FORM: ${{ inputs.align_current_form }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -65,6 +71,10 @@ jobs:
       - name: Configure the selected fixed profile
         shell: bash
         run: |
+          if [[ "${K6_ALIGN_CURRENT_FORM}" == true && "${{ inputs.profile }}" != applicant-sustained && "${{ inputs.profile }}" != applicant-deadline ]]; then
+            echo 'Form alignment is only permitted for the two realistic applicant profiles' >&2
+            exit 1
+          fi
           case "${{ inputs.profile }}" in
             scanner-repeatability)
               cat >> "$GITHUB_ENV" <<'EOF'
@@ -218,6 +228,7 @@ jobs:
             .tmp/benchmark-context.json
             .tmp/scanner-ledger.json
             .tmp/applicant-ledger.json
+            .tmp/form-alignment.json
           if-no-files-found: ignore
           retention-days: 30
       - name: Enforce the selected profile

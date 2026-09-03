@@ -3,6 +3,7 @@ import { createHmac, createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { assertStagingTarget, applicantAnswers as expectedAnswers, fixedResume, RESUME_BYTES, shouldUpload } from "./profile-contract.mjs";
+import { currentIntakeSchema, CURRENT_SCHEMA_SHA256, FORM_SOURCE, schemaFingerprint, assertCurrentIntake, assertAlignmentScope, PUBLISH_CURRENT_FORM_SQL } from "./current-intake-form.mjs";
 
 const command = process.argv[2];
 const fixturePath = process.env.K6_FIXTURE_PATH ?? ".tmp/k6-staging-fixture.json";
@@ -13,9 +14,11 @@ const applicantCount = Number(process.env.K6_APPLICANT_COUNT ?? process.env.K6_A
 const applicantProfile = process.env.K6_APPLICANT_PROFILE ?? "sustained";
 const scannerPassCount = Number(process.env.K6_SCANNER_PASS_COUNT ?? 0);
 const scannerIdentityCount = Number(process.env.K6_SCANNER_IDENTITIES ?? 20);
+const alignCurrentForm = process.env.K6_ALIGN_CURRENT_FORM === "true";
 
 function requireConfiguration() {
   assertStagingTarget(apiBaseURL);
+  if (alignCurrentForm) assertAlignmentScope({ apiBaseURL, applicantProfile, applicantCount, scannerIdentityCount, scannerPassCount });
   if (!apiBaseURL || !databaseURL || !loadTestAuthSecret) {
     throw new Error("API_BASE_URL, DATABASE_URL, and LOAD_TEST_AUTH_SECRET are required");
   }
@@ -336,7 +339,23 @@ async function prepare() {
       await api("/v1/admin/users/" + scannerUser.id + "/roles/scanner", adminToken, { method: "PUT", body: "{}" });
     }));
   }
-  const form = await api("/v1/application-forms/current", adminToken);
+  let form = await api("/v1/application-forms/current", adminToken);
+  if (alignCurrentForm) {
+    const before = { id: form.id, version: form.version, schemaSHA256: schemaFingerprint(form) };
+    let published = null;
+    if (before.schemaSHA256 !== CURRENT_SCHEMA_SHA256) {
+      const result = psql(PUBLISH_CURRENT_FORM_SQL, {
+        cycle_id: form.cycleId, expected_form_id: form.id,
+        admin_clerk_user_id: admin.userId, schema: JSON.stringify(currentIntakeSchema),
+      });
+      if (!result) throw new Error("No form published; staging form changed concurrently or cycle scope differed");
+      published = JSON.parse(result);
+    }
+    form = await api("/v1/application-forms/current", adminToken);
+    assertCurrentIntake(form);
+    if (published && form.id !== published.id) throw new Error("Another form became current during alignment");
+    writeEvidence("form-alignment", { before, after: { id: form.id, version: form.version, schemaSHA256: schemaFingerprint(form), resumeRequired: form.resumeRequired, questionCount: form.questions.length }, publishedNewVersion: published !== null, referenceSource: FORM_SOURCE, existingApplicationsUpdated: false });
+  }
   fixture.form = form;
   let checkpoint = null;
   let scannerPasses = [];
@@ -454,7 +473,7 @@ function verifyApplicants() {
   const report = JSON.parse(psql(`
 WITH expected AS (SELECT * FROM jsonb_to_recordset(:'expected'::jsonb) AS e(user_id text, answers jsonb, upload boolean)),
 actual AS (
-  SELECT e.*, a.id, a.status, a.submitted_at,
+  SELECT e.*, a.id, a.form_id, a.status, a.submitted_at,
     (SELECT jsonb_object_agg(question_key, value_json) FROM ats.application_answers WHERE application_id = a.id) AS saved_answers,
     r.byte_size, encode(r.sha256, 'hex') AS resume_hash,
     count(a.id) OVER (PARTITION BY e.user_id) AS application_count
@@ -464,18 +483,23 @@ actual AS (
 )
 SELECT jsonb_build_object(
   'expected', (SELECT count(*) FROM expected),
+  'expectedResumes', (SELECT count(*) FROM expected WHERE upload),
   'submitted', count(*) FILTER (WHERE status = 'submitted' AND submitted_at IS NOT NULL),
+  'submittedWithResume', count(*) FILTER (WHERE status = 'submitted' AND byte_size IS NOT NULL),
+  'submittedWithoutResume', count(*) FILTER (WHERE status = 'submitted' AND byte_size IS NULL),
+  'wrongFormApplications', count(*) FILTER (WHERE id IS NOT NULL AND form_id IS DISTINCT FROM :'form_id'::uuid),
   'duplicateApplications', count(*) FILTER (WHERE application_count > 1),
   'lostAnswers', count(*) FILTER (WHERE status = 'submitted' AND saved_answers IS DISTINCT FROM answers),
-  'resumeMismatches', count(*) FILTER (WHERE status = 'submitted' AND upload AND
-    (byte_size IS DISTINCT FROM :'resume_bytes'::bigint OR resume_hash IS DISTINCT FROM :'resume_hash')),
+  'resumeMismatches', count(*) FILTER (WHERE status = 'submitted' AND
+    ((upload AND (byte_size IS DISTINCT FROM :'resume_bytes'::bigint OR resume_hash IS DISTINCT FROM :'resume_hash'))
+      OR (NOT upload AND byte_size IS NOT NULL))),
   'persistedResumes', count(byte_size)
 ) FROM actual`, {
-    expected: JSON.stringify(expected), cycle_id: fixture.form.cycleId, resume_bytes: RESUME_BYTES,
+    expected: JSON.stringify(expected), cycle_id: fixture.form.cycleId, form_id: fixture.form.id, resume_bytes: RESUME_BYTES,
     resume_hash: createHash("sha256").update(fixedResume()).digest("hex"),
   }));
   writeEvidence("applicant-ledger", report);
-  if (report.submitted < Math.ceil(expected.length * 0.99) || report.duplicateApplications || report.lostAnswers || report.resumeMismatches) throw new Error("Applicant persistence acceptance criteria failed");
+  if (report.submitted < Math.ceil(expected.length * 0.99) || report.duplicateApplications || report.lostAnswers || report.resumeMismatches || report.wrongFormApplications) throw new Error("Applicant persistence acceptance criteria failed");
 }
 
 async function cleanup() {

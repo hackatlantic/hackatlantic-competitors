@@ -23,7 +23,9 @@ The release profile consumes one distinct attendee pass per scan. Scanner identi
 | `applicant-deadline` | 250 fully prepared applications, 25 submissions/minute for 10 minutes using an arrival-rate executor | Realistic deadline burst |
 | `applicant-stress` | 100 applicants completing the entire lifecycle simultaneously | Explicitly non-realistic stress/capacity test; enforces correctness and `<1%` transport/server errors while reporting, rather than gating on, normal-traffic latency targets |
 
-The deadline fixture prepares drafts and résumés before k6 starts; the measured workload is therefore the submission spike rather than application setup.
+The deadline fixture prepares drafts and any required résumés before k6 starts;
+on the current optional-résumé form it prepares no uploads. The measured workload
+is therefore the submission spike rather than application setup.
 
 Sustained acceptance criteria: form and draft p95 <1,000 ms, submission p95
 <2,000 ms, fixed-size upload wall-clock p95 <3,000 ms, HTTP errors <1%, and at
@@ -45,6 +47,24 @@ fixture IDs. Run the different workloads separately so one does not contaminate
 another. The fixed topology prevents an ad-hoc stress value from becoming a
 release standard. Environment branch protection still applies; do not weaken it
 or replace a protected branch to get a test to run without authorization.
+
+### Opt-in alignment with the current intake form
+
+After explicit approval, select `align_current_form=true` for an
+`applicant-sustained` or `applicant-deadline` run. It is false by default and is
+rejected for scanner/stress profiles. The fixture reads the approved nine-question,
+optional-résumé schema from migration `000013` **without running that migration**.
+If staging differs, it inserts a new published version guarded by the observed
+current form; it never updates existing forms, drafts, submissions or answers.
+Already-aligned staging is a no-op, not another new version.
+
+`form-alignment.json` records old/new form IDs, versions and schema fingerprints.
+Context verifies that the served schema matches the reference and remains
+unchanged throughout measurement. The SQL ledger records wrong-form applications,
+expected/persisted uploads, and submitted journeys with and without a résumé.
+On the current form, the sustained profile exercises 25 uploads and 25 omissions;
+the deadline profile exercises 250 prepared applications without uploads. This
+differs from old required-résumé results and is not a causal optimization baseline.
 
 For local script validation with a staging-only fixture:
 
