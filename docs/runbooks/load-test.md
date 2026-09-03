@@ -39,6 +39,18 @@ required synthetic uploads must have the expected 524,288-byte size and SHA-256.
 Only aggregate counts are published, never answers, emails, tokens, or QR codes.
 The upload check validates persisted metadata; it is not a backup/restore test.
 
+A green k6 threshold summary is insufficient if the process aborted or the SQL
+verifier failed. Require the whole workflow and its ledger checks to pass.
+Current-form expectations are sent through SQL standard input: all 250 nine-
+question answers exceed Linux's per-argument limit if passed in one `psql -v`.
+
+The deadline executor can schedule one extra callback at the ten-minute endpoint.
+The harness records it as `applicant_deadline_boundary_callbacks` (at most one),
+without sending a 251st request. It only permits index 250 at or after 599.9 s
+with exactly 250 fixtures; early exhaustion still aborts. Continue to require
+zero dropped iterations and the normal completion threshold. Do not report this
+no-request endpoint callback as another completed application.
+
 ## Running a profile
 
 From GitHub Actions, dispatch **Staging ATS load profiles** and choose one fixed

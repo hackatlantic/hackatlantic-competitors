@@ -1,5 +1,10 @@
 # Performance validation campaign
 
+> Follow-up: staging form alignment and applicant reruns were subsequently
+> approved. See [current nine-question form evidence](current-form-applicant-validation-2026-09-03.md)
+> for the new measurements and retained failed first deadline run. The original
+> campaign below is preserved; its old-form measurements are not relabelled.
+
 Campaign started on 2026-09-02 (America/Toronto; artifact timestamps use UTC).
 Test harness and evidence are in PR #109. The user approved a temporary exact
 `codex/performance-validation` staging branch policy; production was not changed.
@@ -49,8 +54,8 @@ original `main` and `staging` deployment branch policies remain.
 - Subsequent scanner context exposed the existing staging form as version 1,
   **three questions**, resume required. These applicant results validate the
   staging API journeys, **not parity with the current nine-question, optional-
-  resume production form**. Publishing the current form to staging and repeating
-  applicant measurements requires separate approval; do not hide this gap.
+  resume production form**. This gap required separate approval, subsequently
+  granted for the [current-form follow-up](current-form-applicant-validation-2026-09-03.md).
 - Grafana 30-second samples, filtered by source timestamp to exclude preparation:
   sustained max in-use 1/5 (20%). Deadline samples recorded zero in-use at their
   sample instants; its sub-second, 25/minute queries fall between samples, so this
@@ -179,9 +184,10 @@ incident-notification delivery claim follows from this test.
   collector. Normal telemetry ingestion and existing alerts were not disabled.
 - Fixture jobs cleaned up temporary scanner access/admin allowlist changes.
   Synthetic benchmark records remain in staging; this was not a database purge.
-- PR #109 stays a draft. Next decisions are approving staging form alignment and
-  applicant reruns, then a narrowly scoped investigation of the failed hot-pass
-  HTTP test. Neither is concealed by the passing everyday scanner results.
+- PR #109 stays a draft. Staging form alignment and applicant reruns were later
+  approved and are reported in the follow-up. A narrowly scoped investigation
+  of the failed hot-pass HTTP test remains separate; passing everyday scanner
+  results do not conceal that failure.
 
 ## Required evidence before making claims
 
