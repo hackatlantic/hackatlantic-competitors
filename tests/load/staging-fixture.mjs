@@ -170,7 +170,7 @@ function sessionWindows(identity) {
   }) };
 }
 
-function seedAcceptedAttendees(form, runID, count) {
+function seedAcceptedAttendees(form, runID, count, adminClerkUserID) {
   const attendees = Array.from({ length: count }, (_, index) => {
     const identity = createIdentity(runID, "scanner_attendee", index + 1);
     return {
@@ -178,6 +178,7 @@ function seedAcceptedAttendees(form, runID, count) {
       email: identity.email,
       user_id: randomUUID(),
       application_id: randomUUID(),
+      decision_id: randomUUID(),
       attendee_id: randomUUID(),
       display_name: "Synthetic attendee " + (index + 1),
     };
@@ -248,6 +249,57 @@ FROM input;
 WITH input AS (
   SELECT *
   FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
+    user_id uuid,
+    application_id uuid,
+    decision_id uuid
+  )
+), admin AS (
+  SELECT id FROM ats.users WHERE clerk_user_id = :'admin_clerk_user_id'
+)
+INSERT INTO ats.decisions (
+  id,
+  application_id,
+  outcome,
+  internal_reason,
+  decided_by,
+  released_by,
+  released_at
+)
+SELECT
+  decision_id,
+  application_id,
+  'accepted',
+  'Synthetic scanner release-gate fixture',
+  admin.id,
+  admin.id,
+  CURRENT_TIMESTAMP
+FROM input CROSS JOIN admin;
+
+WITH input AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
+    application_id uuid,
+    decision_id uuid
+  )
+)
+UPDATE ats.applications AS application
+SET current_decision_id = input.decision_id
+FROM input
+WHERE application.id = input.application_id;
+
+WITH input AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
+    user_id uuid,
+    decision_id uuid
+  )
+)
+INSERT INTO ats.attendance_responses (decision_id, status, responded_by)
+SELECT decision_id, 'confirmed', user_id FROM input;
+
+WITH input AS (
+  SELECT *
+  FROM jsonb_to_recordset(:'rows'::jsonb) AS row(
     clerk_user_id text,
     email text,
     user_id uuid,
@@ -272,7 +324,7 @@ WITH input AS (
 )
 INSERT INTO ats.attendee_roles (attendee_id, role)
 SELECT attendee_id, 'hacker' FROM input;
-`, { rows, cycle_id: form.cycleId, form_id: form.id });
+`, { rows, cycle_id: form.cycleId, form_id: form.id, admin_clerk_user_id: adminClerkUserID });
   }
   return attendees;
 }
@@ -375,7 +427,7 @@ async function prepare() {
         active: true,
       }),
     });
-    const scannerAttendees = seedAcceptedAttendees(form, runID, scannerPassCount);
+    const scannerAttendees = seedAcceptedAttendees(form, runID, scannerPassCount, admin.userId);
     scannerPasses = await issueScannerPasses(scannerAttendees, admin);
   }
   fixture.scanner = {

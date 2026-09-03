@@ -40,3 +40,16 @@ test("current-form workload fills all nine fields and exercises optional upload 
   assert.equal(Array.from({ length: 50 }, (_, i) => shouldUpload(currentIntakeSchema, i, "sustained")).filter(Boolean).length, 25);
   assert.equal(shouldUpload(currentIntakeSchema, 0, "deadline"), false);
 });
+
+test("scanner release fixtures confirm RSVP before requesting passes", () => {
+  const fixture = readFileSync(new URL("./staging-fixture.mjs", import.meta.url), "utf8");
+  const seed = fixture.slice(fixture.indexOf("function seedAcceptedAttendees"), fixture.indexOf("async function issueScannerPasses"));
+  assert.match(seed, /decision_id: randomUUID\(\)/);
+  assert.match(seed, /INSERT INTO ats\.decisions/);
+  assert.match(seed, /SET current_decision_id = input\.decision_id/);
+  assert.match(seed, /INSERT INTO ats\.attendance_responses \(decision_id, status, responded_by\)/);
+  assert.match(seed, /SELECT decision_id, 'confirmed', user_id FROM input/);
+  assert.ok(seed.indexOf("INSERT INTO ats.decisions") < seed.indexOf("SET current_decision_id = input.decision_id"));
+  assert.ok(seed.indexOf("SET current_decision_id = input.decision_id") < seed.indexOf("INSERT INTO ats.attendance_responses"));
+  assert.match(fixture, /seedAcceptedAttendees\(form, runID, scannerPassCount, admin\.userId\)/);
+});
