@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ApplicationButton } from "@/components/application-motion";
 import { ApplicantPass } from "@/components/applicant-pass";
+import { ApplicantRSVP } from "@/components/applicant-rsvp";
 import {
   ApplicantDecisionStatus,
   type DecisionLoadState,
@@ -574,7 +575,10 @@ export function ApplicantDashboard() {
             </p>
           ) : null}
           {decisionState === "ready" && decision?.outcome === "accepted" ? (
-            <ApplicantPass />
+            <>
+              <ApplicantRSVP key={`${application.id}-${decision.releasedAt}`} applicationId={application.id} />
+              <ApplicantPass />
+            </>
           ) : null}
         </>
       ) : currentForm ? (

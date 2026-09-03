@@ -138,6 +138,20 @@ export type ApplicantReleasedDecision = {
   releasedAt: string;
 };
 
+export type RSVPStatus = "pending" | "confirmed" | "declined";
+export type AttendanceRSVP = {
+  applicationId: string;
+  decisionId: string;
+  status: RSVPStatus;
+  lockVersion: number;
+  respondedAt?: string;
+};
+export type RespondToRSVPRequest = {
+  decisionId: string;
+  status: Exclude<RSVPStatus, "pending">;
+  lockVersion: number;
+};
+
 export type OrganizerApplicationStatus =
   | "submitted"
   | "accepted"
@@ -368,6 +382,7 @@ export type OrganizerApplication = {
   answers: ApplicationAnswers;
   currentDecision?: OrganizerDecision;
   attendeePass?: OrganizerAttendeePass;
+  rsvp?: AttendanceRSVP;
   createdAt: string;
   updatedAt: string;
 };
@@ -380,6 +395,7 @@ export type OrganizerApplicationListResponse = {
 export type OrganizerApplicationFilters = {
   status?: OrganizerApplicationStatus;
   q?: string;
+  rsvp?: RSVPStatus;
 };
 
 export type AssignReviewerRequest = {
@@ -451,6 +467,8 @@ export type ApiClient = {
   createApplication(): Promise<ApplicantApplication>;
   getMyApplications(): Promise<MyApplicationsResponse>;
   getApplicationDecision(applicationId: string): Promise<ApplicantReleasedDecision>;
+  getApplicationRSVP(applicationId: string): Promise<AttendanceRSVP>;
+  respondToRSVP(applicationId: string, response: RespondToRSVPRequest): Promise<AttendanceRSVP>;
   saveApplicationDraft(
     applicationId: string,
     request: SaveApplicationDraftRequest,
@@ -714,6 +732,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       if (filters.status) {
         searchParameters.set("status", filters.status);
       }
+      if (filters.rsvp) {
+        searchParameters.set("rsvp", filters.rsvp);
+      }
       if (filters.q) {
         searchParameters.set("q", filters.q);
       }
@@ -853,6 +874,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request<ReviewerApplicationListResponse>("/v1/reviewer/assignments"),
     getApplicationDecision: (applicationId) =>
       request<ApplicantReleasedDecision>(`/v1/applications/${applicationId}/decision`),
+    getApplicationRSVP: (applicationId) =>
+      request<AttendanceRSVP>(`/v1/applications/${applicationId}/rsvp`),
+    respondToRSVP: (applicationId, response) =>
+      request<AttendanceRSVP>(`/v1/applications/${applicationId}/rsvp`, {
+        method: "PUT",
+        body: JSON.stringify(response),
+      }),
     getReviewerApplication: (applicationId) =>
       request<ReviewerApplication>(`/v1/reviewer/applications/${applicationId}`),
     saveReviewDraft: (applicationId, review) =>

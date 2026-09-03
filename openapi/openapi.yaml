@@ -310,6 +310,78 @@ paths:
           $ref: "#/components/responses/DecisionNotFound"
         "503":
           $ref: "#/components/responses/IdentityUnavailable"
+  /v1/applications/{applicationId}/rsvp:
+    get:
+      operationId: getApplicationRSVP
+      summary: Get the caller's attendance response for their released acceptance
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      responses:
+        "200":
+          description: Current RSVP; pending means no response to this acceptance yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRSVP"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/RSVPNotAvailable"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
+    put:
+      operationId: respondToRSVP
+      summary: Confirm or decline attendance without changing admission or pass access
+      description: Only the owner of a current released acceptance can respond. Send the decisionId and lockVersion from GET. Repeating the current response is idempotent; conflicting changes or a replaced acceptance require reloading after a 409. Pending is read-only. Actual changes are audited atomically.
+      tags: [Applications]
+      security:
+        - clerkBearer: []
+      parameters:
+        - $ref: "#/components/parameters/ApplicationID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RespondToRSVP"
+      responses:
+        "200":
+          description: Persisted attendance response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRSVP"
+        "400":
+          description: Malformed payload or missing lockVersion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/RSVPNotAvailable"
+        "409":
+          description: Conflicting response version or replaced acceptance; reload before retrying
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: Invalid decisionId, status, or negative lockVersion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          $ref: "#/components/responses/IdentityUnavailable"
   /v1/admin/applications:
     get:
       operationId: listOrganizerApplications
@@ -318,6 +390,13 @@ paths:
       security:
         - clerkBearer: []
       parameters:
+        - name: rsvp
+          in: query
+          required: false
+          description: Filters current released acceptances only; pending means no RSVP yet
+          schema:
+            type: string
+            enum: [pending, confirmed, declined]
         - name: status
           in: query
           required: false
@@ -714,8 +793,8 @@ paths:
   /v1/admin/attendees/{attendeeId}/passes:
     post:
       operationId: issuePass
-      summary: Issue a pass for an accepted attendee
-      description: Creates the attendee's only active pass. The QR and claim credentials are returned in this response only and are never persisted in raw form.
+      summary: Release a pass for an accepted, RSVP-confirmed attendee
+      description: Explicit admin action, normally performed a few days before the event. Requires a confirmed RSVP for the current released acceptance. Confirmation alone does not issue a pass. Creates the attendee's only active pass and queues its pass-link email. The QR and claim credentials are returned in this response only and are never persisted in raw form.
       tags: [Passes]
       security:
         - clerkBearer: []
@@ -735,14 +814,14 @@ paths:
         "404":
           $ref: "#/components/responses/PassNotFound"
         "409":
-          $ref: "#/components/responses/PassActive"
+          $ref: "#/components/responses/PassIssuanceConflict"
         "503":
           $ref: "#/components/responses/PassDependencyUnavailable"
   /v1/admin/passes/{passId}/reissue:
     post:
       operationId: reissuePass
       summary: Atomically replace an active attendee pass
-      description: Revokes and supersedes the active pass while issuing a distinct pair of one-time credentials.
+      description: Requires a confirmed RSVP for the current released acceptance. Revokes and supersedes the active pass while issuing a distinct pair of one-time credentials. An RSVP eligibility failure leaves the old pass unchanged.
       tags: [Passes]
       security:
         - clerkBearer: []
@@ -761,6 +840,8 @@ paths:
           $ref: "#/components/responses/OrganizerRequired"
         "404":
           $ref: "#/components/responses/PassNotFound"
+        "409":
+          $ref: "#/components/responses/RSVPRequired"
         "503":
           $ref: "#/components/responses/PassDependencyUnavailable"
   /v1/admin/passes/{passId}/revoke:
@@ -1553,8 +1634,14 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
-    PassActive:
-      description: The attendee already has an active pass; use reissue to replace it.
+    PassIssuanceConflict:
+      description: The attendee already has an active pass (pass_active), or has not confirmed the current acceptance's RSVP (rsvp_required).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RSVPRequired:
+      description: The current released acceptance requires a confirmed RSVP before pass issuance or reissuance. Existing passes are unchanged.
       content:
         application/json:
           schema:
@@ -1619,7 +1706,47 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    RSVPNotAvailable:
+      description: No current released acceptance belongs to this caller; other applicants' resources are also hidden.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
   schemas:
+    AttendanceRSVP:
+      type: object
+      additionalProperties: false
+      required: [applicationId, decisionId, status, lockVersion]
+      properties:
+        applicationId:
+          type: string
+          format: uuid
+        decisionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, confirmed, declined]
+        lockVersion:
+          type: integer
+          minimum: 0
+        respondedAt:
+          type: string
+          format: date-time
+    RespondToRSVP:
+      type: object
+      additionalProperties: false
+      required: [decisionId, status, lockVersion]
+      properties:
+        decisionId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [confirmed, declined]
+        lockVersion:
+          type: integer
+          minimum: 0
     Service:
       type: object
       additionalProperties: false
@@ -1937,6 +2064,8 @@ components:
       additionalProperties: false
       required: [id, cycleId, formId, formVersion, status, applicant, answers, createdAt, updatedAt]
       properties:
+        rsvp:
+          $ref: "#/components/schemas/AttendanceRSVP"
         id:
           type: string
           format: uuid

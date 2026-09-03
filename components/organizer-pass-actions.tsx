@@ -16,6 +16,7 @@ type DestructiveAction = "revoke" | "reissue" | null;
 
 type OrganizerPassActionsProps = {
   initialAttendeePass: OrganizerAttendeePass;
+  rsvpConfirmed: boolean;
 };
 
 function displayTimestamp(value: string): string {
@@ -32,6 +33,7 @@ function displayTimestamp(value: string): string {
 
 export function OrganizerPassActions({
   initialAttendeePass,
+  rsvpConfirmed,
 }: OrganizerPassActionsProps) {
   const { getToken } = useAuth();
   const router = useRouter();
@@ -63,6 +65,7 @@ export function OrganizerPassActions({
   };
 
   const issuePass = async () => {
+    if (!rsvpConfirmed || actionState !== "idle") return;
     setActionState("issuing");
     setActionError("");
     setNotice("");
@@ -107,7 +110,7 @@ export function OrganizerPassActions({
   };
 
   const reissuePass = async () => {
-    if (!pass || pass.status !== "active") {
+    if (!rsvpConfirmed || !pass || pass.status !== "active") {
       return;
     }
 
@@ -162,6 +165,12 @@ export function OrganizerPassActions({
         )}
       </div>
 
+      <p className="staff-muted">
+        {rsvpConfirmed
+          ? "RSVP confirmed. Release the pass a few days before the event when you are ready; confirming an RSVP does not issue a pass automatically."
+          : "Pass release is unavailable until the attendee confirms their RSVP."}
+      </p>
+
       {pendingAction ? (
         <div className="pass-action-confirmation" aria-live="polite">
           <p>
@@ -172,7 +181,7 @@ export function OrganizerPassActions({
           <div className="staff-actions">
             <button
               className="button primary"
-              disabled={busy}
+              disabled={busy || (pendingAction === "reissue" && !rsvpConfirmed)}
               onClick={submitPendingAction}
               type="button"
             >
@@ -199,7 +208,7 @@ export function OrganizerPassActions({
           {canIssue ? (
             <button
               className="button primary"
-              disabled={busy}
+              disabled={busy || !rsvpConfirmed}
               onClick={() => void issuePass()}
               type="button"
             >
@@ -210,7 +219,7 @@ export function OrganizerPassActions({
             <>
               <button
                 className="button secondary"
-                disabled={busy}
+                disabled={busy || !rsvpConfirmed}
                 onClick={() => setPendingAction("reissue")}
                 type="button"
               >

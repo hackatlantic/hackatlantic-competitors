@@ -27,6 +27,7 @@ import (
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/redemptions"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/resumes"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/reviews"
+	"github.com/hackatlantic/hackatlantic-competitors/api/internal/rsvps"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/users"
 )
 
@@ -158,6 +159,7 @@ func main() {
 			durationEnv("DATABASE_TRANSACTION_TIMEOUT", 15*time.Second),
 		),
 		Passes:           passService,
+		RSVPs:            rsvps.NewService(pool.Pool, durationEnv("DATABASE_QUERY_TIMEOUT", 5*time.Second), durationEnv("DATABASE_TRANSACTION_TIMEOUT", 15*time.Second)),
 		Checkpoints:      checkpointService,
 		Redemptions:      redemptionService,
 		ClaimRateLimiter: claimRateLimiter,

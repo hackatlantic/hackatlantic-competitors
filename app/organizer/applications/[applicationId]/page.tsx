@@ -112,10 +112,21 @@ export default async function OrganizerApplicationDetailPage({
           )}
         </section>
 
+        {application.rsvp ? (
+          <section aria-labelledby="rsvp-heading">
+            <h2 id="rsvp-heading">Attendance RSVP</h2>
+            <p className={`rsvp-status rsvp-${application.rsvp.status}`}>
+              <strong>{application.rsvp.status === "confirmed" ? "Confirmed" : application.rsvp.status === "declined" ? "Not attending" : "Awaiting response"}</strong>
+            </p>
+            {application.rsvp.respondedAt ? <p>Last response: <time dateTime={application.rsvp.respondedAt}>{new Date(application.rsvp.respondedAt).toLocaleString()}</time></p> : null}
+            <p className="staff-muted">Reported by the applicant. This does not change admission, revoke a pass, or prove check-in.</p>
+          </section>
+        ) : null}
+
         {application.attendeePass ? (
           <section aria-labelledby="pass-heading">
             <h2 id="pass-heading">Attendee pass</h2>
-            <OrganizerPassActions initialAttendeePass={application.attendeePass} />
+            <OrganizerPassActions initialAttendeePass={application.attendeePass} rsvpConfirmed={application.rsvp?.status === "confirmed"} />
           </section>
         ) : null}
       </div>

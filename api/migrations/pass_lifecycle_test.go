@@ -86,6 +86,7 @@ func TestPassLifecycleCredentialsAndAccessBoundaries(t *testing.T) {
 	attendeeID := attendeeForApplication(t, ctx, pool, applicationID)
 	assertPassStatus(t, intakeRequest(t, server.URL, http.MethodPost, "/v1/admin/attendees/"+attendeeID+"/passes", "clerk-pass-organizer", nil), http.StatusNotFound)
 	releaseLifecycleDecision(t, server.URL, accepted.ID, "clerk-pass-organizer")
+	confirmRSVPFixture(t, ctx, pool, accepted.ID)
 
 	issued := issueLifecyclePass(t, server.URL, attendeeID)
 	if issued.QRToken == "" || issued.ClaimToken == "" || issued.QRToken == issued.ClaimToken || issued.ClaimURL == "" {
@@ -175,6 +176,7 @@ func TestPassLifecycleCredentialsAndAccessBoundaries(t *testing.T) {
 
 	concurrentDecision := recordLifecycleDecision(t, server.URL, concurrentApplicationID, "clerk-pass-organizer", "accepted", "accepted concurrent")
 	releaseLifecycleDecision(t, server.URL, concurrentDecision.ID, "clerk-pass-organizer")
+	confirmRSVPFixture(t, ctx, pool, concurrentDecision.ID)
 	concurrentAttendeeID := attendeeForApplication(t, ctx, pool, concurrentApplicationID)
 	statuses := concurrentlyIssuePasses(t, server.URL, concurrentAttendeeID)
 	if !(statuses[0] == http.StatusCreated && statuses[1] == http.StatusConflict || statuses[0] == http.StatusConflict && statuses[1] == http.StatusCreated) {
@@ -190,12 +192,14 @@ func TestPassLifecycleCredentialsAndAccessBoundaries(t *testing.T) {
 
 	staleDecision := recordLifecycleDecision(t, server.URL, staleApplicationID, "clerk-pass-organizer", "accepted", "initial acceptance")
 	releaseLifecycleDecision(t, server.URL, staleDecision.ID, "clerk-pass-organizer")
+	confirmRSVPFixture(t, ctx, pool, staleDecision.ID)
 	staleAttendeeID := attendeeForApplication(t, ctx, pool, staleApplicationID)
 	assertPassDatabaseConstraints(t, ctx, pool, concurrentAttendeeID, staleAttendeeID)
 	recordLifecycleDecision(t, server.URL, staleApplicationID, "clerk-pass-organizer", "waitlisted", "later status change")
 	assertPassStatus(t, intakeRequest(t, server.URL, http.MethodPost, "/v1/admin/attendees/"+staleAttendeeID+"/passes", "clerk-pass-organizer", nil), http.StatusNotFound)
 	rejectedDecision := recordLifecycleDecision(t, server.URL, rejectedApplicationID, "clerk-pass-organizer", "accepted", "initial acceptance")
 	releaseLifecycleDecision(t, server.URL, rejectedDecision.ID, "clerk-pass-organizer")
+	confirmRSVPFixture(t, ctx, pool, rejectedDecision.ID)
 	rejectedAttendeeID := attendeeForApplication(t, ctx, pool, rejectedApplicationID)
 	recordLifecycleDecision(t, server.URL, rejectedApplicationID, "clerk-pass-organizer", "rejected", "later rejection")
 	assertPassStatus(t, intakeRequest(t, server.URL, http.MethodPost, "/v1/admin/attendees/"+rejectedAttendeeID+"/passes", "clerk-pass-organizer", nil), http.StatusNotFound)

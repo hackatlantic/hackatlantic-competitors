@@ -44,6 +44,8 @@ PUT    /v1/applications/{applicationId}/draft
 POST   /v1/applications/{applicationId}/submit
 POST   /v1/applications/{applicationId}/withdraw
 GET    /v1/applications/{applicationId}/decision
+GET    /v1/applications/{applicationId}/rsvp
+PUT    /v1/applications/{applicationId}/rsvp
 
 GET    /v1/reviewer/assignments
 GET    /v1/reviewer/applications/{applicationId}

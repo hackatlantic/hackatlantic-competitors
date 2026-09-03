@@ -16,6 +16,18 @@ type passTestService struct {
 	claimCalls int
 }
 
+func TestPassIssuanceRequiresConfirmedRSVPError(t *testing.T) {
+	response := httptest.NewRecorder()
+	writePassError(response, passes.ErrRSVPRequired)
+	var body errorResponse
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusConflict || body.Code != "rsvp_required" {
+		t.Fatalf("unexpected RSVP eligibility error: %d %+v", response.Code, body)
+	}
+}
+
 func (service *passTestService) Issue(context.Context, users.User, string) (passes.Issuance, error) {
 	return passes.Issuance{}, passes.ErrNotFound
 }

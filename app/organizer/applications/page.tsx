@@ -17,6 +17,7 @@ type OrganizerApplicationsPageProps = {
   searchParams: Promise<{
     q?: string;
     status?: string;
+    rsvp?: string;
   }>;
 };
 
@@ -30,6 +31,8 @@ export default async function OrganizerApplicationsPage({
 
   const query = await searchParams;
   const filters: OrganizerApplicationFilters = {
+    ...(query.rsvp === "pending" || query.rsvp === "confirmed" || query.rsvp === "declined"
+      ? { rsvp: query.rsvp } : {}),
     ...(query.q ? { q: query.q } : {}),
     ...(query.status === "submitted" ||
     query.status === "accepted" ||
@@ -84,6 +87,13 @@ export default async function OrganizerApplicationsPage({
         <div><span>Current scope</span><strong className="metric-word">{filters.status ?? "All"}</strong></div>
       </div>
 
+      <div className="rsvp-summary" aria-label="RSVP counts in the displayed results">
+        <span><strong>{applications.items.filter((item) => item.rsvp?.status === "confirmed").length}</strong> confirmed</span>
+        <span><strong>{applications.items.filter((item) => item.rsvp?.status === "pending").length}</strong> awaiting RSVP</span>
+        <span><strong>{applications.items.filter((item) => item.rsvp?.status === "declined").length}</strong> not attending</span>
+        <small>Released acceptances in the displayed results; not check-in totals.</small>
+      </div>
+
       <form className="staff-toolbar" method="get">
         <div className="staff-filter">
           <label htmlFor="application-search">Search applications</label>
@@ -107,6 +117,15 @@ export default async function OrganizerApplicationsPage({
             <option value="accepted">Accepted</option>
             <option value="waitlisted">Waitlisted</option>
             <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div className="staff-filter">
+          <label htmlFor="application-rsvp">RSVP</label>
+          <select defaultValue={filters.rsvp ?? ""} id="application-rsvp" name="rsvp">
+            <option value="">All responses</option>
+            <option value="pending">Awaiting RSVP</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="declined">Not attending</option>
           </select>
         </div>
         <button className="button primary" type="submit">
@@ -133,6 +152,11 @@ export default async function OrganizerApplicationsPage({
                     ? `Submitted ${new Date(application.submittedAt).toLocaleDateString()}`
                     : "Awaiting submission"}
                 </p>
+                {application.rsvp ? (
+                  <p className={`rsvp-status rsvp-${application.rsvp.status}`}>
+                    RSVP: <strong>{application.rsvp.status === "confirmed" ? "Confirmed" : application.rsvp.status === "declined" ? "Not attending" : "Awaiting response"}</strong>
+                  </p>
+                ) : null}
               </div>
               <span className={`status-pill ${application.status}`}>{application.status}</span>
               <Link
