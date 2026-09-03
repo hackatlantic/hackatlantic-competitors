@@ -256,6 +256,8 @@ func writePassError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusForbidden, "forbidden", "The requested pass operation is not permitted.")
 	case errors.Is(err, passes.ErrActivePass):
 		writeError(w, http.StatusConflict, "pass_active", "The attendee already has an active pass.")
+	case errors.Is(err, passes.ErrRSVPRequired):
+		writeError(w, http.StatusConflict, "rsvp_required", "The attendee must confirm their RSVP before a pass can be issued or reissued.")
 	case errors.Is(err, passes.ErrNotFound), errors.Is(err, passes.ErrInvalidID), errors.Is(err, passes.ErrInvalidCred):
 		writeError(w, http.StatusNotFound, "pass_not_found", "Pass not found.")
 	default:

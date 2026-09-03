@@ -74,8 +74,8 @@ export function ApplicantPass() {
       <section className="application-pass" aria-live="polite">
         <h2>Your entry pass</h2>
         <p>
-          We could not find an active entry pass. It may not have been issued yet, or
-          a previous pass may have been revoked.
+          Passes are released by the organizers a few days before the event, after
+          you confirm your RSVP. No active pass is available for your account yet.
         </p>
       </section>
     );

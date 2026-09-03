@@ -21,11 +21,12 @@ import (
 )
 
 var (
-	ErrForbidden   = errors.New("organizer or attendee access is forbidden")
-	ErrNotFound    = errors.New("pass or eligible attendee not found")
-	ErrActivePass  = errors.New("attendee already has an active pass")
-	ErrInvalidID   = errors.New("invalid identifier")
-	ErrInvalidCred = errors.New("invalid credential")
+	ErrForbidden    = errors.New("organizer or attendee access is forbidden")
+	ErrNotFound     = errors.New("pass or eligible attendee not found")
+	ErrActivePass   = errors.New("attendee already has an active pass")
+	ErrRSVPRequired = errors.New("confirmed RSVP required before pass release")
+	ErrInvalidID    = errors.New("invalid identifier")
+	ErrInvalidCred  = errors.New("invalid credential")
 )
 
 const (
@@ -148,7 +149,7 @@ func decodePepper(name, encoded string) ([]byte, error) {
 	return decoded, nil
 }
 
-// Issue creates the only active pass for an accepted, released attendee.
+// Issue is an explicit organizer action for a released, RSVP-confirmed acceptance.
 func (s *Service) Issue(ctx context.Context, actor users.User, attendeeID string) (Issuance, error) {
 	if !actor.HasRole(users.RoleOrganizer) {
 		return Issuance{}, ErrForbidden
@@ -186,6 +187,9 @@ func (s *Service) Issue(ctx context.Context, actor users.User, attendeeID string
 		return Issuance{}, fmt.Errorf("lock accepted attendee: %w", err)
 	}
 	var existingID pgtype.UUID
+	if err := requireConfirmedRSVP(ctx, tx, attendee.id); err != nil {
+		return Issuance{}, err
+	}
 	err = tx.QueryRow(ctx, `SELECT id FROM ats.passes WHERE attendee_id = $1 AND status = 'active' FOR UPDATE`, attendee.id).Scan(&existingID)
 	if err == nil {
 		return Issuance{}, ErrActivePass
@@ -251,6 +255,9 @@ func (s *Service) Reissue(ctx context.Context, actor users.User, passID string) 
 		return Issuance{}, ErrNotFound
 	} else if err != nil {
 		return Issuance{}, fmt.Errorf("lock accepted attendee: %w", err)
+	}
+	if err := requireConfirmedRSVP(ctx, tx, attendeeID); err != nil {
+		return Issuance{}, err
 	}
 	current, err := lockActivePass(ctx, tx, passUUID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -506,6 +513,28 @@ func passAttendeeID(ctx context.Context, tx pgx.Tx, passID pgtype.UUID) (pgtype.
 	var attendeeID pgtype.UUID
 	err := tx.QueryRow(ctx, `SELECT attendee_id FROM ats.passes WHERE id = $1`, passID).Scan(&attendeeID)
 	return attendeeID, err
+}
+
+// Call only after locking the attendee and application. RSVP changes use the
+// same application lock; this separate read sees changes committed while waiting.
+func requireConfirmedRSVP(ctx context.Context, tx pgx.Tx, attendeeID pgtype.UUID) error {
+	var confirmed bool
+	err := tx.QueryRow(ctx, `SELECT EXISTS (
+      SELECT 1 FROM ats.attendees attendee
+      JOIN ats.applications application ON application.id = attendee.application_id
+      JOIN ats.decisions decision ON decision.id = application.current_decision_id
+        AND decision.application_id = application.id
+      JOIN ats.attendance_responses response ON response.decision_id = decision.id
+      WHERE attendee.id = $1 AND decision.outcome = 'accepted'
+        AND decision.released_at IS NOT NULL AND response.status = 'confirmed'
+    )`, attendeeID).Scan(&confirmed)
+	if err != nil {
+		return fmt.Errorf("check pass RSVP eligibility: %w", err)
+	}
+	if !confirmed {
+		return ErrRSVPRequired
+	}
+	return nil
 }
 
 func lockActivePass(ctx context.Context, tx pgx.Tx, passID pgtype.UUID) (lockedPass, error) {

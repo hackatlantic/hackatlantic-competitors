@@ -70,6 +70,7 @@ type Dependencies struct {
 	Applications     applicationIntakeService
 	Reviews          reviewWorkflowService
 	Decisions        decisionLifecycleService
+	RSVPs            rsvpService
 	Passes           passLifecycleService
 	Checkpoints      checkpointService
 	Redemptions      redemptionService
@@ -182,6 +183,8 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	mux.HandleFunc("PUT /v1/applications/{applicationId}/resume", uploadApplicationResumeHandler(dependencies))
 	mux.HandleFunc("GET /v1/applications/{applicationId}/resume", getApplicantResumeHandler(dependencies))
 	mux.HandleFunc("GET /v1/applications/{applicationId}/decision", getApplicantDecisionHandler(dependencies))
+	mux.HandleFunc("GET /v1/applications/{applicationId}/rsvp", applicantRSVPHandler(dependencies))
+	mux.HandleFunc("PUT /v1/applications/{applicationId}/rsvp", applicantRSVPHandler(dependencies))
 	mux.HandleFunc("GET /v1/admin/applications", listOrganizerApplicationsHandler(dependencies))
 	mux.HandleFunc("GET /v1/admin/applications/{applicationId}", getOrganizerApplicationHandler(dependencies))
 	mux.HandleFunc("GET /v1/admin/applications/{applicationId}/resume", getAdminResumeHandler(dependencies))

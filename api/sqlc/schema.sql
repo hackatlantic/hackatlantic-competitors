@@ -168,6 +168,14 @@ CREATE UNIQUE INDEX passes_one_active_per_attendee_idx
 CREATE INDEX passes_attendee_issued_at_idx
     ON ats.passes (attendee_id, issued_at DESC);
 
+CREATE TABLE ats.attendance_responses (
+    decision_id uuid PRIMARY KEY REFERENCES ats.decisions(id),
+    status text NOT NULL CHECK (status IN ('confirmed', 'declined')),
+    lock_version integer NOT NULL DEFAULT 1 CHECK (lock_version > 0),
+    responded_by uuid NOT NULL REFERENCES ats.users(id),
+    responded_at timestamptz NOT NULL DEFAULT now()
+);
+
 CREATE TABLE ats.audit_events (
     id uuid PRIMARY KEY,
     actor_user_id uuid REFERENCES ats.users(id),

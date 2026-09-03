@@ -82,6 +82,14 @@ type AtsApplicationResume struct {
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
+type AtsAttendanceResponse struct {
+	DecisionID  pgtype.UUID        `json:"decision_id"`
+	Status      string             `json:"status"`
+	LockVersion int32              `json:"lock_version"`
+	RespondedBy pgtype.UUID        `json:"responded_by"`
+	RespondedAt pgtype.Timestamptz `json:"responded_at"`
+}
+
 type AtsAttendee struct {
 	ID            pgtype.UUID        `json:"id"`
 	CycleID       pgtype.UUID        `json:"cycle_id"`

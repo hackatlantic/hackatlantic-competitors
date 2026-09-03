@@ -12,7 +12,8 @@ Clerk account
   -> admin review workflow
   -> accepted | waitlisted | rejected
   -> accepted application becomes attendee
-  -> attendee pass issued
+  -> acceptance released and applicant confirms RSVP
+  -> admin releases attendee pass a few days before the event
   -> event and meal redemptions
 ```
 
@@ -30,6 +31,7 @@ last event redemption.
 - Submits before the configured deadline.
 - Sees submission state and released decisions.
 - Uses the same account to view an attendee pass after acceptance.
+- Confirms or declines attendance after the current acceptance is released.
 
 ### Admin
 
@@ -118,8 +120,69 @@ Releasing that decision is a separate atomic action that:
 2. enqueues the appropriate decision email in the transactional outbox;
 3. writes an audit event.
 
-Pass issuance can occur in the same workflow or a later operation, but retries
-must not create duplicate attendees or passes.
+Pass issuance is a later, explicit admin operation after the applicant confirms
+their RSVP, normally a few days before the event. Recording or releasing an
+acceptance must not issue a pass. Retries must not create duplicate attendees or
+passes.
+
+## Attendance RSVP
+
+RSVP measures attendance intention, not admission or actual arrival. The applicant
+dashboard offers **Confirm attendance** and **I can't attend** only after the
+current acceptance is released. Applicants can change their response; declining
+requires a confirmation step. Existing released acceptances start as pending.
+
+Admins see confirmed, awaiting-RSVP, and not-attending counts in the application
+queue, can filter by response, and can inspect the response timestamp in detail.
+Counts describe the displayed results, not all cycles or scanned attendees.
+
+The intended operational sequence is **acceptance released → RSVP confirmed →
+admin releases the pass a few days before the event → attendee checks in**.
+Confirmation never issues a pass or queues a pass email automatically. Admins
+choose when to use the existing per-attendee **Issue pass** action; there is no
+scheduled or bulk release job in this version. The pass-link email is queued only
+by that explicit issuance action.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: Current acceptance released
+    Pending --> Confirmed: Applicant confirms
+    Pending --> Declined: Applicant declines
+    Confirmed --> Declined: Applicant changes response
+    Declined --> Confirmed: Applicant changes response
+```
+
+Persistence and safety:
+
+- `ats.attendance_responses` stores one response per decision; no row means
+  pending. An acceptance replacement begins pending, retaining older history.
+- Only the owning applicant can write. Unreleased decisions, other applicants,
+  and non-accepted applications return 404; scanner-only access returns 403.
+- Writes take the same application-row lock as decision recording, then re-read
+  eligibility and response state. A changed admission cannot race past RSVP.
+- `decisionId` plus `lockVersion` protects stale tabs. Repeating the current
+  choice is idempotent; an opposing stale choice returns 409. Actual changes and
+  `attendance.rsvp_changed` audit events commit in one transaction.
+- The Supabase Data API roles receive no table access. The runtime role can
+  read/insert/update responses but cannot delete them.
+- Pass issue and reissue require a confirmed RSVP for the current released
+  acceptance. A pending/declined response returns `409 rsvp_required`. The check
+  occurs after acquiring the application lock, preventing a concurrent decline
+  from being ignored by a waiting issuer. The admin controls also disable release
+  until confirmation; the backend is authoritative if the admin page is stale.
+
+This first version does **not** add deadlines, reminder emails, automatic waitlist
+promotion, automatic pass revocation, or a new RSVP check inside scanning. An RSVP
+does not guarantee someone will show up; the redemption ledger remains the record
+of actual check-in. Any capacity-release policy requires a separate product decision.
+Already-issued passes are not silently invalidated when someone changes their RSVP;
+admins retain the existing explicit revoke action, even for a declined RSVP.
+
+Deployment requires migration `000014_attendee_rsvp.sql` before the new API, then
+the frontend. The migration is additive; rolling back application code leaves
+responses intact. Do not edit an already-applied migration or drop the table to
+roll back code. Before promotion, run component/API tests and the disposable
+database integration suite, including `TestRSVPLifecycleAuthorizationConcurrencyAndDecisionChanges`.
 
 ## Email lifecycle
 

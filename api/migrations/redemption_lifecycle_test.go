@@ -98,16 +98,19 @@ func TestScannerRedemptionsAreAtomicIdempotentAndMinimal(t *testing.T) {
 
 	mainDecision := recordLifecycleDecision(t, server.URL, applicationID, "clerk-redemption-organizer", "accepted", "accepted for scanning")
 	releaseLifecycleDecision(t, server.URL, mainDecision.ID, "clerk-redemption-organizer")
+	confirmRSVPFixture(t, ctx, pool, mainDecision.ID)
 	mainAttendeeID := attendeeForApplication(t, ctx, pool, applicationID)
 	mainPass := issueRedemptionPass(t, server.URL, mainAttendeeID)
 
 	revokedDecision := recordLifecycleDecision(t, server.URL, revokedApplicationID, "clerk-redemption-organizer", "accepted", "accepted then revoked")
 	releaseLifecycleDecision(t, server.URL, revokedDecision.ID, "clerk-redemption-organizer")
+	confirmRSVPFixture(t, ctx, pool, revokedDecision.ID)
 	revokedPass := issueRedemptionPass(t, server.URL, attendeeForApplication(t, ctx, pool, revokedApplicationID))
 	assertPassStatus(t, intakeRequest(t, server.URL, http.MethodPost, "/v1/admin/passes/"+revokedPass.ID+"/revoke", "clerk-redemption-organizer", nil), http.StatusOK)
 
 	concurrentDecision := recordLifecycleDecision(t, server.URL, concurrentApplicationID, "clerk-redemption-organizer", "accepted", "accepted for atomic scan")
 	releaseLifecycleDecision(t, server.URL, concurrentDecision.ID, "clerk-redemption-organizer")
+	confirmRSVPFixture(t, ctx, pool, concurrentDecision.ID)
 	concurrentPass := issueRedemptionPass(t, server.URL, attendeeForApplication(t, ctx, pool, concurrentApplicationID))
 
 	defaultCheckpointID := insertRedemptionCheckpoint(t, ctx, pool, cycleID, "entry", "Main entrance", true, 2, true, nil, nil)
@@ -345,6 +348,15 @@ func TestDistinctPassRedemptionsSustainTwentyConcurrentScanners(t *testing.T) {
 			fmt.Sprintf("Load attendee %03d", index), clerkID+"@example.test").Scan(&attendeeID); err != nil {
 			t.Fatalf("create load attendee %d: %v", index, err)
 		}
+		var decisionID string
+		if err := pool.QueryRow(ctx, `INSERT INTO ats.decisions (application_id, outcome, decided_by, released_at, released_by)
+            VALUES ($1, 'accepted', $2, CURRENT_TIMESTAMP, $2) RETURNING id::text`, applicationID, organizerID).Scan(&decisionID); err != nil {
+			t.Fatalf("create load acceptance %d: %v", index, err)
+		}
+		if _, err := pool.Exec(ctx, `UPDATE ats.applications SET current_decision_id = $2 WHERE id = $1`, applicationID, decisionID); err != nil {
+			t.Fatal(err)
+		}
+		confirmRSVPFixture(t, ctx, pool, decisionID)
 		issued[index], err = passService.Issue(ctx, organizer, attendeeID)
 		if err != nil {
 			t.Fatalf("issue load pass %d: %v", index, err)
