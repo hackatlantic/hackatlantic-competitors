@@ -11,7 +11,9 @@ Test harness and evidence are in PR #109. The user approved a temporary exact
 Execution and cleanup are complete. **Not all acceptance criteria passed:**
 the HTTP contention test failed, the current production form was not exercised,
 and fault detection plus restoration exceeded the proposed five-minute target.
-PR #109 remains a draft; these results do not authorize a production deployment.
+PR #109 contains the testing tools and archived evidence. Finalizing and merging
+it does not mean every acceptance criterion passed or authorize production
+promotion.
 
 ## Verification completed
 
@@ -184,8 +186,8 @@ incident-notification delivery claim follows from this test.
   collector. Normal telemetry ingestion and existing alerts were not disabled.
 - Fixture jobs cleaned up temporary scanner access/admin allowlist changes.
   Synthetic benchmark records remain in staging; this was not a database purge.
-- PR #109 stays a draft. Staging form alignment and applicant reruns were later
-  approved and are reported in the follow-up. A narrowly scoped investigation
+- Staging form alignment and applicant reruns were later approved and are
+  reported in the follow-up. A narrowly scoped investigation
   of the failed hot-pass HTTP test remains separate; passing everyday scanner
   results do not conceal that failure.
 

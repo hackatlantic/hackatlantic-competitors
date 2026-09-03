@@ -137,5 +137,6 @@ one `apps-s-1vcpu-0.5gb` instance in `tor`. PDF SHA-256:
   production, and no test-record purge was performed.
 - No temporary Grafana reader was created for this follow-up. Normal ingestion
   and alerts were not changed.
-- **PR #109 remains draft and unmerged.** Publication of this sanitized evidence
-  is approved; production deployment is not part of this follow-up.
+- PR #109 was draft and unmerged when this follow-up was published. Its later
+  finalization merges the testing tools and sanitized reports, not a claim that
+  every campaign target passed. Production promotion requires separate approval.
