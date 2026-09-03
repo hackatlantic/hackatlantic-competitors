@@ -441,6 +441,7 @@ textarea:focus-visible {
 .submitted-confirmation,
 .application-decision,
 .application-pass,
+.application-resume-summary,
 .form-intro,
 .resume-summary,
 .decision-current,
@@ -560,6 +561,18 @@ textarea:focus-visible {
   color: var(--brand-navy);
   background: var(--brand-white);
   box-shadow: none;
+}
+
+.application-resume-summary p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.application-resume-summary strong {
+  color: var(--brand-navy);
 }
 
 .question-field input:not([type="radio"]):not([type="checkbox"]):not([type="file"]),

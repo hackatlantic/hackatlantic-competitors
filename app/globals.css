@@ -801,6 +801,7 @@ textarea:focus-visible {
 
 .application-decision,
 .application-pass,
+.application-resume-summary,
 .pass-current,
 .pass-action-confirmation,
 .pass-issuance-confirmation,
@@ -814,6 +815,7 @@ textarea:focus-visible {
 
 .application-decision h2,
 .application-pass h2,
+.application-resume-summary h2,
 .pass-current h3,
 .pass-issuance-confirmation h3,
 .decision-current h3 {
@@ -2619,6 +2621,7 @@ textarea:focus-visible {
 .submitted-confirmation,
 .application-decision,
 .application-pass,
+.application-resume-summary,
 .application-form {
   margin-left: clamp(1rem, 4vw, 3.5rem);
   margin-right: clamp(1rem, 4vw, 3.5rem);
@@ -2904,6 +2907,7 @@ textarea:focus-visible {
 
 .application-identity,
 .resume-summary,
+.application-resume-summary,
 .application-notice,
 .submitted-confirmation,
 .decision-current,

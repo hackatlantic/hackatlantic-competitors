@@ -570,9 +570,12 @@ export function ApplicantDashboard() {
             state={decisionState}
           />
           {resume ? (
-            <p className="resume-summary">
-              Resume attached: <strong>{resume.originalFilename}</strong>
-            </p>
+            <section className="application-resume-summary" aria-labelledby="resume-summary-heading">
+              <h2 id="resume-summary-heading">Resume</h2>
+              <p>
+                Attached file: <strong>{resume.originalFilename}</strong>
+              </p>
+            </section>
           ) : null}
           {decisionState === "ready" && decision?.outcome === "accepted" ? (
             <>

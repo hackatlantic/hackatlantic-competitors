@@ -179,4 +179,34 @@ describe("ApplicantDashboard", () => {
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "instant", block: "center" }));
     expect(document.activeElement).toBe(screen.getByLabelText(/Name/));
   });
+
+  it("renders an attached resume as an aligned application summary card", async () => {
+    api.getMyApplications.mockResolvedValueOnce({
+      items: [{
+        id: "application-1",
+        cycleId: "cycle-1",
+        formId: "form-1",
+        formVersion: 2,
+        status: "submitted",
+        lockVersion: 1,
+        answers: {},
+        submittedAt: "2026-09-01T14:09:00Z",
+        createdAt: "2026-09-01T12:00:00Z",
+        updatedAt: "2026-09-01T14:09:00Z",
+      }],
+      nextCursor: null,
+    });
+    api.getApplicationResume.mockResolvedValueOnce({
+      originalFilename: "AdebowaleAdebayo2026-08-24.pdf",
+      byteSize: 1024,
+      uploadedAt: "2026-08-24T12:00:00Z",
+    });
+
+    render(<ApplicantDashboard />);
+
+    const heading = await screen.findByRole("heading", { name: "Resume" });
+    const summary = heading.closest(".application-resume-summary");
+    expect(summary).toBeTruthy();
+    expect(summary?.textContent).toContain("Attached file: AdebowaleAdebayo2026-08-24.pdf");
+  });
 });
