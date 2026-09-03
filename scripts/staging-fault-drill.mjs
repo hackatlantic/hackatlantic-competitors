@@ -66,7 +66,12 @@ export async function runDrill(phase) {
   const report = read(reportPath);
   if (phase === "detect") {
     const limit = Date.now() + 12 * 60 * 1000;
+    report.readinessSamples = 0;
+    report.unhealthySamples = 0;
     while (Date.now() < limit) {
+      report.readinessSamples++;
+      try { if ((await publicJSON("/readyz")).status !== "ready") report.unhealthySamples++; }
+      catch { report.unhealthySamples++; }
       const deployments = (await cloud(`/${state.appID}/deployments?per_page=20`)).deployments;
       const candidate = deployments.find((deployment) => deployment.id !== state.originalID && apiService(deployment.spec)?.health_check?.http_path === FAULT_PATH && Date.parse(deployment.created_at) >= Date.parse(state.injectedAt) - 5000);
       if (candidate) {
@@ -84,6 +89,7 @@ export async function runDrill(phase) {
           return;
         }
       }
+      save(reportPath, report);
       await sleep();
     }
     throw new Error("Timed out waiting for candidate health-check rejection");

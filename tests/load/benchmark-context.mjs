@@ -17,11 +17,13 @@ const service = app.active_deployment.spec.services.find((service) => service.na
 const deployment = { gitSha: version.gitSha, digest: service.image.digest, instanceSize: service.instance_size_slug, instanceCount: service.instance_count, region: app.region?.slug ?? app.spec.region };
 const path = ".tmp/benchmark-context.json";
 if (process.argv[2] === "start") {
+  const fixture = JSON.parse(readFileSync(process.env.K6_FIXTURE_PATH, "utf8"));
   writeFileSync(path, JSON.stringify({
     startedAt: new Date().toISOString(), deployment, testCommit: process.env.GITHUB_SHA,
     runID: process.env.GITHUB_RUN_ID, repetition: process.env.K6_REPETITION,
     runner: "GitHub-hosted ubuntu-24.04; physical region not controlled",
     profile: process.env.K6_SCANNER_PROFILE ?? process.env.K6_APPLICANT_PROFILE,
+    form: { id: fixture.form.id, version: fixture.form.version, resumeRequired: fixture.form.resumeRequired, questionCount: fixture.form.questions.length },
     resumeBytes: RESUME_BYTES, resumeSHA256: createHash("sha256").update(fixedResume()).digest("hex"),
   }, null, 2) + "\n");
 } else if (process.argv[2] === "finish") {
