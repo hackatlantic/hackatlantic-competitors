@@ -509,7 +509,7 @@ export function ApplicantDashboard() {
 
   return (
     <section
-      className="application-panel"
+      className={`application-panel${submitted ? " application-panel-submitted" : ""}`}
       aria-labelledby="application-heading"
     >
       <div className="application-progress" aria-label="Application progress">
@@ -522,13 +522,13 @@ export function ApplicantDashboard() {
         <h1 id="application-heading">Your application</h1>
       </div>
 
-      <p className="application-summary">
-        {submitted
-          ? "Your submitted application is no longer editable."
-          : currentForm
+      {!submitted ? (
+        <p className="application-summary">
+          {currentForm
             ? "Your answers are only visible to you until you submit this application."
             : "This draft can no longer be changed or submitted because the application window is closed."}
-      </p>
+        </p>
+      ) : null}
 
       <AnimatePresence initial={false}>
         {notice ? (
@@ -548,40 +548,38 @@ export function ApplicantDashboard() {
 
       {submitted ? (
         <>
-          <motion.div
-            className="submitted-confirmation"
-            aria-live="polite"
-            initial={reducedMotion ? false : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={feedbackTransition}
-          >
-            <h2>Application submitted</h2>
-            {application.submittedAt ? (
-              <p>
-                Submitted <time dateTime={application.submittedAt}>{displayTimestamp(application.submittedAt)}</time>.
-              </p>
-            ) : (
-              <p>Your application was submitted successfully.</p>
-            )}
-          </motion.div>
-          <ApplicantDecisionStatus
-            decision={decision}
-            onRetry={() => void loadReleasedDecision(application.id)}
-            state={decisionState}
-          />
-          {resume ? (
-            <section className="application-resume-summary" aria-labelledby="resume-summary-heading">
-              <h2 id="resume-summary-heading">Resume</h2>
-              <p>
-                Attached file: <strong>{resume.originalFilename}</strong>
-              </p>
-            </section>
-          ) : null}
+          <div className="application-overview" aria-label="Application overview">
+            <motion.section
+              className="submitted-confirmation"
+              aria-live="polite"
+              initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={feedbackTransition}
+            >
+              <h2>Application</h2>
+              <p className="overview-status">Submitted</p>
+              {application.submittedAt ? (
+                <time dateTime={application.submittedAt}>{displayTimestamp(application.submittedAt)}</time>
+              ) : null}
+            </motion.section>
+            <ApplicantDecisionStatus
+              decision={decision}
+              onRetry={() => void loadReleasedDecision(application.id)}
+              state={decisionState}
+            />
+            {resume ? (
+              <section className="application-resume-summary" aria-labelledby="resume-summary-heading">
+                <h2 id="resume-summary-heading">Resume</h2>
+                <p><strong>{resume.originalFilename}</strong></p>
+                <span>Attached</span>
+              </section>
+            ) : null}
+          </div>
           {decisionState === "ready" && decision?.outcome === "accepted" ? (
-            <>
+            <div className="attendance-overview">
               <ApplicantRSVP key={`${application.id}-${decision.releasedAt}`} applicationId={application.id} />
               <ApplicantPass />
-            </>
+            </div>
           ) : null}
         </>
       ) : currentForm ? (

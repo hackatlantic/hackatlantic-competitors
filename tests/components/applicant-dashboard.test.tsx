@@ -207,6 +207,8 @@ describe("ApplicantDashboard", () => {
     const heading = await screen.findByRole("heading", { name: "Resume" });
     const summary = heading.closest(".application-resume-summary");
     expect(summary).toBeTruthy();
-    expect(summary?.textContent).toContain("Attached file: AdebowaleAdebayo2026-08-24.pdf");
+    expect(summary?.textContent).toContain("AdebowaleAdebayo2026-08-24.pdf");
+    expect(summary?.textContent).toContain("Attached");
+    expect(heading.closest(".application-overview")).toBeTruthy();
   });
 });

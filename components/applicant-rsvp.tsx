@@ -62,7 +62,7 @@ export function ApplicantRSVP({ applicationId }: { applicationId: string }) {
       if (sequence !== requestSequence.current) return;
       setResponse(saved);
       setDeclining(false);
-      setNotice(status === "confirmed" ? "You’re confirmed! We look forward to seeing you." : "Your RSVP is saved: you won’t be attending.");
+      setNotice("RSVP updated.");
     } catch (cause) {
       if (sequence !== requestSequence.current) return;
       if (cause instanceof ApiError && (cause.status === 409 || cause.status === 404)) {
@@ -80,27 +80,36 @@ export function ApplicantRSVP({ applicationId }: { applicationId: string }) {
 
   return (
     <section className="application-rsvp" aria-labelledby="rsvp-heading" aria-busy={loading || saving}>
-      <h2 id="rsvp-heading">Will you join us?</h2>
-      <p>Let us know whether you’ll attend Hack Atlantic so we can plan for everyone.</p>
+      <div className="event-card-heading">
+        <span className="event-card-kicker">Event</span>
+        <h2 id="rsvp-heading">Attendance</h2>
+      </div>
       {loading ? <p role="status">Loading your RSVP…</p> : null}
       {!loading && response ? (
         <>
           <p className={`rsvp-status rsvp-${response.status}`}>
-            RSVP: <strong>{response.status === "confirmed" ? "Confirmed" : response.status === "declined" ? "Not attending" : "Awaiting your response"}</strong>
+            <span>RSVP status</span>
+            <strong>{response.status === "confirmed" ? "Confirmed" : response.status === "declined" ? "Not attending" : "Response needed"}</strong>
           </p>
-          <p className="rsvp-help">Confirm your RSVP to be eligible for an entry pass. Organizers will release passes separately a few days before the event. You can change your response here.</p>
+          <p className="rsvp-help">
+            {response.status === "confirmed"
+              ? "You’re on the attendee list. Update your response here if your plans change."
+              : response.status === "declined"
+                ? "We’ve recorded that you can’t attend. You can confirm again if your plans change."
+                : "Confirm attendance before entry passes are released."}
+          </p>
           {declining ? (
             <div className="rsvp-confirmation" role="group" aria-label="Confirm you will not attend">
-              <p>Let the organizers know you won’t be attending?</p>
+              <p>Change your RSVP to not attending?</p>
               <div className="rsvp-actions">
-                <ApplicationButton className="button secondary" disabled={saving} onClick={() => void respond("declined")} type="button">{saving ? "Saving…" : "Yes, I can’t attend"}</ApplicationButton>
-                <ApplicationButton className="button secondary" disabled={saving} onClick={() => setDeclining(false)} type="button">Keep my current response</ApplicationButton>
+                <ApplicationButton className="button secondary" disabled={saving} onClick={() => void respond("declined")} type="button">{saving ? "Saving…" : "Confirm change"}</ApplicationButton>
+                <ApplicationButton className="button secondary" disabled={saving} onClick={() => setDeclining(false)} type="button">Cancel</ApplicationButton>
               </div>
             </div>
           ) : (
             <div className="rsvp-actions">
-              <ApplicationButton className="button primary" disabled={saving || response.status === "confirmed"} onClick={() => void respond("confirmed")} type="button">{saving ? "Saving…" : response.status === "confirmed" ? "Attendance confirmed" : "Confirm attendance"}</ApplicationButton>
-              <ApplicationButton className="button secondary" disabled={saving || response.status === "declined"} onClick={() => setDeclining(true)} type="button">I can’t attend</ApplicationButton>
+              <ApplicationButton className="button primary" disabled={saving || response.status === "confirmed"} onClick={() => void respond("confirmed")} type="button">{saving ? "Saving…" : response.status === "confirmed" ? "Confirmed" : "Confirm attendance"}</ApplicationButton>
+              <ApplicationButton className="button secondary" disabled={saving || response.status === "declined"} onClick={() => setDeclining(true)} type="button">Can’t attend</ApplicationButton>
             </div>
           )}
         </>

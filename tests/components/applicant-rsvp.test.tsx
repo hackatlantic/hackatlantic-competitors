@@ -21,20 +21,20 @@ describe("ApplicantRSVP", () => {
   it("loads an existing response and confirms using its decision and version", async () => {
     render(<ApplicantRSVP applicationId="application" />);
     fireEvent.click(await screen.findByRole("button", { name: "Confirm attendance" }));
-    await screen.findByText("You’re confirmed! We look forward to seeing you.");
+    await screen.findByText("RSVP updated.");
     expect(api.respondToRSVP).toHaveBeenCalledWith("application", { decisionId: "acceptance", lockVersion: 0, status: "confirmed" });
-    expect((screen.getByRole("button", { name: "Attendance confirmed" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Confirmed" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("requires confirmation before declining and allows cancellation", async () => {
     render(<ApplicantRSVP applicationId="application" />);
-    fireEvent.click(await screen.findByRole("button", { name: "I can’t attend" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Can’t attend" }));
     expect(api.respondToRSVP).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Keep my current response" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(api.respondToRSVP).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "I can’t attend" }));
-    fireEvent.click(screen.getByRole("button", { name: "Yes, I can’t attend" }));
-    await screen.findByText("Your RSVP is saved: you won’t be attending.");
+    fireEvent.click(screen.getByRole("button", { name: "Can’t attend" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm change" }));
+    await screen.findByText("RSVP updated.");
     expect(api.respondToRSVP).toHaveBeenCalledWith("application", expect.objectContaining({ status: "declined" }));
   });
 
@@ -52,9 +52,9 @@ describe("ApplicantRSVP", () => {
     const button = await screen.findByRole("button", { name: "Confirm attendance" });
     fireEvent.click(button); fireEvent.click(button);
     expect(api.respondToRSVP).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("You’re confirmed! We look forward to seeing you.")).toBeNull();
+    expect(screen.queryByText("RSVP updated.")).toBeNull();
     await act(async () => complete({ ...pending, status: "confirmed", lockVersion: 1 }));
-    expect(screen.getByText("You’re confirmed! We look forward to seeing you.")).not.toBeNull();
+    expect(screen.getByText("RSVP updated.")).not.toBeNull();
   });
 
   it("shows a failed save and permits a safe retry", async () => {
@@ -63,7 +63,7 @@ describe("ApplicantRSVP", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Confirm attendance" }));
     expect((await screen.findByRole("alert")).textContent).toContain("couldn’t confirm");
     fireEvent.click(screen.getByRole("button", { name: "Confirm attendance" }));
-    await screen.findByText("You’re confirmed! We look forward to seeing you.");
+    await screen.findByText("RSVP updated.");
   });
 
   it("requires reloading after a version conflict instead of overwriting it", async () => {
