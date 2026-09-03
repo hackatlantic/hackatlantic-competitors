@@ -63,8 +63,11 @@ export function ApplicantPass() {
   if (state === "loading") {
     return (
       <section className="application-pass" aria-busy="true" aria-live="polite">
-        <h2>Your entry pass</h2>
-        <p>Checking whether your pass is available…</p>
+        <div className="event-card-heading">
+          <span className="event-card-kicker">Access</span>
+          <h2>Entry pass</h2>
+        </div>
+        <p>Checking pass status…</p>
       </section>
     );
   }
@@ -72,11 +75,11 @@ export function ApplicantPass() {
   if (state === "unavailable") {
     return (
       <section className="application-pass" aria-live="polite">
-        <h2>Your entry pass</h2>
-        <p>
-          Passes are released by the organizers a few days before the event, after
-          you confirm your RSVP. No active pass is available for your account yet.
-        </p>
+        <div className="event-card-heading">
+          <span className="event-card-kicker">Access</span>
+          <h2>Entry pass</h2>
+        </div>
+        <p><strong>Not issued yet.</strong> Passes are released shortly before the event.</p>
       </section>
     );
   }
@@ -84,9 +87,12 @@ export function ApplicantPass() {
   if (state === "error" || !pass) {
     return (
       <section className="application-pass" aria-live="polite">
-        <h2>Entry pass unavailable</h2>
+        <div className="event-card-heading">
+          <span className="event-card-kicker">Access</span>
+          <h2>Entry pass</h2>
+        </div>
         <p className="error-message" role="alert">
-          We could not load your entry pass. Your application and decision are unchanged.
+          We couldn’t load your pass. Try again.
         </p>
         <button className="button secondary" onClick={retryPass} type="button">
           Try again
@@ -98,9 +104,12 @@ export function ApplicantPass() {
 
   return (
     <section className="application-pass" aria-live="polite">
-      <h2>Your entry pass</h2>
+      <div className="event-card-heading">
+        <span className="event-card-kicker">Access</span>
+        <h2>Entry pass</h2>
+      </div>
       <p>
-        <strong>Active.</strong> Your HackAtlantic entry pass was issued{" "}
+        <strong>Issued.</strong>{" "}
         <time dateTime={pass.issuedAt}>{displayTimestamp(pass.issuedAt)}</time>.
       </p>
       <div className="attendee-pass-qr">

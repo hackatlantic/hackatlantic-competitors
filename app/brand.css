@@ -1088,29 +1088,201 @@ input[type="checkbox"] {
   }
 }
 
-.application-rsvp {
-  background: var(--brand-white);
-  border: 1px solid var(--brand-line);
-  border-left: 4px solid var(--brand-teal-dark);
-  border-radius: var(--radius);
-  margin-block: 24px;
-  padding: clamp(20px, 4vw, 32px);
-  text-align: left;
+.application-panel-submitted .application-heading {
+  margin-top: clamp(2rem, 5vw, 3.75rem);
+  margin-bottom: 0;
+  padding-bottom: clamp(1rem, 2.5vw, 1.6rem);
 }
 
-.application-rsvp h2 { margin-top: 0; }
-.application-rsvp p { line-height: 1.6; }
-.rsvp-help { color: var(--brand-muted); }
-.rsvp-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
-.rsvp-actions .button { min-height: 48px; white-space: normal; }
-.rsvp-confirmation { border-top: 1px solid var(--brand-line); margin-top: 20px; }
-.rsvp-status { color: var(--brand-navy); }
+.application-panel-submitted h1 {
+  max-width: none;
+  font-size: clamp(3.25rem, 6vw, 5.25rem);
+}
+
+.application-overview,
+.attendance-overview {
+  margin-left: clamp(1rem, 4vw, 3.5rem);
+  margin-right: clamp(1rem, 4vw, 3.5rem);
+}
+
+.application-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.application-overview > :is(.submitted-confirmation, .application-decision, .application-resume-summary) {
+  min-width: 0;
+  min-height: 142px;
+  margin: 0;
+  padding: 20px;
+  background: var(--brand-white);
+}
+
+.application-overview h2 {
+  margin: 0 0 18px;
+  color: var(--brand-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.application-overview .overview-status,
+.application-overview .application-resume-summary p {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.application-overview time,
+.application-overview .application-resume-summary > span {
+  display: block;
+  color: var(--brand-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.attendance-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+  align-items: stretch;
+  gap: 16px;
+  margin-top: 32px;
+  margin-bottom: 40px;
+}
+
+.application-rsvp,
+.attendance-overview .application-pass {
+  min-width: 0;
+  min-height: 100%;
+  margin: 0;
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--radius);
+  text-align: left;
+  background: var(--brand-white);
+}
+
+.application-rsvp {
+  border-left: 4px solid var(--brand-teal-dark);
+}
+
+.attendance-overview .application-pass {
+  background: #edf7f5;
+}
+
+.event-card-heading {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 22px;
+}
+
+.event-card-heading h2 {
+  margin: 0;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+  line-height: 1;
+}
+
+.event-card-kicker {
+  color: var(--brand-teal-dark);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.application-rsvp p,
+.attendance-overview .application-pass p {
+  line-height: 1.5;
+}
+
+.rsvp-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--brand-line);
+  border-radius: 10px;
+  color: var(--brand-muted);
+  background: #f7fbfa;
+  font-size: 0.8rem;
+}
+
+.rsvp-status strong {
+  color: var(--brand-navy);
+  font-size: 0.88rem;
+}
+
+.rsvp-help {
+  max-width: 55ch;
+  margin: 18px 0 0;
+  color: var(--brand-muted);
+}
+
+.rsvp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.rsvp-actions .button {
+  min-height: 44px;
+  white-space: normal;
+}
+
+.rsvp-confirmation {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--brand-line);
+}
+
 .rsvp-confirmed strong { color: #08614e; }
 .rsvp-declined strong { color: #8c3827; }
 .rsvp-summary { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 20px 24px; }
 .rsvp-summary small { flex-basis: 100%; color: var(--brand-muted); }
 
+@media (max-width: 850px) {
+  .application-overview,
+  .attendance-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .application-overview > :is(.submitted-confirmation, .application-decision, .application-resume-summary) {
+    min-height: auto;
+  }
+}
+
 @media (max-width: 600px) {
+  .application-panel-submitted h1 {
+    font-size: clamp(3rem, 15vw, 4rem);
+  }
+
+  .application-overview,
+  .attendance-overview {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .rsvp-status {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
   .rsvp-actions { flex-direction: column; }
   .rsvp-actions .button { width: 100%; }
 }
