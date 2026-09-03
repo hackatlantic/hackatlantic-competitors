@@ -4,9 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: Type ROLLBACK STAGING to temporarily activate the previous staging deployment
+        description: Type ROLLBACK STAGING to authorize the selected staging-only recovery drill
         required: true
         type: string
+      mode:
+        description: Healthy-release rollback or deliberate unhealthy candidate rejection
+        required: true
+        default: previous-release
+        type: choice
+        options: [previous-release, unhealthy-candidate]
 
 permissions:
   contents: read
@@ -18,7 +24,7 @@ concurrency:
 jobs:
   drill:
     name: Roll back and restore staging
-    if: inputs.confirmation == 'ROLLBACK STAGING'
+    if: inputs.confirmation == 'ROLLBACK STAGING' && inputs.mode != 'unhealthy-candidate'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment:
@@ -99,3 +105,70 @@ jobs:
             echo "- Readiness after restoration: passed"
             echo "- Rollback activation time: ${rollback_seconds}s"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  unhealthy:
+    name: Reject unhealthy staging candidate and restore configuration
+    if: inputs.confirmation == 'ROLLBACK STAGING' && inputs.mode == 'unhealthy-candidate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment: staging
+    outputs:
+      candidate_healthy: ${{ steps.result.outputs.candidate_healthy }}
+    env:
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+      API_BASE_URL: https://hackatlantic-api-staging-5c4l8.ondigitalocean.app
+      DRILL_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22 }
+      - name: Verify fault scope and release dependency gate
+        run: node --test tests/load/rollback-contract.test.mjs
+      - name: Submit a candidate with one invalid readiness path
+        run: node scripts/staging-fault-drill.mjs inject
+      - name: Require health-check rejection
+        run: node scripts/staging-fault-drill.mjs detect
+      - name: Always restore original staging deployment
+        if: always() && hashFiles('.tmp/staging-fault-private.json') != ''
+        run: node scripts/staging-fault-drill.mjs restore
+      - name: Record promotion eligibility
+        id: result
+        run: |
+          jq -e '.healthCheckFailure == true and .originalDigestRestored == true and .readinessPassed == true and .candidateHealthy == false and .recoverySeconds < 300' .tmp/staging-fault-report.json
+          echo 'candidate_healthy=false' >> "$GITHUB_OUTPUT"
+          {
+            echo '### Unhealthy staging candidate drill'
+            jq -r '"- Detection: \(.detectionSeconds)s\n- Recovery after rollback request: \(.recoverySeconds)s\n- Original digest/readiness restored: true\n- Candidate eligible for promotion: false"' .tmp/staging-fault-report.json
+            echo '- This is a rejected-candidate/configuration recovery drill, not proof of recovery from a production outage.'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload only the sanitized recovery report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-fault-${{ github.run_id }}
+          path: .tmp/staging-fault-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+      - name: Remove private app spec from the runner
+        if: always()
+        run: rm -f .tmp/staging-fault-private.json
+
+  promotion-canary:
+    name: Non-deploying promotion gate canary
+    needs: unhealthy
+    if: needs.unhealthy.outputs.candidate_healthy == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'Unhealthy candidate incorrectly passed the gate' >&2; exit 1
+
+  verify-gate:
+    name: Confirm unhealthy candidate cannot advance
+    needs: [unhealthy, promotion-canary]
+    if: always() && inputs.confirmation == 'ROLLBACK STAGING' && inputs.mode == 'unhealthy-candidate'
+    runs-on: ubuntu-24.04
+    steps:
+      - run: |
+          test '${{ needs.unhealthy.result }}' = success
+          test '${{ needs.promotion-canary.result }}' = skipped
+          echo 'Non-deploying promotion canary was skipped. No production environment or credentials were accessed.' >> "$GITHUB_STEP_SUMMARY"
