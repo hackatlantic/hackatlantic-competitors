@@ -30,10 +30,57 @@ invalidated run into a résumé claim.
 | Dependency audit | 0 npm vulnerabilities after upgrading transitive `nanoid` to 3.3.18 |
 | k6 validation | All six fixed profiles parsed with pinned `grafana/k6:1.7.0` |
 
-## Final release measurements
+## Verified staging scanner measurements — September 2, 2026
 
-Populate these fields only from successful workflow artifacts after the closeout
-commit is merged and the exact digest is deployed.
+These are successful synthetic staging runs, not production uptime measurements.
+Both use 20 scanner identities, 1,500 distinct passes, and 2–5 second pacing.
+
+| Measurement | Earlier release | Instrumentation release, attempt 1 |
+| --- | --- | --- |
+| Workflow run | [33654433935](https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33654433935) | [33687509195](https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33687509195/attempts/1) |
+| API Git SHA | `2a3b073ebf8425297474db632bb15383c9d70e52` | `21b1a585a75d6995a66a5261571a23eb9d6d72a2` |
+| Lookup p95 | 336.12 ms | 272.54 ms |
+| Redemption p95 | 592.85 ms | 510.49 ms |
+| HTTP failures | 0 / 3,000 | 0 / 3,000 |
+| Ledger verification | 1,500 atomic entries; no duplicate attendees | 1,500 atomic entries; no duplicate attendees |
+
+The earlier run lasted 5m22.9s. The instrumentation release's first attempt had
+misconfigured exporter authentication; its passing application tests do **not**
+prove telemetry ingestion. Its configuration-only rerun reuses image digest
+`sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f`.
+Do not attribute differences between these runs to a controlled optimization.
+
+### Corrected ingestion rollout — attempt 2
+
+[Release 33687509195, attempt 2](https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33687509195/attempts/2)
+reused that same digest, passed the staging gate in **5m15.9s**, and recorded:
+
+- 20 scanner identities and 1,500 distinct passes.
+- Lookup p95 **304.37 ms**; redemption p95 **558.23 ms**.
+- **0 / 3,000** HTTP failures.
+- **1,500 atomic ledger entries**, no duplicate attendees.
+
+The production API apply and exact-digest health verification both passed, and
+Grafana received production telemetry for the same Git SHA. The overall workflow
+was nevertheless marked failed because its final frontend promotion returned
+Vercel's specific HTTP 409: that deployment was **already current production**.
+Do not present this attempt as a completely green workflow. The applicant portal
+returned HTTP 200 afterward; the retry regression is covered separately.
+
+### Applicant stress result — August 23, 2026
+
+The sanitized `applicant-stress-32664233051/profile-summary.json` artifact from
+[run 32664233051](https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/32664233051)
+records 100 iterations, 499 HTTP requests, 0.2004% HTTP failures, and 6,150.66 ms
+overall HTTP request p95. All 100 application creations and draft saves passed;
+99 résumé uploads and 99 submissions succeeded, with one upload failure.
+The workflow passed its configured error/check thresholds, but this is not a
+zero-failure result or evidence of acceptable everyday applicant latency.
+
+## Measurements still to establish
+
+Populate remaining fields only from successful workflow artifacts and actual
+recovery/availability observations. A configured target is not an achieved SLO.
 
 ```text
 Release workflow run:
