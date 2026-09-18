@@ -335,6 +335,8 @@ export type OrganizerRedemptionCount = {
   checkpointId: string;
   checkpointName: string;
   totalRedemptions: number;
+  uniqueAttendees?: number;
+  confirmedRsvps?: number;
   lastRedeemedAt?: string | null;
 };
 

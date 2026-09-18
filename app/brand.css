@@ -1298,3 +1298,56 @@ input[type="checkbox"] {
     animation: none;
   }
 }
+
+/* Event-day workflows: one action at a time, secondary setup kept out of the way. */
+.organizer-operations [hidden] { display: none !important; }
+.scanner-panel [hidden] { display: none !important; }
+.organizer-operations { padding: clamp(16px, 3vw, 28px); }
+.organizer-operations h2 { font-family: var(--font-display); text-transform: none; letter-spacing: -0.03em; line-height: 1.15; }
+.organizer-operations .staff-actions { background: transparent; border: 0; padding: 0; }
+.event-day-navigation { display: flex; gap: 8px; padding: 6px; background: #e4eeec; border-radius: 12px; width: fit-content; margin-bottom: 24px; }
+.event-day-navigation button { padding: 12px 20px; border: 0; border-radius: 8px; background: transparent; color: var(--brand-navy); box-shadow: none; font: 600 0.95rem/1.4 var(--font-body, sans-serif); text-transform: none; }
+.event-day-navigation button[aria-pressed="true"] { background: var(--brand-navy); color: white; }
+.event-day-overview { display: grid; gap: 20px; min-width: 0; }
+.event-day-overview h2 { margin: 0 0 8px; font-size: clamp(1.6rem, 3vw, 2.3rem); }
+.event-day-overview .operations-field { max-width: 480px; }
+.event-day-overview .staff-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.event-day-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.event-day-stats > div { padding: 24px; background: #edf7f5; border: 1px solid var(--brand-line); border-radius: 14px; }
+.event-day-stats dt { font-size: 0.9rem; color: var(--brand-muted); }
+.event-day-stats dd { margin: 10px 0 0; font-size: clamp(2.5rem, 6vw, 4rem); color: var(--brand-navy); font-weight: 700; line-height: 1.1; }
+.event-day-recent { padding: 0; margin: 0; list-style: none; }
+.event-day-recent li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--brand-line); }
+.event-day-recent li > div { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.event-day-recent span, .event-day-recent time { color: var(--brand-muted); font-size: 0.88rem; }
+.event-day-recent time { flex-shrink: 0; }
+.operations-advanced { margin: 16px 0; border: 1px solid var(--brand-line); border-radius: 12px; padding: 18px; }
+.operations-advanced > summary, .scanner-manual > summary { cursor: pointer; font-weight: 650; color: var(--brand-navy); min-height: 32px; }
+.operations-advanced .operations-section { border: 0; margin-bottom: 0; }
+.attendee-search-result { width: 100%; padding: 14px; border: 1px solid var(--brand-line); border-radius: 8px; background: white; text-align: left; text-transform: none; overflow-wrap: anywhere; box-shadow: none; }
+.selected-attendee { overflow-wrap: anywhere; }
+.application-panel-submitted > .application-rsvp { margin: 24px clamp(1rem, 4vw, 3.5rem); min-height: auto; }
+.attendance-next-step { padding: 0; margin: 12px 0 0; border: 0; background: transparent; }
+.attendance-next-step .button { margin-top: 16px; }
+.application-rsvp .event-card-heading { margin-bottom: 12px; }
+.application-rsvp .rsvp-help { margin-top: 0; }
+.scanner-panel h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1.1; letter-spacing: -0.04em; text-transform: none; }
+.scanner-panel .scanner-result-valid { background: #edf3f7; border: 1px solid #9baebc; box-shadow: none; }
+.scanner-panel .scanner-result-redeemed { background: #d9f4e8; border: 2px solid #16845d; box-shadow: none; }
+.scanner-panel .scanner-result h2 { font-size: 1.65rem; line-height: 1.2; }
+.scanner-manual { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--brand-line); }
+.scanner-manual[open] { display: grid; gap: 12px; }
+.scanner-panel input, .event-setup input { min-height: 48px; }
+.scanner-panel .scanner-actions:empty { display: none; }
+.event-day-navigation button:focus-visible, .operations-advanced summary:focus-visible, .scanner-manual summary:focus-visible { outline: 3px solid var(--brand-teal-dark); outline-offset: 4px; }
+@media (max-width: 600px) {
+  .event-day-stats { gap: 10px; }
+  .event-day-stats > div { padding: 16px; }
+  .event-day-overview .operations-section-heading { align-items: stretch; flex-direction: column; gap: 16px; }
+  .event-day-overview .staff-actions > .button { flex: 1 1 100%; }
+  .operations-advanced { padding: 14px; }
+  .event-day-navigation { width: 100%; }
+  .event-day-navigation button { flex: 1; padding-inline: 8px; }
+  .attendance-next-step .button { width: 100%; }
+  .application-panel-submitted > .application-rsvp { margin-inline: 0; }
+}

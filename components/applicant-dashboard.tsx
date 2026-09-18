@@ -3,7 +3,6 @@
 import { useAuth } from "@clerk/nextjs";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ApplicationButton } from "@/components/application-motion";
-import { ApplicantPass } from "@/components/applicant-pass";
 import { ApplicantRSVP } from "@/components/applicant-rsvp";
 import {
   ApplicantDecisionStatus,
@@ -516,7 +515,7 @@ export function ApplicantDashboard() {
         <div className="progress-step complete"><span>01</span><strong>Account</strong></div>
         <div className={`progress-step ${submitted ? "complete" : "current"}`}><span>02</span><strong>Application</strong></div>
         <div className={`progress-step ${decisionState === "ready" ? "complete" : submitted ? "current" : ""}`}><span>03</span><strong>Decision</strong></div>
-        <div className={`progress-step ${decision?.outcome === "accepted" ? "current" : ""}`}><span>04</span><strong>Event pass</strong></div>
+        <div className={`progress-step ${decision?.outcome === "accepted" ? "current" : ""}`}><span>04</span><strong>Attendance & pass</strong></div>
       </div>
       <div className="application-heading">
         <h1 id="application-heading">Your application</h1>
@@ -548,6 +547,9 @@ export function ApplicantDashboard() {
 
       {submitted ? (
         <>
+          {decisionState === "ready" && decision?.outcome === "accepted" ? (
+            <ApplicantRSVP key={`${application.id}-${decision.releasedAt}`} applicationId={application.id} />
+          ) : null}
           <div className="application-overview" aria-label="Application overview">
             <motion.section
               className="submitted-confirmation"
@@ -575,12 +577,6 @@ export function ApplicantDashboard() {
               </section>
             ) : null}
           </div>
-          {decisionState === "ready" && decision?.outcome === "accepted" ? (
-            <div className="attendance-overview">
-              <ApplicantRSVP key={`${application.id}-${decision.releasedAt}`} applicationId={application.id} />
-              <ApplicantPass />
-            </div>
-          ) : null}
         </>
       ) : currentForm ? (
         <form className="application-form" noValidate onSubmit={submitApplication}>

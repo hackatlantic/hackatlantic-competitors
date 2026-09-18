@@ -41,6 +41,7 @@ export default async function OrganizerOperationsPage() {
   const client = createApiClient({ getToken });
   let operations: OrganizerOperationsData | null = null;
   let loadError: unknown = undefined;
+  let currentCycleId: string | undefined;
 
   try {
     const [activities, checkpoints, counts] = await Promise.all([
@@ -49,6 +50,8 @@ export default async function OrganizerOperationsPage() {
       client.listOrganizerRedemptionCounts(),
     ]);
     operations = { activities, checkpoints, counts };
+    // Setup remains usable when intake is closed or the current form is unavailable.
+    currentCycleId = await client.getCurrentApplicationForm().then((form) => form.cycleId).catch(() => undefined);
   } catch (error) {
     loadError = error;
   }
@@ -77,6 +80,7 @@ export default async function OrganizerOperationsPage() {
         initialActivities={operations.activities.items}
         initialCheckpoints={operations.checkpoints.items}
         initialCounts={operations.counts.items}
+        currentCycleId={currentCycleId}
       />
     </StaffPageFrame>
   );

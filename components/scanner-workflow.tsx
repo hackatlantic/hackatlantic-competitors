@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -48,20 +48,20 @@ const outcomeCopy: Record<
   { title: string; message: string }
 > = {
   redeemed: {
-    title: "Entry recorded",
-    message: "This checkpoint redemption was recorded.",
+    title: "Checked in",
+    message: "Check-in recorded. You can scan the next pass.",
   },
   already_exhausted: {
-    title: "Redemption limit reached",
-    message: "No additional redemption is available at this checkpoint.",
+    title: "Already checked in",
+    message: "This pass has used its allowance at this scan point. Ask an organizer if help is needed.",
   },
   not_entitled: {
-    title: "Not entitled",
-    message: "This pass is not entitled to this checkpoint.",
+    title: "Not available for this pass",
+    message: "This attendee does not have access at this scan point.",
   },
   outside_window: {
-    title: "Checkpoint closed",
-    message: "This checkpoint is not open for redemption right now.",
+    title: "Scan point closed",
+    message: "Check-in is not open here right now.",
   },
   invalid_pass: {
     title: "Pass not valid",
@@ -148,6 +148,14 @@ function createIdempotencyKey(): string {
 
 
 export function ScannerWorkflow() {
+  const { userId, isLoaded } = useAuth();
+  if (!isLoaded) return <main className="scanner-page"><section className="scanner-panel"><p role="status">Preparing scanner…</p></section></main>;
+  if (!userId) return <main className="scanner-page"><section className="scanner-panel"><h1>Sign in to scan</h1><Link href="/">Return to sign in</Link></section></main>;
+  return <ScannerSession key={userId} />;
+}
+
+function ScannerSession() {
+  const reducedMotion = useReducedMotion();
   const { getToken, isLoaded } = useAuth();
   const client = useMemo(() => createApiClient({ getToken }), [getToken]);
   const [checkpoints, setCheckpoints] = useState<ScannerCheckpoint[]>([]);
@@ -168,8 +176,13 @@ export function ScannerWorkflow() {
   const [cameraMessage, setCameraMessage] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraControlsRef = useRef<CameraControls | null>(null);
+  const cameraSequence = useRef(0);
+  const requestSequence = useRef(0);
+  const requestBusy = useRef(false);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
 
   const stopCamera = () => {
+    cameraSequence.current++;
     cameraControlsRef.current?.stop();
     cameraControlsRef.current = null;
     setCameraActive(false);
@@ -177,6 +190,8 @@ export function ScannerWorkflow() {
 
   useEffect(
     () => () => {
+      cameraSequence.current++;
+      requestSequence.current++;
       cameraControlsRef.current?.stop();
     },
     [],
@@ -205,6 +220,8 @@ export function ScannerWorkflow() {
 
         if (!cancelled) {
           setCheckpoints(nextCheckpoints);
+          setCheckpointId((current) => nextCheckpoints.some((point) => point.id === current)
+            ? current : nextCheckpoints.length === 1 ? nextCheckpoints[0].id : "");
           setCheckpointLoadState(nextCheckpoints.length === 0 ? "empty" : "ready");
         }
       } catch (nextError) {
@@ -250,27 +267,36 @@ export function ScannerWorkflow() {
   };
 
   const handleStartCamera = async () => {
-    if (!videoRef.current || cameraActive || busy) {
+    if (!videoRef.current || cameraActive || requestBusy.current) {
       return;
     }
     setCameraMessage(null);
     setCameraActive(true);
+    const sequence = ++cameraSequence.current;
+    let captured = false;
     try {
       const { BrowserQRCodeReader } = await import("@zxing/browser");
+      if (sequence !== cameraSequence.current || !videoRef.current) return;
       const reader = new BrowserQRCodeReader();
-      cameraControlsRef.current = await reader.decodeFromConstraints(
+      const controls = await reader.decodeFromConstraints(
         { video: { facingMode: { ideal: "environment" } } },
         videoRef.current,
         (scanResult) => {
-          if (!scanResult) {
+          if (!scanResult || captured || sequence !== cameraSequence.current) {
             return;
           }
-          handleCredentialChange(scanResult.getText());
-          setCameraMessage("QR code captured. Look up the pass to verify it.");
+          captured = true;
+          const token = scanResult.getText();
+          handleCredentialChange(token);
+          setCameraMessage(null);
           stopCamera();
+          void lookupPass(token);
         },
       );
+      if (sequence !== cameraSequence.current) controls.stop();
+      else cameraControlsRef.current = controls;
     } catch {
+      if (sequence !== cameraSequence.current) return;
       stopCamera();
       setCameraMessage(
         "The camera could not be opened. Allow camera access or enter the QR code manually.",
@@ -286,13 +312,20 @@ export function ScannerWorkflow() {
 
   const handleLookup = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    await lookupPass(qrToken);
+  };
 
-    const nextQrToken = qrToken.trim();
+  const lookupPass = async (token: string) => {
+    if (requestBusy.current) return;
+    const nextQrToken = token.trim();
     if (!nextQrToken) {
       setError({ message: "Enter or paste a QR code before looking it up.", retryable: false });
       return;
     }
 
+    stopCamera();
+    requestBusy.current = true;
+    const sequence = ++requestSequence.current;
     clearTransientState();
     setLookup(null);
     setRetryableRedemption(null);
@@ -300,13 +333,16 @@ export function ScannerWorkflow() {
 
     try {
       const response = await client.lookupScannerPass({ qrToken: nextQrToken });
+      if (sequence !== requestSequence.current) return;
       if (response.pass.status === "revoked") {
         setResult({ kind: "lookup", outcome: "revoked_pass" });
         clearCredentialState();
       } else {
         setLookup({ qrToken: nextQrToken, response });
+        window.requestAnimationFrame(() => confirmRef.current?.focus());
       }
     } catch (nextError) {
+      if (sequence !== requestSequence.current) return;
       const outcome = getScannerOutcome(nextError);
       if (outcome) {
         setResult({ kind: "lookup", outcome });
@@ -319,19 +355,27 @@ export function ScannerWorkflow() {
         setError(getScannerError(nextError));
       }
     } finally {
-      setPendingAction(null);
+      if (sequence === requestSequence.current) {
+        requestBusy.current = false;
+        setPendingAction(null);
+      }
     }
   };
 
   const redeem = async (request: ScannerRedemptionRequest) => {
+    if (requestBusy.current) return;
+    requestBusy.current = true;
+    const sequence = ++requestSequence.current;
     clearTransientState();
     setPendingAction("redeem");
 
     try {
       const response = await client.redeemScannerPass(request);
+      if (sequence !== requestSequence.current) return;
       setResult({ kind: "redemption", response });
       clearCredentialState();
     } catch (nextError) {
+      if (sequence !== requestSequence.current) return;
       const outcome = getScannerOutcome(nextError);
       if (outcome) {
         setResult({
@@ -349,7 +393,10 @@ export function ScannerWorkflow() {
         setRetryableRedemption(nextScannerError.retryable ? request : null);
       }
     } finally {
-      setPendingAction(null);
+      if (sequence === requestSequence.current) {
+        requestBusy.current = false;
+        setPendingAction(null);
+      }
     }
   };
 
@@ -364,7 +411,7 @@ export function ScannerWorkflow() {
     }
 
     if (!activeCheckpoint) {
-      setError({ message: "Choose an active checkpoint before redeeming.", retryable: false });
+      setError({ message: "Choose a scan point before checking in.", retryable: false });
       return;
     }
 
@@ -400,6 +447,7 @@ export function ScannerWorkflow() {
   const handleScanAnother = () => {
     clearCredentialState();
     clearTransientState();
+    void handleStartCamera();
   };
 
   if (!isLoaded) {
@@ -488,25 +536,23 @@ export function ScannerWorkflow() {
     <main className="scanner-page">
       <section className="scanner-panel" aria-labelledby="scanner-heading">
         <Link className="staff-link" href="/">
-          Applicant home
+          ← Back to dashboard
         </Link>
-        <p className="eyebrow">Scanner</p>
-        <h1 id="scanner-heading">Verify entry pass</h1>
+        <h1 id="scanner-heading">Check in attendees</h1>
         <p className="scanner-summary">
-          Select a checkpoint, then scan or enter the opaque QR code. This screen shows
-          only the verification information needed at entry.
+          Scan a ticket, check the name, then confirm check-in.
         </p>
 
-        <form className="scanner-form" onSubmit={handleLookup}>
+        <form className="scanner-form" hidden={Boolean(lookup) || Boolean(result)} onSubmit={handleLookup}>
           <div className="scanner-field">
-            <label htmlFor="scanner-checkpoint">Checkpoint</label>
+            <label htmlFor="scanner-checkpoint">Scan point</label>
             <select
               disabled={busy}
               id="scanner-checkpoint"
               onChange={(event) => handleCheckpointChange(event.target.value)}
               value={checkpointId}
             >
-              <option value="">Choose before redeeming</option>
+              <option value="">Choose where you’re scanning</option>
               {checkpoints.map((checkpoint) => (
                 <option key={checkpoint.id} value={checkpoint.id}>
                   {checkpoint.name}
@@ -516,7 +562,6 @@ export function ScannerWorkflow() {
           </div>
 
           <div className="scanner-field">
-            <label htmlFor="scanner-qr-token">QR code</label>
             <div className={`scanner-camera${cameraActive ? " scanner-camera-active" : ""}`}>
               <video
                 aria-label="QR code camera preview"
@@ -532,18 +577,21 @@ export function ScannerWorkflow() {
                 </button>
               ) : (
                 <button
-                  className="button secondary"
-                  disabled={busy}
+                  className="button primary"
+                  disabled={busy || Boolean(lookup) || Boolean(result) || !activeCheckpoint}
                   onClick={() => void handleStartCamera()}
                   type="button"
                 >
-                  Scan with camera
+                  Scan ticket
                 </button>
               )}
             </div>
             {cameraMessage ? (
               <p className="scanner-help" aria-live="polite">{cameraMessage}</p>
             ) : null}
+            <details className="scanner-manual">
+            <summary>Camera not working? Enter a code</summary>
+            <label htmlFor="scanner-qr-token">QR code</label>
             <input
               aria-describedby="scanner-qr-help"
               autoCapitalize="none"
@@ -553,35 +601,19 @@ export function ScannerWorkflow() {
               inputMode="text"
               onChange={(event) => handleCredentialChange(event.target.value)}
               placeholder="Paste or type the QR code"
-              required
               spellCheck={false}
               type="text"
               value={qrToken}
             />
             <p id="scanner-qr-help" className="scanner-help">
-              Manual entry remains available if camera access is unavailable.
+              Paste the code from a QR reader. This is not the attendee’s email.
             </p>
+            <button className="button secondary" disabled={busy || !activeCheckpoint} type="submit">
+              {pendingAction === "lookup" ? "Verifying…" : "Verify code"}
+            </button>
+            </details>
           </div>
 
-          <div className="scanner-actions">
-            <button className="button primary" disabled={busy} type="submit">
-              {pendingAction === "lookup" ? "Looking up…" : "Look up pass"}
-            </button>
-            {lookup ? (
-              <button
-                className="button secondary"
-                disabled={busy || !activeCheckpoint}
-                onClick={handleRedeem}
-                type="button"
-              >
-                {pendingAction === "redeem"
-                  ? "Recording…"
-                  : activeCheckpoint
-                    ? `Redeem at ${activeCheckpoint.name}`
-                    : "Choose a checkpoint to redeem"}
-              </button>
-            ) : null}
-          </div>
         </form>
 
         <AnimatePresence initial={false} mode="popLayout">
@@ -590,12 +622,12 @@ export function ScannerWorkflow() {
               animate={{ opacity: 1, y: 0 }}
               className="scanner-progress"
               exit={{ opacity: 0, y: -8 }}
-              initial={{ opacity: 0, y: 8 }}
+              initial={reducedMotion ? false : { opacity: 0, y: 8 }}
               key="scanner-progress"
               aria-busy="true"
               aria-live="polite"
             >
-              <p>{pendingAction === "lookup" ? "Verifying pass…" : "Recording redemption…"}</p>
+              <p>{pendingAction === "lookup" ? "Verifying pass…" : "Recording check-in…"}</p>
             </motion.section>
           ) : null}
 
@@ -604,17 +636,33 @@ export function ScannerWorkflow() {
               animate={{ opacity: 1, scale: 1 }}
               className="scanner-result scanner-result-valid"
               exit={{ opacity: 0, scale: 0.98 }}
-              initial={{ opacity: 0, scale: 0.98 }}
+              initial={reducedMotion ? false : { opacity: 0, scale: 0.98 }}
               key={`lookup-${lookup.qrToken}`}
               aria-live="polite"
             >
-              <h2>Pass verified</h2>
+              <h2>Ready to check in</h2>
               <p>
-                <strong>{lookup.response.attendee.displayName}</strong> has an active pass.
+                <strong>{lookup.response.attendee.displayName}</strong> · {activeCheckpoint?.name || "Choose a scan point"}.
                 {activeCheckpoint
-                  ? " Confirm the checkpoint to record entry."
-                  : " Choose a checkpoint to record entry."}
+                  ? " Check the name, then tap Check in. Entry has not been recorded yet."
+                  : " Choose a scan point to continue."}
               </p>
+              <div className="scanner-actions">
+              <button
+                ref={confirmRef}
+                className="button primary"
+                disabled={busy || !activeCheckpoint}
+                onClick={handleRedeem}
+                type="button"
+              >
+                {pendingAction === "redeem"
+                  ? "Checking in…"
+                  : activeCheckpoint
+                    ? `Check in at ${activeCheckpoint.name}`
+                    : "Choose a scan point"}
+              </button>
+                <button className="button secondary" type="button" disabled={busy} onClick={handleScanAnother}>Cancel and scan another</button>
+              </div>
             </motion.section>
           ) : null}
         </AnimatePresence>
@@ -630,7 +678,7 @@ export function ScannerWorkflow() {
         {result ? (
           <div className="scanner-actions">
             <button className="button secondary" onClick={handleScanAnother} type="button">
-              Scan another pass
+              Scan next attendee
             </button>
           </div>
         ) : null}
@@ -646,7 +694,7 @@ export function ScannerWorkflow() {
                   onClick={handleRetryRedemption}
                   type="button"
                 >
-                  Retry redemption
+                  Retry check-in
                 </button>
               ) : null}
             </div>
@@ -663,13 +711,14 @@ type ScanOutcomeProps = {
 };
 
 function ScanOutcome({ outcome, attendee }: ScanOutcomeProps) {
+  const reducedMotion = useReducedMotion();
   const copy = outcomeCopy[outcome];
 
   return (
     <motion.section
       animate={{ opacity: 1, scale: 1, y: 0 }}
       className={`scanner-result scanner-result-${outcome}`}
-      initial={{ opacity: 0, scale: 0.98, y: 10 }}
+      initial={reducedMotion ? false : { opacity: 0, scale: 0.98, y: 10 }}
       key={outcome}
       transition={{ type: "spring", stiffness: 360, damping: 30 }}
       aria-live={outcome === "redeemed" ? "polite" : "assertive"}
