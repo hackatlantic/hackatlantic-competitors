@@ -23,7 +23,7 @@ COPY instrumentation.ts ./instrumentation.ts
 COPY eslint.config.mjs next-env.d.ts next.config.ts proxy.ts tsconfig.json ./
 RUN npm run build
 
-FROM cgr.dev/chainguard/node@sha256:f2a8ed64ec02cef2e53c76d1255d0917e749570af251e32e99f54cda1076cc8d AS runtime
+FROM cgr.dev/chainguard/node@sha256:1f903d44fc11a6f6e74447fc2c6a3c141f112217576be5d96c283210116b5d25 AS runtime
 
 WORKDIR /app
 ENV NODE_ENV=production
