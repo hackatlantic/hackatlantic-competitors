@@ -3,6 +3,7 @@
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApplicationButton } from "@/components/application-motion";
+import { ApplicantPass } from "@/components/applicant-pass";
 import { ApiError, createApiClient, type AttendanceRSVP, type RSVPStatus } from "@/lib/api";
 
 export function ApplicantRSVP({ applicationId }: { applicationId: string }) {
@@ -81,23 +82,20 @@ export function ApplicantRSVP({ applicationId }: { applicationId: string }) {
   return (
     <section className="application-rsvp" aria-labelledby="rsvp-heading" aria-busy={loading || saving}>
       <div className="event-card-heading">
-        <span className="event-card-kicker">Event</span>
-        <h2 id="rsvp-heading">Attendance</h2>
+        <span className="event-card-kicker">Your next step</span>
+        <h2 id="rsvp-heading">{response?.status === "confirmed" ? "You’re confirmed" : response?.status === "declined" ? "You’re not attending" : "Will you join us?"}</h2>
       </div>
       {loading ? <p role="status">Loading your RSVP…</p> : null}
       {!loading && response ? (
         <>
-          <p className={`rsvp-status rsvp-${response.status}`}>
-            <span>RSVP status</span>
-            <strong>{response.status === "confirmed" ? "Confirmed" : response.status === "declined" ? "Not attending" : "Response needed"}</strong>
-          </p>
           <p className="rsvp-help">
             {response.status === "confirmed"
-              ? "You’re on the attendee list. Update your response here if your plans change."
+              ? "You’re on the attendee list for Hack Atlantic."
               : response.status === "declined"
                 ? "We’ve recorded that you can’t attend. You can confirm again if your plans change."
-                : "Confirm attendance before entry passes are released."}
+                : "You’ve been accepted. Confirm your attendance so we can save your place."}
           </p>
+          {response.status === "confirmed" ? <ApplicantPass key={response.lockVersion} /> : null}
           {declining ? (
             <div className="rsvp-confirmation" role="group" aria-label="Confirm you will not attend">
               <p>Change your RSVP to not attending?</p>
@@ -108,8 +106,8 @@ export function ApplicantRSVP({ applicationId }: { applicationId: string }) {
             </div>
           ) : (
             <div className="rsvp-actions">
-              <ApplicationButton className="button primary" disabled={saving || response.status === "confirmed"} onClick={() => void respond("confirmed")} type="button">{saving ? "Saving…" : response.status === "confirmed" ? "Confirmed" : "Confirm attendance"}</ApplicationButton>
-              <ApplicationButton className="button secondary" disabled={saving || response.status === "declined"} onClick={() => setDeclining(true)} type="button">Can’t attend</ApplicationButton>
+              {response.status !== "confirmed" ? <ApplicationButton className="button primary" disabled={saving} onClick={() => void respond("confirmed")} type="button">{saving ? "Saving…" : "Confirm attendance"}</ApplicationButton> : null}
+              {response.status !== "declined" ? <ApplicationButton className="button secondary" disabled={saving} onClick={() => setDeclining(true)} type="button">{response.status === "confirmed" ? "Change attendance" : "Can’t attend"}</ApplicationButton> : null}
             </div>
           )}
         </>

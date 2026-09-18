@@ -2,6 +2,8 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { EventDayOverview } from "@/components/event-day-overview";
 import { type FormEvent, useMemo, useState } from "react";
 import {
   ApiError,
@@ -10,7 +12,7 @@ import {
   type CreateOrganizerCheckpointRequest,
   type OrganizerActivity,
   type OrganizerCheckpoint,
-  type OrganizerEntitlement,
+  type OrganizerApplication,
   type OrganizerRedemptionCount,
   type UpdateOrganizerActivityRequest,
   type UpdateOrganizerCheckpointRequest,
@@ -20,6 +22,7 @@ type OrganizerEventOperationsProps = {
   initialActivities: OrganizerActivity[];
   initialCheckpoints: OrganizerCheckpoint[];
   initialCounts: OrganizerRedemptionCount[];
+  currentCycleId?: string;
 };
 
 type ActivityFormState = {
@@ -44,30 +47,14 @@ type CheckpointFormState = {
   active: boolean;
 };
 
-type EntitlementFormState = {
-  attendeeId: string;
-  checkpointId: string;
-  allowed: boolean;
-  maxRedemptions: string;
-};
-
 type PendingDeletion =
   | { kind: "activity"; id: string; name: string }
   | { kind: "checkpoint"; id: string; name: string }
-  | { kind: "entitlement"; attendeeId: string; checkpointId: string }
   | null;
-
-type PendingEntitlementSave = {
-  attendeeId: string;
-  checkpointId: string;
-  allowed: boolean;
-  maxRedemptions: number;
-} | null;
 
 type BusyAction =
   | "activity"
   | "checkpoint"
-  | "entitlement"
   | "deletion"
   | "attendance-export"
   | "reconciliation-export"
@@ -93,13 +80,6 @@ const emptyCheckpointForm: CheckpointFormState = {
   defaultAllowed: true,
   defaultMaxRedemptions: "1",
   active: true,
-};
-
-const emptyEntitlementForm: EntitlementFormState = {
-  attendeeId: "",
-  checkpointId: "",
-  allowed: true,
-  maxRedemptions: "1",
 };
 
 function organizerErrorMessage(error: unknown, fallback: string): string {
@@ -203,6 +183,7 @@ export function OrganizerEventOperations({
   initialActivities,
   initialCheckpoints,
   initialCounts,
+  currentCycleId,
 }: OrganizerEventOperationsProps) {
   const { getToken } = useAuth();
   const router = useRouter();
@@ -216,23 +197,22 @@ export function OrganizerEventOperations({
     useState(initialCheckpoints);
   const [previousInitialCounts, setPreviousInitialCounts] = useState(initialCounts);
   const [activityForm, setActivityForm] = useState<ActivityFormState>(
-    emptyActivityForm,
+    { ...emptyActivityForm, cycleId: currentCycleId ?? "" },
   );
   const [checkpointForm, setCheckpointForm] = useState<CheckpointFormState>(
-    emptyCheckpointForm,
+    { ...emptyCheckpointForm, cycleId: currentCycleId ?? "" },
   );
-  const [entitlementForm, setEntitlementForm] = useState<EntitlementFormState>(
-    emptyEntitlementForm,
-  );
-  const [loadedEntitlement, setLoadedEntitlement] =
-    useState<OrganizerEntitlement | null>(null);
-  const [pendingDeletion, setPendingDeletion] = useState<PendingDeletion>(null);
-  const [pendingEntitlementSave, setPendingEntitlementSave] =
-    useState<PendingEntitlementSave>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const [pendingDeletion, setPendingDeletion] = useState<PendingDeletion>(null);
   const [notice, setNotice] = useState("");
   const [actionError, setActionError] = useState("");
   const [exportCheckpointId, setExportCheckpointId] = useState("");
+  const [view, setView] = useState<"event" | "setup">("event");
+  const [attendeeQuery, setAttendeeQuery] = useState("");
+  const [attendeeMatches, setAttendeeMatches] = useState<OrganizerApplication[]>([]);
+  const [attendeeSearchBusy, setAttendeeSearchBusy] = useState(false);
+
+  const [attendeeSearchMessage, setAttendeeSearchMessage] = useState("");
 
   if (
     initialActivities !== previousInitialActivities ||
@@ -247,7 +227,21 @@ export function OrganizerEventOperations({
     setCounts(initialCounts);
   }
 
-  const busy = busyAction !== null;
+  const busy = busyAction !== null || attendeeSearchBusy;
+
+  async function searchAttendees() {
+    if (!attendeeQuery.trim() || busy) return;
+    setAttendeeSearchBusy(true);
+    setAttendeeMatches([]);
+    setAttendeeSearchMessage("");
+    try {
+      const result = await client.listOrganizerApplications({ status: "accepted", q: attendeeQuery.trim() });
+      setAttendeeMatches(result.items);
+      setAttendeeSearchMessage(result.items.length ? "Choose an attendee. Narrow your search if they are not listed." : "No accepted attendees found. Try their email address.");
+    } catch (error) {
+      setAttendeeSearchMessage(organizerErrorMessage(error, "Couldn’t search attendees. Try again."));
+    } finally { setAttendeeSearchBusy(false); }
+  }
 
   const clearFeedback = () => {
     setNotice("");
@@ -255,22 +249,22 @@ export function OrganizerEventOperations({
   };
 
   const resetActivityForm = () => {
-    setActivityForm(emptyActivityForm);
+    setActivityForm({ ...emptyActivityForm, cycleId: currentCycleId ?? "" });
   };
 
   const resetCheckpointForm = () => {
-    setCheckpointForm(emptyCheckpointForm);
+    setCheckpointForm({ ...emptyCheckpointForm, cycleId: currentCycleId ?? "" });
   };
 
   const updateActivityForm = (activityId: string) => {
     const activity = activities.find((item) => item.id === activityId);
-    setActivityForm(activity ? activityFormFrom(activity) : emptyActivityForm);
+    setActivityForm(activity ? activityFormFrom(activity) : { ...emptyActivityForm, cycleId: currentCycleId ?? "" });
     clearFeedback();
   };
 
   const updateCheckpointForm = (checkpointId: string) => {
     const checkpoint = checkpoints.find((item) => item.id === checkpointId);
-    setCheckpointForm(checkpoint ? checkpointFormFrom(checkpoint) : emptyCheckpointForm);
+    setCheckpointForm(checkpoint ? checkpointFormFrom(checkpoint) : { ...emptyCheckpointForm, cycleId: currentCycleId ?? "" });
     clearFeedback();
   };
 
@@ -334,7 +328,7 @@ export function OrganizerEventOperations({
     clearFeedback();
 
     const cycleId = checkpointForm.cycleId.trim();
-    const slug = checkpointForm.slug.trim();
+    const slug = checkpointForm.slug.trim() || checkpointForm.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const name = checkpointForm.name.trim();
     const defaultMaxRedemptions = Number(checkpointForm.defaultMaxRedemptions);
     if (!checkpointForm.id && !cycleId) {
@@ -397,94 +391,6 @@ export function OrganizerEventOperations({
     }
   };
 
-  const loadEntitlement = async () => {
-    clearFeedback();
-    const attendeeId = entitlementForm.attendeeId.trim();
-    const checkpointId = entitlementForm.checkpointId;
-    if (!attendeeId || !checkpointId) {
-      setActionError("Enter an attendee ID and choose a checkpoint before loading an override.");
-      return;
-    }
-
-    setBusyAction("entitlement");
-    try {
-      const response = await client.getOrganizerAttendeeEntitlement(
-        attendeeId,
-        checkpointId,
-      );
-      setLoadedEntitlement(response.override);
-      setEntitlementForm((current) => ({
-        ...current,
-        allowed: response.override?.allowed ?? true,
-        maxRedemptions: String(response.override?.maxRedemptions ?? 1),
-      }));
-      setNotice(
-        response.override
-          ? "Current attendee override loaded."
-          : "No explicit override exists. The checkpoint default currently applies.",
-      );
-    } catch (error) {
-      setLoadedEntitlement(null);
-      setActionError(
-        organizerErrorMessage(error, "Unable to load the attendee entitlement."),
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const requestEntitlementSave = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    clearFeedback();
-    const attendeeId = entitlementForm.attendeeId.trim();
-    const checkpointId = entitlementForm.checkpointId;
-    const maxRedemptions = Number(entitlementForm.maxRedemptions);
-    if (!attendeeId || !checkpointId) {
-      setActionError("Enter an attendee ID and choose a checkpoint before saving an override.");
-      return;
-    }
-    if (!Number.isInteger(maxRedemptions) || maxRedemptions < 0) {
-      setActionError("The override redemption limit must be a whole number of zero or more.");
-      return;
-    }
-
-    setPendingEntitlementSave({
-      attendeeId,
-      checkpointId,
-      allowed: entitlementForm.allowed,
-      maxRedemptions,
-    });
-  };
-
-  const confirmEntitlementSave = async () => {
-    if (!pendingEntitlementSave) {
-      return;
-    }
-
-    clearFeedback();
-    setBusyAction("entitlement");
-    try {
-      const entitlement = await client.updateOrganizerAttendeeEntitlement(
-        pendingEntitlementSave.attendeeId,
-        pendingEntitlementSave.checkpointId,
-        {
-          allowed: pendingEntitlementSave.allowed,
-          maxRedemptions: pendingEntitlementSave.maxRedemptions,
-        },
-      );
-      setLoadedEntitlement(entitlement);
-      setPendingEntitlementSave(null);
-      setNotice("Attendee entitlement override saved.");
-      router.refresh();
-    } catch (error) {
-      setActionError(
-        organizerErrorMessage(error, "Unable to save the attendee entitlement."),
-      );
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   const confirmDeletion = async () => {
     if (!pendingDeletion) {
       return;
@@ -514,13 +420,6 @@ export function OrganizerEventOperations({
           resetCheckpointForm();
         }
         setNotice("Checkpoint deleted.");
-      } else {
-        await client.deleteOrganizerAttendeeEntitlement(
-          pendingDeletion.attendeeId,
-          pendingDeletion.checkpointId,
-        );
-        setLoadedEntitlement(null);
-        setNotice("Attendee entitlement override removed. The checkpoint default now applies.");
       }
       setPendingDeletion(null);
       router.refresh();
@@ -565,11 +464,11 @@ export function OrganizerEventOperations({
 
   return (
     <div className="organizer-operations">
-      <p className="staff-summary">
-        Configure event operations from organizer-authorized data. Checkpoint defaults
-        and attendee overrides are enforced by the server during redemption; they do not
-        grant scanner access.
-      </p>
+      <div className="event-day-navigation" aria-label="Operations views">
+        <button type="button" aria-pressed={view === "event"} onClick={() => setView("event")}>Event day</button>
+        <button type="button" aria-pressed={view === "setup"} onClick={() => setView("setup")}>Event setup</button>
+      </div>
+      {view === "event" ? <EventDayOverview checkpoints={checkpoints} counts={counts} onSetup={() => setView("setup")} onRefresh={() => router.refresh()} /> : null}
 
       {pendingDeletion ? (
         <section className="operations-confirmation" aria-live="polite">
@@ -577,9 +476,7 @@ export function OrganizerEventOperations({
           <p>
             {pendingDeletion.kind === "activity"
               ? `Delete activity “${pendingDeletion.name}”? Checkpoints using it must be reassigned first.`
-              : pendingDeletion.kind === "checkpoint"
-                ? `Delete checkpoint “${pendingDeletion.name}”? Existing redemption records remain immutable.`
-                : "Remove this attendee override? The checkpoint default will apply to future redemptions."}
+              : `Delete checkpoint “${pendingDeletion.name}”? Existing redemption records remain immutable.`}
           </p>
           <div className="staff-actions">
             <button
@@ -602,10 +499,14 @@ export function OrganizerEventOperations({
         </section>
       ) : null}
 
+      <div hidden={view !== "setup"} className="event-setup">
+      <p className="staff-summary">Start with one entrance. Add meal or swag scan points only if you need them. Changes here affect future scans; recorded check-ins stay intact.</p>
+      <details className="operations-advanced">
+      <summary>Optional activity schedule</summary>
       <section className="operations-section" aria-labelledby="activity-metadata-heading">
         <div className="operations-section-heading">
           <div>
-            <h2 id="activity-metadata-heading">Activity metadata</h2>
+            <h2 id="activity-metadata-heading">Activity schedule</h2>
             <p className="staff-muted">
               Activities are optional schedule metadata. They do not create scanner access
               or redemption rules on their own.
@@ -725,25 +626,25 @@ export function OrganizerEventOperations({
           </div>
         </form>
       </section>
+      </details>
 
       <section className="operations-section" aria-labelledby="checkpoint-heading">
         <div className="operations-section-heading">
           <div>
-            <h2 id="checkpoint-heading">Checkpoints</h2>
+            <h2 id="checkpoint-heading">Entrance & scan points</h2>
             <p className="staff-muted">
-              Set an active checkpoint&apos;s redemption window and authoritative default
-              entitlement. Scanner operators choose from active checkpoints only.
+              Choose when scanning opens and how many times each attendee can use this point. Only active points appear in the scanner.
             </p>
           </div>
           <div className="operations-select">
-            <label htmlFor="checkpoint-select">Edit checkpoint</label>
+            <label htmlFor="checkpoint-select">Edit scan point</label>
             <select
               disabled={busy}
               id="checkpoint-select"
               onChange={(event) => updateCheckpointForm(event.target.value)}
               value={checkpointForm.id ?? ""}
             >
-              <option value="">Create a checkpoint</option>
+              <option value="">Create a scan point</option>
               {checkpoints.map((checkpoint) => (
                 <option key={checkpoint.id} value={checkpoint.id}>
                   {checkpoint.name} ({checkpoint.slug})
@@ -754,6 +655,8 @@ export function OrganizerEventOperations({
         </div>
 
         <form className="operations-form" onSubmit={submitCheckpoint}>
+          <details className="operations-advanced" open={!checkpointForm.cycleId}>
+          <summary>Advanced identifiers & activity link</summary>
           <div className="operations-field">
             <label htmlFor="checkpoint-cycle-id">Cycle ID</label>
             <input
@@ -792,10 +695,11 @@ export function OrganizerEventOperations({
               onChange={(event) =>
                 setCheckpointForm((current) => ({ ...current, slug: event.target.value }))
               }
-              required
+              placeholder="Generated from the name for new scan points"
               value={checkpointForm.slug}
             />
           </div>
+          </details>
           <div className="operations-field">
             <label htmlFor="checkpoint-name">Name</label>
             <input
@@ -833,7 +737,7 @@ export function OrganizerEventOperations({
             />
           </div>
           <div className="operations-field">
-            <label htmlFor="checkpoint-default-limit">Default redemption limit</label>
+            <label htmlFor="checkpoint-default-limit">Allowed uses per attendee</label>
             <input
               disabled={busy}
               id="checkpoint-default-limit"
@@ -849,6 +753,7 @@ export function OrganizerEventOperations({
               type="number"
               value={checkpointForm.defaultMaxRedemptions}
             />
+            <p className="staff-muted">Use 1 for first arrival. Returning attendees will need a wristband or a separate re-entry policy.</p>
           </div>
           <div className="operations-checkboxes">
             <label>
@@ -882,8 +787,8 @@ export function OrganizerEventOperations({
               {busyAction === "checkpoint"
                 ? "Saving…"
                 : checkpointForm.id
-                  ? "Save checkpoint"
-                  : "Create checkpoint"}
+                  ? "Save scan point"
+                  : "Create scan point"}
             </button>
             {checkpointForm.id ? (
               <button
@@ -898,7 +803,7 @@ export function OrganizerEventOperations({
                 }
                 type="button"
               >
-                Delete checkpoint
+                Delete scan point
               </button>
             ) : null}
             <button
@@ -907,157 +812,33 @@ export function OrganizerEventOperations({
               onClick={resetCheckpointForm}
               type="button"
             >
-              New checkpoint
+              New scan point
             </button>
           </div>
         </form>
       </section>
 
-      <section className="operations-section" aria-labelledby="entitlement-heading">
-        <h2 id="entitlement-heading">Attendee entitlement override</h2>
-        <p className="staff-muted">
-          An override is event access data, not a scanner or application role. It takes
-          precedence over the checkpoint default only for this attendee.
-        </p>
-        <form className="operations-form" onSubmit={requestEntitlementSave}>
-          <div className="operations-field">
-            <label htmlFor="entitlement-attendee-id">Attendee ID</label>
-            <input
-              disabled={busy}
-              id="entitlement-attendee-id"
-              onChange={(event) => {
-                setLoadedEntitlement(null);
-                setPendingEntitlementSave(null);
-                setEntitlementForm((current) => ({ ...current, attendeeId: event.target.value }));
-              }}
-              required
-              value={entitlementForm.attendeeId}
-            />
-          </div>
-          <div className="operations-field">
-            <label htmlFor="entitlement-checkpoint">Checkpoint</label>
-            <select
-              disabled={busy}
-              id="entitlement-checkpoint"
-              onChange={(event) => {
-                setLoadedEntitlement(null);
-                setPendingEntitlementSave(null);
-                setEntitlementForm((current) => ({ ...current, checkpointId: event.target.value }));
-              }}
-              required
-              value={entitlementForm.checkpointId}
-            >
-              <option value="">Choose a checkpoint</option>
-              {checkpoints.map((checkpoint) => (
-                <option key={checkpoint.id} value={checkpoint.id}>
-                  {checkpoint.name} ({checkpoint.slug})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="operations-field">
-            <label htmlFor="entitlement-limit">Override redemption limit</label>
-            <input
-              disabled={busy}
-              id="entitlement-limit"
-              min="0"
-              onChange={(event) => {
-                setPendingEntitlementSave(null);
-                setEntitlementForm((current) => ({
-                  ...current,
-                  maxRedemptions: event.target.value,
-                }));
-              }}
-              required
-              step="1"
-              type="number"
-              value={entitlementForm.maxRedemptions}
-            />
-          </div>
-          <div className="operations-checkboxes">
-            <label>
-              <input
-                checked={entitlementForm.allowed}
-                disabled={busy}
-                onChange={(event) => {
-                  setPendingEntitlementSave(null);
-                  setEntitlementForm((current) => ({
-                    ...current,
-                    allowed: event.target.checked,
-                  }));
-                }}
-                type="checkbox"
-              />
-              Allow this attendee
-            </label>
-          </div>
-          <div className="operations-form-actions">
-            <button
-              className="button secondary"
-              disabled={busy}
-              onClick={() => void loadEntitlement()}
-              type="button"
-            >
-              {busyAction === "entitlement" ? "Loading…" : "Load current override"}
-            </button>
-            <button className="button primary" disabled={busy} type="submit">
-              {busyAction === "entitlement" ? "Saving…" : "Save override"}
-            </button>
-            {loadedEntitlement ? (
-              <button
-                className="button secondary"
-                disabled={busy}
-                onClick={() =>
-                  setPendingDeletion({
-                    kind: "entitlement",
-                    attendeeId: entitlementForm.attendeeId.trim(),
-                    checkpointId: entitlementForm.checkpointId,
-                  })
-                }
-                type="button"
-              >
-                Remove override
-              </button>
-            ) : null}
-          </div>
-        </form>
-        {pendingEntitlementSave ? (
-          <section className="operations-confirmation" aria-live="polite">
-            <h3>Confirm attendee override</h3>
-            <p>
-              {pendingEntitlementSave.allowed
-                ? `Allow this attendee up to ${pendingEntitlementSave.maxRedemptions} redemption${pendingEntitlementSave.maxRedemptions === 1 ? "" : "s"} at this checkpoint?`
-                : "Deny this attendee at this checkpoint? The redemption limit will not be used while access is denied."}
-            </p>
-            <div className="staff-actions">
-              <button
-                className="button primary"
-                disabled={busy}
-                onClick={() => void confirmEntitlementSave()}
-                type="button"
-              >
-                {busyAction === "entitlement" ? "Saving…" : "Confirm override"}
-              </button>
-              <button
-                className="button secondary"
-                disabled={busy}
-                onClick={() => setPendingEntitlementSave(null)}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
-          </section>
-        ) : null}
-      </section>
+      <details className="operations-advanced">
+        <summary>Find an attendee’s access settings</summary>
+        <p>Search by name or email, then manage exceptions inside their attendee record.</p>
+        <div className="operations-field">
+          <label htmlFor="access-attendee-search">Name or email</label>
+          <input id="access-attendee-search" value={attendeeQuery} disabled={busy} onChange={(event) => { setAttendeeQuery(event.target.value); setAttendeeMatches([]); setAttendeeSearchMessage(""); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void searchAttendees(); } }} />
+          <button type="button" className="button secondary" disabled={busy || !attendeeQuery.trim()} onClick={() => void searchAttendees()}>{attendeeSearchBusy ? "Searching…" : "Find attendee"}</button>
+          {attendeeSearchMessage ? <p role="status">{attendeeSearchMessage}</p> : null}
+          {attendeeMatches.map((application) => <Link className="attendee-search-result" key={application.id} href={`/organizer/applications/${application.id}#access-settings`}>{application.applicant.displayName || "Attendee"} · {application.applicant.email}</Link>)}
+        </div>
+      </details>
+      </div>
 
+      <details hidden={view !== "event"} className="operations-advanced">
+      <summary>Scan point totals</summary>
       <section className="operations-section" aria-labelledby="redemption-monitoring-heading">
         <div className="operations-section-heading">
           <div>
-            <h2 id="redemption-monitoring-heading">Redemption monitoring</h2>
+            <h2 id="redemption-monitoring-heading">Check-in activity</h2>
             <p className="staff-muted">
-              Counts are operational aggregates. Individual scan credentials, application
-              answers, and review records are not displayed here.
+              Successful scans at each point, including repeat uses where allowed. These are not unique attendance totals.
             </p>
           </div>
           <button
@@ -1077,8 +858,8 @@ export function OrganizerEventOperations({
               <thead>
                 <tr>
                   <th scope="col">Checkpoint</th>
-                  <th scope="col">Redemptions</th>
-                  <th scope="col">Last redemption</th>
+                  <th scope="col">Successful scans</th>
+                  <th scope="col">Last scan</th>
                 </tr>
               </thead>
               <tbody>
@@ -1095,15 +876,15 @@ export function OrganizerEventOperations({
         )}
       </section>
 
-      <section className="operations-section" aria-labelledby="exports-heading">
-        <h2 id="exports-heading">CSV exports</h2>
+      </details>
+      <section hidden={view !== "event"} className="operations-section" aria-labelledby="exports-heading">
+        <h2 id="exports-heading">Export attendance</h2>
         <p className="staff-muted">
-          Download the minimum necessary attendance or reconciliation data. Exports omit
-          credential hashes, application answers, reviews, and decisions.
+          Download the check-in record for your team. Application answers and QR credentials are never included.
         </p>
         <div className="operations-export-controls">
           <div className="operations-field">
-            <label htmlFor="export-checkpoint">Checkpoint filter (optional)</label>
+            <label htmlFor="export-checkpoint">Scan point (optional)</label>
             <select
               disabled={busy}
               id="export-checkpoint"
@@ -1129,16 +910,10 @@ export function OrganizerEventOperations({
                 ? "Preparing attendance…"
                 : "Download attendance CSV"}
             </button>
-            <button
-              className="button secondary"
-              disabled={busy}
-              onClick={() => void downloadCsv("reconciliation")}
-              type="button"
-            >
-              {busyAction === "reconciliation-export"
-                ? "Preparing reconciliation…"
-                : "Download reconciliation CSV"}
-            </button>
+            <details className="operations-advanced"><summary>Advanced export</summary>
+              <p>Download scan IDs and staff IDs for reconciliation. Personal application data is excluded.</p>
+              <button className="button secondary" disabled={busy} onClick={() => void downloadCsv("reconciliation")} type="button">{busyAction === "reconciliation-export" ? "Preparing reconciliation…" : "Download reconciliation CSV"}</button>
+            </details>
           </div>
         </div>
       </section>

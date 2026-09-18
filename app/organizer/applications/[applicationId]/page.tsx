@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { OrganizerDecisionActions } from "@/components/organizer-decision-actions";
 import { OrganizerPassActions } from "@/components/organizer-pass-actions";
 import { AdminResumeViewer } from "@/components/admin-resume-viewer";
+import { AttendeeAccessSettings } from "@/components/attendee-access-settings";
 import {
   ApplicationAnswersList,
   StaffErrorState,
@@ -121,6 +122,10 @@ export default async function OrganizerApplicationDetailPage({
             {application.rsvp.respondedAt ? <p>Last response: <time dateTime={application.rsvp.respondedAt}>{new Date(application.rsvp.respondedAt).toLocaleString()}</time></p> : null}
             <p className="staff-muted">Reported by the applicant. This does not change admission, revoke a pass, or prove check-in.</p>
           </section>
+        ) : null}
+
+        {application.attendeePass ? (
+          <AttendeeAccessSettings key={application.attendeePass.attendeeId} attendeeId={application.attendeePass.attendeeId} cycleId={application.cycleId} displayName={application.applicant.displayName || application.applicant.email} />
         ) : null}
 
         {application.attendeePass ? (

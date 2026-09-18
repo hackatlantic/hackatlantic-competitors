@@ -19,11 +19,29 @@ describe("Event pass", () => {
     api.getAttendeePass.mockResolvedValue(pass);
   });
 
-  it("links from the dashboard without fetching or embedding a QR", () => {
+  it("only links from the dashboard after confirming availability, without embedding a QR", async () => {
     render(<ApplicantPass />);
-    expect(screen.getByRole("link", { name: /Event pass/ }).getAttribute("href")).toBe("/event-pass");
-    expect(api.getAttendeePass).not.toHaveBeenCalled();
+    expect(screen.queryByRole("link", { name: /View event pass/ })).toBeNull();
+    expect((await screen.findByRole("link", { name: /View event pass/ })).getAttribute("href")).toBe("/event-pass");
     expect(screen.queryByRole("img", { name: /QR code/ })).toBeNull();
+  });
+
+  it("keeps the dashboard in waiting state until a pass is released", async () => {
+    api.getAttendeePass.mockRejectedValueOnce(new ApiError(404, { code: "pass_not_found" }));
+    render(<ApplicantPass />);
+    await screen.findByText(/Your pass will appear here/);
+    expect(screen.queryByRole("link", { name: /View event pass/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Check for pass" }));
+    await screen.findByRole("link", { name: /View event pass/ });
+  });
+
+  it("does not describe a pass lookup failure as an unreleased pass", async () => {
+    api.getAttendeePass.mockRejectedValueOnce(new Error("offline"));
+    render(<ApplicantPass />);
+    await screen.findByText(/couldn’t check your pass/);
+    expect(screen.queryByRole("link", { name: /View event pass/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await screen.findByRole("link", { name: /View event pass/ });
   });
 
   it("renders the issued ticket, attendee and check-in logistics", async () => {

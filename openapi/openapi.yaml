@@ -2699,7 +2699,7 @@ components:
           minimum: 0
     OrganizerCheckpointCount:
       type: object
-      description: Count of successful immutable redemption records at one checkpoint.
+      description: Successful scans and distinct attendees at one checkpoint, plus current confirmed accepted RSVPs for its event cycle. Counts are not combined across checkpoints.
       additionalProperties: false
       required: [checkpointId, checkpointName, totalRedemptions]
       properties:
@@ -2711,6 +2711,14 @@ components:
         totalRedemptions:
           type: integer
           minimum: 0
+        uniqueAttendees:
+          type: integer
+          minimum: 0
+          description: Distinct attendee IDs with a successful redemption at this checkpoint.
+        confirmedRsvps:
+          type: integer
+          minimum: 0
+          description: Confirmed responses to the current released acceptance in this checkpoint's event cycle, regardless of checkpoint access.
         lastRedeemedAt:
           type: string
           format: date-time

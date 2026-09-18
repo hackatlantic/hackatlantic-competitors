@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApplicantRSVP } from "@/components/applicant-rsvp";
 import { ApiError } from "@/lib/api";
 
-const api = vi.hoisted(() => ({ getApplicationRSVP: vi.fn(), respondToRSVP: vi.fn() }));
+const api = vi.hoisted(() => ({ getApplicationRSVP: vi.fn(), respondToRSVP: vi.fn(), getAttendeePass: vi.fn() }));
 const getToken = vi.hoisted(() => vi.fn());
-vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ getToken }) }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ getToken, isLoaded: true, userId: "user" }) }));
 vi.mock("@/lib/api", async (original) => ({ ...(await original<typeof import("@/lib/api")>()), createApiClient: () => api }));
 
 const pending = { applicationId: "application", decisionId: "acceptance", status: "pending", lockVersion: 0 };
@@ -15,6 +15,7 @@ describe("ApplicantRSVP", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     api.getApplicationRSVP.mockResolvedValue(pending);
+    api.getAttendeePass.mockRejectedValue(new ApiError(404, { code: "pass_not_found" }));
     api.respondToRSVP.mockImplementation(async (_id, input) => ({ ...pending, ...input, lockVersion: 1 }));
   });
 
@@ -23,7 +24,9 @@ describe("ApplicantRSVP", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Confirm attendance" }));
     await screen.findByText("RSVP updated.");
     expect(api.respondToRSVP).toHaveBeenCalledWith("application", { decisionId: "acceptance", lockVersion: 0, status: "confirmed" });
-    expect((screen.getByRole("button", { name: "Confirmed" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("heading", { name: "You’re confirmed" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Confirm attendance" })).toBeNull();
+    await screen.findByText(/Your pass will appear here/);
   });
 
   it("requires confirmation before declining and allows cancellation", async () => {
