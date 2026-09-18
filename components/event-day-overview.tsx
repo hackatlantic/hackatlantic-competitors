@@ -2,24 +2,25 @@
 
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createApiClient, type OrganizerCheckpoint, type OrganizerRedemption, type OrganizerRedemptionCount } from "@/lib/api";
 
-export function EventDayOverview({ checkpoints, counts, onSetup, onRefresh }: {
+export function CheckInOverview({ checkpoints, counts, onRefresh, children }: {
   checkpoints: OrganizerCheckpoint[];
   counts: OrganizerRedemptionCount[];
-  onSetup: () => void;
   onRefresh: () => void;
+  children: ReactNode;
 }) {
   const { getToken } = useAuth();
   const client = useMemo(() => createApiClient({ getToken }), [getToken]);
-  const active = checkpoints.filter((point) => point.active);
   const [selection, setSelection] = useState("");
-  const selected = checkpoints.find((point) => point.id === selection) ?? (active.length === 1 ? active[0] : null);
+  // Never guess which configured activity represents entrance attendance.
+  const selected = checkpoints.find((point) => point.id === selection) ?? (checkpoints.length === 1 ? checkpoints[0] : null);
   const count = counts.find((item) => item.checkpointId === selected?.id);
   const [recent, setRecent] = useState<OrganizerRedemption[] | null>(null);
   const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
     void client.listOrganizerRedemptions().then((data) => {
@@ -27,30 +28,48 @@ export function EventDayOverview({ checkpoints, counts, onSetup, onRefresh }: {
     }).catch(() => { if (!cancelled) setError(true); });
     return () => { cancelled = true; };
   }, [client, reload, counts]);
-  const rows = (recent ?? []).filter((row) => !selected || row.checkpoint.id === selected.id).slice(0, 10);
-  return <section className="event-day-overview" aria-labelledby="event-day-heading">
-    <div className="operations-section-heading">
-      <div><h2 id="event-day-heading">Ready for arrivals</h2><p className="staff-muted">Open the scanner to welcome attendees. Manage event settings separately.</p></div>
-      <div className="staff-actions"><Link href="/scanner" className="button primary">Open scanner</Link><Link href="/organizer/reviewers" className="button secondary">Manage volunteers</Link></div>
-    </div>
-    {!active.length ? <div className="operations-confirmation"><p>No scan points are active. Set up your entrance before check-in begins.</p><button className="button secondary" onClick={onSetup} type="button">Set up entrance</button></div> : null}
-    <div className="operations-field">
-      <label htmlFor="event-day-point">Attendance at</label>
-      <select id="event-day-point" value={selected?.id ?? ""} onChange={(event) => setSelection(event.target.value)}>
-        <option value="">Choose an entrance or scan point</option>
-        {checkpoints.map((point) => <option key={point.id} value={point.id}>{point.name}{point.active ? "" : " (inactive)"}</option>)}
-      </select>
-    </div>
-    {selected ? <>
+
+  const rows = selected ? (recent ?? []).filter((row) => row.checkpoint.id === selected.id).slice(0, 5) : [];
+  return (
+    <div className="check-in-overview">
+      <div className="check-in-actions">
+        <Link href="/scanner" className="button primary">Open scanner <span aria-hidden="true">↗</span></Link>
+        <Link href="/organizer/reviewers" className="staff-link">Manage volunteers</Link>
+      </div>
+
+      {checkpoints.length > 1 ? <div className="check-in-selection">
+        <label htmlFor="check-in-activity">Show check-ins for</label>
+        <select id="check-in-activity" value={selected?.id ?? ""} onChange={(event) => setSelection(event.target.value)}>
+          <option value="">Choose entrance or a meal</option>
+          {checkpoints.map((point) => <option key={point.id} value={point.id}>{point.name}{point.active ? "" : " (closed)"}</option>)}
+        </select>
+      </div> : null}
+
       <dl className="event-day-stats">
-        <div><dt>People checked in here</dt><dd>{count?.uniqueAttendees ?? "—"}</dd></div>
-        <div><dt>Confirmed for this event</dt><dd>{count?.confirmedRsvps ?? "—"}</dd></div>
+        <div><dt>Confirmed attendees</dt><dd>{count?.confirmedRsvps ?? "—"}</dd></div>
+        <div><dt>People checked in{selected ? ` · ${selected.name}` : ""}</dt><dd>{count?.uniqueAttendees ?? "—"}</dd></div>
       </dl>
-      <p className="staff-muted">Each person is counted once at {selected.name}. Confirmed attendance includes all current accepted RSVPs for this event, not just this scan point.</p>
-      {count?.uniqueAttendees === undefined ? <p role="status">Attendance totals are not available from the API yet.</p> : null}
-    </> : <p className="staff-muted">Choose the entrance to see unique check-ins. We don’t combine entrance, meal and swag scans into an attendance total.</p>}
-    <div className="operations-section-heading"><h3>Recent check-ins</h3><button type="button" className="button secondary" onClick={() => { setRecent(null); setError(false); setReload((value) => value + 1); onRefresh(); }}>Refresh overview</button></div>
-    {error ? <p role="alert">We couldn’t load recent check-ins. Try refreshing activity.</p> : recent === null ? <p role="status">Loading check-ins…</p> : rows.length === 0 ? <p>No check-ins in the latest activity for this selection.</p> : <ul className="event-day-recent">{rows.map((row) => <li key={row.id}><div><strong>{row.attendee.displayName}</strong><span>{row.checkpoint.name}</span></div><time dateTime={row.redeemedAt}>{new Date(row.redeemedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time></li>)}</ul>}
-    <p className="staff-muted">Shows up to 10 matches from the latest 100 successful scans. Use the attendance export for the complete record.</p>
-  </section>;
+      {!checkpoints.length ? <p className="staff-muted" role="status">Check-in hasn’t been configured yet. Ask the event lead to enable scanning before arrivals.</p>
+        : !selected ? <p className="staff-muted">Choose what to view. Entrance and meal check-ins are counted separately.</p>
+          : count?.uniqueAttendees === undefined || count?.confirmedRsvps === undefined ? <p className="staff-muted" role="status">Attendance totals are currently unavailable.</p>
+            : <p className="staff-muted check-in-count-note">Confirmed for the event. Checked in once per person at {selected.name}.</p>}
+
+      {children}
+
+      <section className="check-in-recent" aria-labelledby="recent-check-ins-heading">
+        <div className="operations-section-heading">
+          <h2 id="recent-check-ins-heading">Recent check-ins</h2>
+          <button type="button" className="button secondary" onClick={() => { setRecent(null); setError(false); setReload((value) => value + 1); onRefresh(); }}>Refresh</button>
+        </div>
+        {error ? <p role="alert">We couldn’t load recent check-ins. Please refresh.</p>
+          : !selected ? <p className="staff-muted">{checkpoints.length ? "Choose what to view above." : "Recent check-ins will appear here."}</p>
+            : recent === null ? <p role="status">Loading check-ins…</p>
+              : rows.length === 0 ? <p className="staff-muted">No recent check-ins for {selected.name}.</p>
+                : <ul className="event-day-recent">{rows.map((row) => (
+                  <li key={row.id}><strong>{row.attendee.displayName}</strong><time dateTime={row.redeemedAt}>{new Date(row.redeemedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time></li>
+                ))}</ul>}
+        {rows.length > 0 && !error ? <p className="staff-muted check-in-count-note">Recent activity, not a complete attendance list.</p> : null}
+      </section>
+    </div>
+  );
 }

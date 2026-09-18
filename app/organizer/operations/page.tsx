@@ -4,14 +4,12 @@ import { OrganizerEventOperations } from "@/components/organizer-event-operation
 import {
   ApiError,
   createApiClient,
-  type OrganizerActivityListResponse,
   type OrganizerCheckpointListResponse,
   type OrganizerRedemptionCountsResponse,
 } from "@/lib/api";
 import { StaffErrorState, StaffPageFrame } from "@/components/staff-workflow";
 
 type OrganizerOperationsData = {
-  activities: OrganizerActivityListResponse;
   checkpoints: OrganizerCheckpointListResponse;
   counts: OrganizerRedemptionCountsResponse;
 };
@@ -19,17 +17,17 @@ type OrganizerOperationsData = {
 function organizerOperationsLoadMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 401) {
-      return "Your session has ended. Sign in again to access event operations.";
+      return "Your session has ended. Sign in again to view check-in.";
     }
 
     if (error.status === 403) {
-      return "Admin access is required to manage event operations.";
+      return "Admin access is required to view attendance.";
     }
   }
 
   return error instanceof Error
     ? error.message
-    : "Event operations could not be loaded.";
+    : "Check-in could not be loaded.";
 }
 
 export default async function OrganizerOperationsPage() {
@@ -41,17 +39,13 @@ export default async function OrganizerOperationsPage() {
   const client = createApiClient({ getToken });
   let operations: OrganizerOperationsData | null = null;
   let loadError: unknown = undefined;
-  let currentCycleId: string | undefined;
 
   try {
-    const [activities, checkpoints, counts] = await Promise.all([
-      client.listOrganizerActivities(),
+    const [checkpoints, counts] = await Promise.all([
       client.listOrganizerCheckpoints(),
       client.listOrganizerRedemptionCounts(),
     ]);
-    operations = { activities, checkpoints, counts };
-    // Setup remains usable when intake is closed or the current form is unavailable.
-    currentCycleId = await client.getCurrentApplicationForm().then((form) => form.cycleId).catch(() => undefined);
+    operations = { checkpoints, counts };
   } catch (error) {
     loadError = error;
   }
@@ -61,9 +55,10 @@ export default async function OrganizerOperationsPage() {
       <StaffPageFrame
         eyebrow="Admin workspace"
         role="admin"
-        title="Event operations"
+        title="Check-in"
+        compactHeader
       >
-        <StaffErrorState title="Event operations unavailable">
+        <StaffErrorState title="Check-in unavailable">
           {organizerOperationsLoadMessage(loadError)}
         </StaffErrorState>
       </StaffPageFrame>
@@ -74,13 +69,12 @@ export default async function OrganizerOperationsPage() {
     <StaffPageFrame
       eyebrow="Admin workspace"
       role="admin"
-      title="Event operations"
+      title="Check-in"
+      compactHeader
     >
       <OrganizerEventOperations
-        initialActivities={operations.activities.items}
         initialCheckpoints={operations.checkpoints.items}
         initialCounts={operations.counts.items}
-        currentCycleId={currentCycleId}
       />
     </StaffPageFrame>
   );
