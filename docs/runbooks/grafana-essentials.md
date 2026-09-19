@@ -49,8 +49,8 @@ Confirmed connection values (not credentials):
 Created the stack-scoped `hackatlantic-api-metrics` access policy with only
 `metrics:write`, and the `hackatlantic-terraform` service account (numeric ID
 `18`) with Editor and Alerting's Write via Provisioning API roles. The ingestion
-policy does not have a token yet. Generate its token only when the protected
-deployment destination is available; never place credentials in this document.
+policy now has a deployment token stored only in the protected
+`API_OBSERVABILITY_ENV_JSON` inputs. Never place credentials in this document.
 
 **Provisioned:** the original `HackAtlantic/hackatlantic-ats-observability`
 workspace (`ws-xTtgfRfR3kMx2VeT`, local execution) now manages four resources:
@@ -59,20 +59,45 @@ group. The final live Terraform plan reported **No changes**. Production and
 staging infrastructure workspaces were not modified.
 
 Dashboard: [HackAtlantic API Overview](https://calmbamboo2335.grafana.net/d/hackatlantic-api/hackatlantic-api-overview).
-Its eleven panels render, but show no API data yet. All three rules are paused
-(`enable_alerts=false`). Grafana reported **Test notification sent successfully**
+Its eleven panels have been verified with real staging telemetry. Grafana reported **Test notification sent successfully**
 for the approved email recipient on September 2, and inbox delivery was
 confirmed. Temporary bootstrap credentials are not deployment
 credentials and must not be installed in CI. Both bootstrap tokens were revoked
 after the final no-drift check; the existing HCP GitHub Actions token was left
 unchanged. The temporary saved plan was removed; remote state remains intact.
 
-**Not operational yet:** protected ingestion/configuration credentials, API
-deployment, real metrics/label verification, an accepted second-recipient
-Grafana invitation and delivery confirmation, and alert activation remain
-outstanding. Terraform validation and both mocked tests pass
-under WSL Ubuntu; those tests do not prove API ingestion. The instrumentation
-changes are on `codex/grafana-essentials`, not deployed to production yet.
+**Rollout:** PR #107 is merged and API revision
+`21b1a585a75d6995a66a5261571a23eb9d6d72a2` deployed successfully. The initial
+ingestion header incorrectly used the Prometheus tenant ID. It was corrected to
+the OTLP instance ID above, and an empty OTLP request returned HTTP 200 before
+the replacement secret was installed. Release `33687509195`, attempt 2, reuses
+the already-built digest to roll out this configuration correction.
+
+Live staging verification confirmed fresh heartbeat samples, all eleven
+dashboard panels, templated routes, pool counts, scanner latency histograms,
+and the exact Git SHA in `target_info`. Production verification then confirmed
+the same Git SHA, a fresh heartbeat, HTTP counters, and pool gauges. All three
+production alert queries returned zero (healthy). The reviewed activation plan
+updated only the rule group: **0 additions, 1 in-place change, 0 deletions**.
+All three alerts are enabled; the post-apply Terraform plan reported **No changes**
+with `enable_alerts=true`. These are live checks, not inferred from unit tests.
+
+Production scanner graphs can legitimately be empty until actual scanner traffic
+occurs. Staging exercised and populated both scanner series; no production
+attendee records were created to manufacture dashboard data.
+
+The configuration-only rerun successfully updated and verified the production
+API, but its final Vercel step returned HTTP 409 because that frontend was already
+current production. The applicant portal remained HTTP 200. The promotion wrapper
+recognizes only that exact pinned-CLI response as an idempotent success; other
+conflicts, auth errors, additional errors, and interrupted commands still fail.
+
+The second email recipient still requires an accepted Grafana organization
+invitation. This does not prevent alerting to the primary confirmed recipient.
+Automated observability plans/drift are **not activated**: their protected
+`TFVARS_OBSERVABILITY_JSON` and appropriate read credentials still need setup.
+Do not install short-lived bootstrap credentials into CI or describe a skipped
+plan job as a successful live Terraform plan.
 
 ### Deployment steps
 
@@ -81,7 +106,7 @@ changes are on `codex/grafana-essentials`, not deployed to production yet.
 2. In the stack's OpenTelemetry connection instructions, obtain its actual
    OTLP/HTTP endpoint and a stack-scoped token with **metrics:write only**.
    This ingestion token is separate from the Grafana configuration token.
-3. Add these keys to the existing sensitive `api_env` payload in staging first:
+3. Set these keys in the separate protected `API_OBSERVABILITY_ENV_JSON` map:
 
    - `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`: the stack OTLP endpoint ending in
      `/v1/metrics` (for example, the displayed `/otlp` base plus `/v1/metrics`).
@@ -93,8 +118,15 @@ changes are on `codex/grafana-essentials`, not deployed to production yet.
    and `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` unset/empty for metrics-only operation.
    A nonempty global endpoint enables all three signals. Do not put ingestion
    credentials in a NEXT_PUBLIC variable or in source control.
-4. Update the existing protected Terraform environment-secret payload, preserving
-   every unrelated key. The App Platform module already marks all API environment
+   Construct the Basic header with the **OTLP instance ID**, not the Prometheus
+   tenant ID. Validate a POST of `{"resourceMetrics":[]}` with
+   `Content-Type: application/json` to the metrics endpoint; require HTTP 200
+   without printing the header. This tests authentication without inventing
+   heartbeat or application metrics.
+4. Update this dedicated secret in `staging`, `Production`, `terraform-plan`,
+   and `terraform-drift`, without overwriting `TFVARS_*_JSON` or unrelated
+   credentials. The roots merge it through sensitive `api_observability_env`.
+   The App Platform module already marks all API environment
    values SECRET. Deploy through the existing digest-pinned release pipeline.
    Do not hand-edit DigitalOcean without updating the managed source of truth.
 5. After roughly two collection intervals (30 seconds each), verify in Grafana
@@ -105,6 +137,15 @@ changes are on `codex/grafana-essentials`, not deployed to production yet.
    settings, not accepting an empty dashboard as success.
 6. Promote the verified image/config to production through the usual approval.
    Confirm production appears separately and the reported version is correct.
+   To change only configuration on an already-successful release, rerun its
+   staging job and dependent production job. This retains the original image
+   digest and re-executes the staging gates.
+
+`service_version` currently reports `staging` or `production`; use
+`target_info.vcs_ref_head_revision` and `/versionz` for the exact deployed Git SHA.
+Grafana histogram quantiles are bucket estimates over a rolling window, so they
+need not equal k6's per-request percentiles. Large admin fixture-creation batches
+can also affect the overall API p95 without representing scanner latency.
 
 The SDK exports only route templates, bounded methods/status classes, timing,
 counts, build metadata, and random process identifiers. No SQL text, names,
@@ -165,6 +206,8 @@ synthetic monitoring credentials. A telemetry heartbeat is not their substitute.
 - After ingestion, labels, and delivery pass, set `enable_alerts=true` in the
   protected observability inputs. Review and apply a plan that only unpauses
   the three rules. Do not enable the missing-telemetry alert during bootstrap.
+  Retain `enable_alerts=true` in subsequent authorized operator inputs; the
+  module default deliberately remains false for safe first-time bootstrap.
 - Inspect each alert query in Explore: idle/no-5xx traffic evaluates to zero;
   missing telemetry evaluates to one after ten minutes. Do not break production
   to test alerts. Use a temporary staging-scoped rule/exporter pause if approved.
