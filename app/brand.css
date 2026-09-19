@@ -1313,6 +1313,9 @@ input[type="checkbox"] {
 .check-in-actions .button { min-height: 52px; }
 .check-in-actions .staff-link { padding-block: 12px; }
 .check-in-selection { display: grid; gap: 8px; max-width: 480px; }
+.check-in-setup { display: grid; justify-items: start; gap: 16px; padding: 24px; border: 1px solid var(--brand-line); border-radius: 16px; background: white; }
+.check-in-setup p { margin: 0; }
+.check-in-setup .button { min-height: 48px; max-width: 100%; white-space: normal; }
 .check-in-selection select, .check-in-search input { width: 100%; min-width: 0; min-height: 48px; padding: 12px 14px; background: white; color: var(--brand-navy); border: 1px solid var(--brand-line); border-radius: 10px; font: inherit; }
 .check-in-count-note { margin: -12px 0 0; font-size: 0.88rem; }
 .check-in-search, .check-in-recent { display: grid; gap: 16px; border-top: 1px solid var(--brand-line); padding-top: 24px; min-width: 0; }

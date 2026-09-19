@@ -1,9 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizerEventOperations } from "@/components/organizer-event-operations";
-import type { OrganizerRedemptionCount } from "@/lib/api";
+import { ApiError, type OrganizerRedemptionCount } from "@/lib/api";
 
-const api = vi.hoisted(() => ({ listOrganizerRedemptions: vi.fn(), listOrganizerApplications: vi.fn(), updateOrganizerAttendeeEntitlement: vi.fn() }));
+const api = vi.hoisted(() => ({ getOrganizerAttendanceSummary: vi.fn(), enableOrganizerEntrance: vi.fn(), listOrganizerRedemptions: vi.fn(), listOrganizerApplications: vi.fn(), updateOrganizerAttendeeEntitlement: vi.fn() }));
 const getToken = vi.hoisted(() => vi.fn());
 const router = vi.hoisted(() => ({ refresh: vi.fn() }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => ({ getToken }) }));
@@ -16,7 +16,7 @@ function show(counts: OrganizerRedemptionCount[] = [count]) { return render(<Org
 
 describe("Simple check-in dashboard", () => {
   afterEach(cleanup);
-  beforeEach(() => { vi.resetAllMocks(); api.listOrganizerRedemptions.mockResolvedValue({ items: [] }); });
+  beforeEach(() => { vi.resetAllMocks(); api.listOrganizerRedemptions.mockResolvedValue({ items: [] }); api.getOrganizerAttendanceSummary.mockResolvedValue({ cycleId: "cycle", cycleName: "Hack Atlantic", confirmedRsvps: 30 }); api.enableOrganizerEntrance.mockResolvedValue(checkpoint); });
 
   it("shows attendance, scanner, volunteers and search without setup or exports", async () => {
     show(); await screen.findByText(/No recent check-ins for Main entrance/);
@@ -33,7 +33,8 @@ describe("Simple check-in dashboard", () => {
   it("does not substitute scan counts when the older API lacks unique totals", async () => {
     show([{ checkpointId: "entrance", checkpointName: "Main entrance", totalRedemptions: 20 }]);
     await screen.findByText(/Attendance totals are currently unavailable/);
-    expect(screen.getAllByText("—").length).toBe(2);
+    expect(screen.getAllByText("—").length).toBe(1);
+    expect(screen.getByText("30")).toBeTruthy();
     expect(screen.queryByText("20")).toBeNull();
   });
 
@@ -79,7 +80,7 @@ describe("Simple check-in dashboard", () => {
     render(<OrganizerEventOperations initialCheckpoints={[checkpoint, lunch]} initialCounts={[count, { ...count, checkpointId: "lunch", uniqueAttendees: 7 }]} />);
     expect(screen.queryByText("12")).toBeNull();
     expect(screen.queryByText("Entrance attendee")).toBeNull();
-    fireEvent.change(screen.getByLabelText("Show check-ins for"), { target: { value: "lunch" } });
+    fireEvent.change(await screen.findByLabelText("Show check-ins for"), { target: { value: "lunch" } });
     await screen.findByText("Lunch attendee");
     expect(screen.getByText("7")).toBeTruthy();
     expect(screen.queryByText("12")).toBeNull();
@@ -91,9 +92,64 @@ describe("Simple check-in dashboard", () => {
 
   it("does not invent scanning choices when none are configured", async () => {
     render(<OrganizerEventOperations initialCheckpoints={[]} initialCounts={[]} />);
-    await screen.findByText(/Check-in hasn’t been configured/);
+    await screen.findByRole("button", { name: "Enable entrance check-in" });
     expect(screen.queryByRole("combobox")).toBeNull();
-    expect(screen.getAllByText("—").length).toBe(2);
+    expect(screen.getByText("30")).toBeTruthy();
+    expect(screen.getByText("0")).toBeTruthy();
+    expect(api.enableOrganizerEntrance).not.toHaveBeenCalled();
+  });
+
+  it("enables the current event once, then uses the returned entrance", async () => {
+    render(<OrganizerEventOperations initialCheckpoints={[]} initialCounts={[]} />);
+    const button = await screen.findByRole("button", { name: "Enable entrance check-in" });
+    fireEvent.click(button); fireEvent.click(button);
+    await screen.findByText(/No recent check-ins for Main entrance/);
+    expect(api.enableOrganizerEntrance).toHaveBeenCalledExactlyOnceWith("cycle");
+    expect(router.refresh).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "Enable entrance check-in" })).toBeNull();
+  });
+
+  it("offers a safe retry after uncertain setup and preserves a closed entrance on replay", async () => {
+    api.enableOrganizerEntrance.mockRejectedValueOnce(new Error("network")).mockResolvedValueOnce({ ...checkpoint, active: false, defaultMaxRedemptions: 2 });
+    render(<OrganizerEventOperations initialCheckpoints={[]} initialCounts={[]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Enable entrance check-in" }));
+    await screen.findByText(/You can safely try again/);
+    fireEvent.click(screen.getByRole("button", { name: "Enable entrance check-in" }));
+    await screen.findByText(/Main entrance is closed/);
+    expect(api.enableOrganizerEntrance).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not show old-event counts or block current-event setup", async () => {
+    render(<OrganizerEventOperations initialCheckpoints={[{ ...checkpoint, cycleId: "old-cycle" }]} initialCounts={[count]} />);
+    await screen.findByRole("button", { name: "Enable entrance check-in" });
+    expect(screen.getByText("0")).toBeTruthy();
+    expect(screen.queryByText("12")).toBeNull();
+  });
+
+  it("keeps unavailable totals distinct from zero and disables setup until refresh succeeds", async () => {
+    api.getOrganizerAttendanceSummary.mockRejectedValueOnce(new Error("offline"));
+    render(<OrganizerEventOperations initialCheckpoints={[]} initialCounts={[]} />);
+    await screen.findByText(/We couldn’t load attendance totals/);
+    expect(screen.getAllByText("—")).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Enable entrance check-in" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await screen.findByRole("button", { name: "Enable entrance check-in" });
+  });
+
+  it("does not offer setup when there is no active event", async () => {
+    api.getOrganizerAttendanceSummary.mockRejectedValue(new ApiError(404, { code: "operations_not_found" }));
+    render(<OrganizerEventOperations initialCheckpoints={[]} initialCounts={[]} />);
+    await screen.findByText(/No active event was found/);
+    expect(screen.queryByRole("button", { name: "Enable entrance check-in" })).toBeNull();
+    expect(api.enableOrganizerEntrance).not.toHaveBeenCalled();
+  });
+
+  it("explains a setup conflict without changing existing rules", async () => {
+    api.enableOrganizerEntrance.mockRejectedValue(new ApiError(409, { code: "operations_conflict" }));
+    render(<OrganizerEventOperations initialCheckpoints={[]} initialCounts={[]} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Enable entrance check-in" }));
+    await screen.findByText(/The event setup changed/);
+    expect(api.updateOrganizerAttendeeEntitlement).not.toHaveBeenCalled();
   });
 
   it("uses refreshed server totals without retaining an outdated snapshot", async () => {

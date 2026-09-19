@@ -1303,6 +1303,79 @@ paths:
           $ref: "#/components/responses/OperationsNotFound"
         "503":
           $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/attendance-summary:
+    get:
+      operationId: getOrganizerAttendanceSummary
+      summary: Confirmed RSVPs for the active event, independent of checkpoints and form opening dates
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: Current accepted decisions with confirmed responses only.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cycleId, cycleName, confirmedRsvps]
+                properties:
+                  cycleId:
+                    type: string
+                    format: uuid
+                  cycleName:
+                    type: string
+                  confirmedRsvps:
+                    type: integer
+                    minimum: 0
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+  /v1/admin/check-in/entrance:
+    post:
+      operationId: enableOrganizerEntrance
+      summary: Enable a one-use main entrance for an unconfigured active event
+      description: Serialized by event; retries return the existing main-entrance checkpoint without resetting its rules. Conflicts if the event is inactive or other checkpoint configuration already exists. Does not issue passes or change RSVPs.
+      tags: [Operations]
+      security:
+        - clerkBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [cycleId]
+              properties:
+                cycleId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Newly created entrance or unchanged existing entrance.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizerCheckpoint"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/OrganizerRequired"
+        "404":
+          $ref: "#/components/responses/OperationsNotFound"
+        "409":
+          $ref: "#/components/responses/OperationsConflict"
+        "503":
+          $ref: "#/components/responses/DependencyUnavailable"
+        "422":
+          $ref: "#/components/responses/InvalidOperationsInput"
   /v1/admin/redemptions/counts:
     get:
       operationId: listOrganizerRedemptionCounts

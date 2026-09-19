@@ -331,6 +331,12 @@ export type UpdateOrganizerEntitlementRequest = {
   maxRedemptions: number;
 };
 
+export type OrganizerAttendanceSummary = {
+  cycleId: string;
+  cycleName: string;
+  confirmedRsvps: number;
+};
+
 export type OrganizerRedemptionCount = {
   checkpointId: string;
   checkpointName: string;
@@ -532,6 +538,8 @@ export type ApiClient = {
     checkpointId: string,
   ): Promise<void>;
   listOrganizerRedemptionCounts(): Promise<OrganizerRedemptionCountsResponse>;
+  getOrganizerAttendanceSummary(): Promise<OrganizerAttendanceSummary>;
+  enableOrganizerEntrance(cycleId: string): Promise<OrganizerCheckpoint>;
   listOrganizerRedemptions(): Promise<OrganizerRedemptionListResponse>;
   downloadOrganizerAttendanceCsv(
     filters?: OrganizerExportFilters,
@@ -832,6 +840,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       ),
     listOrganizerRedemptionCounts: () =>
       request<OrganizerRedemptionCountsResponse>("/v1/admin/redemptions/counts"),
+    getOrganizerAttendanceSummary: () => request<OrganizerAttendanceSummary>("/v1/admin/attendance-summary"),
+    enableOrganizerEntrance: (cycleId) => request<OrganizerCheckpoint>("/v1/admin/check-in/entrance", { method: "POST", body: JSON.stringify({ cycleId }) }),
     listOrganizerRedemptions: () =>
       request<OrganizerRedemptionListResponse>("/v1/admin/redemptions"),
     downloadOrganizerAttendanceCsv: (filters) =>

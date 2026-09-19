@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { createApiClient, type OrganizerCheckpoint, type OrganizerRedemption, type OrganizerRedemptionCount } from "@/lib/api";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ApiError, createApiClient, type OrganizerAttendanceSummary, type OrganizerCheckpoint, type OrganizerRedemption, type OrganizerRedemptionCount } from "@/lib/api";
 
-export function CheckInOverview({ checkpoints, counts, onRefresh, children }: {
+export function CheckInOverview({ checkpoints: initialCheckpoints, counts, onRefresh, children }: {
   checkpoints: OrganizerCheckpoint[];
   counts: OrganizerRedemptionCount[];
   onRefresh: () => void;
@@ -13,6 +13,13 @@ export function CheckInOverview({ checkpoints, counts, onRefresh, children }: {
 }) {
   const { getToken } = useAuth();
   const client = useMemo(() => createApiClient({ getToken }), [getToken]);
+  const [summary, setSummary] = useState<OrganizerAttendanceSummary | null>(null);
+  const [summaryError, setSummaryError] = useState("");
+  const [added, setAdded] = useState<OrganizerCheckpoint | null>(null);
+  const [enabling, setEnabling] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  const setupBusy = useRef(false);
+  const checkpoints = summary ? [...initialCheckpoints, ...(added && !initialCheckpoints.some((point) => point.id === added.id) ? [added] : [])].filter((point) => point.cycleId === summary.cycleId) : [];
   const [selection, setSelection] = useState("");
   // Never guess which configured activity represents entrance attendance.
   const selected = checkpoints.find((point) => point.id === selection) ?? (checkpoints.length === 1 ? checkpoints[0] : null);
@@ -20,6 +27,38 @@ export function CheckInOverview({ checkpoints, counts, onRefresh, children }: {
   const [recent, setRecent] = useState<OrganizerRedemption[] | null>(null);
   const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void client.getOrganizerAttendanceSummary().then((data) => {
+      if (!cancelled) { setSummary(data); setSummaryError(""); }
+    }).catch((error: unknown) => {
+      if (!cancelled) {
+        setSummary(null);
+        setSummaryError(error instanceof ApiError && error.status === 404
+          ? "No active event was found. Check the event configuration before enabling check-in."
+          : "We couldn’t load attendance totals. Please refresh before enabling check-in.");
+      }
+    });
+    return () => { cancelled = true; };
+  }, [client, reload, counts]);
+
+  async function enableEntrance() {
+    if (!summary || setupBusy.current) return;
+    setupBusy.current = true;
+    setEnabling(true);
+    setSetupError("");
+    try {
+      const point = await client.enableOrganizerEntrance(summary.cycleId);
+      setAdded(point);
+      setSelection(point.id);
+      onRefresh();
+    } catch (error: unknown) {
+      setSetupError(error instanceof ApiError && error.status === 409
+        ? "The event setup changed. Refresh to load the latest check-in options."
+        : "We couldn’t confirm setup. You can safely try again; this won’t create a second entrance.");
+    } finally { setupBusy.current = false; setEnabling(false); }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -46,12 +85,21 @@ export function CheckInOverview({ checkpoints, counts, onRefresh, children }: {
       </div> : null}
 
       <dl className="event-day-stats">
-        <div><dt>Confirmed attendees</dt><dd>{count?.confirmedRsvps ?? "—"}</dd></div>
-        <div><dt>People checked in{selected ? ` · ${selected.name}` : ""}</dt><dd>{count?.uniqueAttendees ?? "—"}</dd></div>
+        <div><dt>Confirmed attendees</dt><dd>{summary?.confirmedRsvps ?? "—"}</dd></div>
+        <div><dt>People checked in{selected ? ` · ${selected.name}` : ""}</dt><dd>{summary && !checkpoints.length ? 0 : count?.uniqueAttendees ?? "—"}</dd></div>
       </dl>
-      {!checkpoints.length ? <p className="staff-muted" role="status">Check-in hasn’t been configured yet. Ask the event lead to enable scanning before arrivals.</p>
+      {summaryError ? <p role="alert">{summaryError}</p>
+        : !summary ? <p role="status">Loading attendance…</p>
+        : !checkpoints.length ? <section className="check-in-setup" aria-labelledby="enable-check-in-heading">
+          <h2 id="enable-check-in-heading">Ready for arrivals?</h2>
+          <p className="staff-muted">Enable entrance check-in for {summary.cycleName}. Each attendee can check in once with their released pass.</p>
+          <button type="button" className="button primary" disabled={enabling} onClick={() => void enableEntrance()}>{enabling ? "Enabling check-in…" : "Enable entrance check-in"}</button>
+          <p className="staff-muted check-in-count-note">Enables scanning now. This does not release passes or change RSVPs.</p>
+          {setupError ? <p role="alert">{setupError}</p> : null}
+        </section>
         : !selected ? <p className="staff-muted">Choose what to view. Entrance and meal check-ins are counted separately.</p>
-          : count?.uniqueAttendees === undefined || count?.confirmedRsvps === undefined ? <p className="staff-muted" role="status">Attendance totals are currently unavailable.</p>
+          : !selected.active ? <p className="staff-muted" role="status">{selected.name} is closed. Its existing scanning rules have been kept.</p>
+          : count?.uniqueAttendees === undefined ? <p className="staff-muted" role="status">Attendance totals are currently unavailable. Refresh to update check-in counts.</p>
             : <p className="staff-muted check-in-count-note">Confirmed for the event. Checked in once per person at {selected.name}.</p>}
 
       {children}

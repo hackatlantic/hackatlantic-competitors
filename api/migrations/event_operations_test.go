@@ -334,6 +334,11 @@ func TestEventAdministrationOperationsAreAuditedAndExportsAreMinimal(t *testing.
 	if counts.Items[0].TotalRedemptions != 2 || counts.Items[0].UniqueAttendees != 1 || counts.Items[0].ConfirmedRSVPs != 1 {
 		t.Fatalf("repeat scans inflated attendance: %+v", counts)
 	}
+	var summary operations.AttendanceSummary
+	decodeIntakeResponse(t, intakeRequest(t, server.URL, http.MethodGet, "/v1/admin/attendance-summary", "clerk-m7-organizer", nil), &summary)
+	if summary.CycleID != cycleID || summary.ConfirmedRSVPs != 1 {
+		t.Fatalf("independent RSVP total: %+v", summary)
+	}
 	var replacementDecision string
 	if err := pool.QueryRow(ctx, `INSERT INTO ats.decisions(application_id, outcome, decided_by, supersedes_id) VALUES ($1, 'accepted', $2, $3) RETURNING id::text`, applicationID, organizerID, confirmedDecision).Scan(&replacementDecision); err != nil {
 		t.Fatal(err)
@@ -344,6 +349,10 @@ func TestEventAdministrationOperationsAreAuditedAndExportsAreMinimal(t *testing.
 	decodeIntakeResponse(t, intakeRequest(t, server.URL, http.MethodGet, "/v1/admin/redemptions/counts", "clerk-m7-organizer", nil), &counts)
 	if counts.Items[0].ConfirmedRSVPs != 0 {
 		t.Fatalf("superseded RSVP was counted: %+v", counts)
+	}
+	decodeIntakeResponse(t, intakeRequest(t, server.URL, http.MethodGet, "/v1/admin/attendance-summary", "clerk-m7-organizer", nil), &summary)
+	if summary.ConfirmedRSVPs != 0 {
+		t.Fatalf("summary included superseded RSVP: %+v", summary)
 	}
 }
 

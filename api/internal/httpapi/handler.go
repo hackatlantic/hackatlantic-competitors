@@ -203,6 +203,8 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	mux.HandleFunc("PATCH /v1/admin/activities/{activityId}", updateOrganizerActivityHandler(dependencies))
 	mux.HandleFunc("DELETE /v1/admin/activities/{activityId}", deleteOrganizerActivityHandler(dependencies))
 	mux.HandleFunc("GET /v1/admin/checkpoints", listOrganizerCheckpointsHandler(dependencies))
+	mux.HandleFunc("GET /v1/admin/attendance-summary", organizerAttendanceSummaryHandler(dependencies))
+	mux.HandleFunc("POST /v1/admin/check-in/entrance", enableOrganizerEntranceHandler(dependencies))
 	mux.HandleFunc("POST /v1/admin/checkpoints", createOrganizerCheckpointHandler(dependencies))
 	mux.HandleFunc("PATCH /v1/admin/checkpoints/{checkpointId}", updateOrganizerCheckpointHandler(dependencies))
 	mux.HandleFunc("DELETE /v1/admin/checkpoints/{checkpointId}", deleteOrganizerCheckpointHandler(dependencies))
