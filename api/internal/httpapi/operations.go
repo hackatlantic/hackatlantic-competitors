@@ -16,6 +16,8 @@ import (
 )
 
 type organizerOperationsService interface {
+	GetAttendanceSummary(context.Context, users.User) (operations.AttendanceSummary, error)
+	EnableEntrance(context.Context, users.User, string) (operations.Checkpoint, error)
 	ListActivities(context.Context, users.User) ([]operations.Activity, error)
 	CreateActivity(context.Context, users.User, operations.ActivityInput) (operations.Activity, error)
 	UpdateActivity(context.Context, users.User, string, operations.ActivityInput) (operations.Activity, error)
@@ -34,6 +36,51 @@ type organizerOperationsService interface {
 
 type organizerActivityListResponse struct {
 	Items []operations.Activity `json:"items"`
+}
+
+func organizerAttendanceSummaryHandler(dependencies Dependencies) http.HandlerFunc {
+	return func(w http.ResponseWriter, request *http.Request) {
+		organizer, ok := requireRole(w, request, dependencies, users.RoleOrganizer)
+		if !ok {
+			return
+		}
+		service, ok := operationsService(w, dependencies)
+		if !ok {
+			return
+		}
+		summary, err := service.GetAttendanceSummary(request.Context(), organizer)
+		if err != nil {
+			writeOperationsError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, summary)
+	}
+}
+
+func enableOrganizerEntranceHandler(dependencies Dependencies) http.HandlerFunc {
+	return func(w http.ResponseWriter, request *http.Request) {
+		organizer, ok := requireRole(w, request, dependencies, users.RoleOrganizer)
+		if !ok {
+			return
+		}
+		var payload struct {
+			CycleID string `json:"cycleId"`
+		}
+		if err := decodeIntakeJSON(request, &payload); err != nil || blank(payload.CycleID) {
+			writeError(w, http.StatusBadRequest, "invalid_request", "The request body is invalid.")
+			return
+		}
+		service, ok := operationsService(w, dependencies)
+		if !ok {
+			return
+		}
+		checkpoint, err := service.EnableEntrance(request.Context(), organizer, payload.CycleID)
+		if err != nil {
+			writeOperationsError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, checkpoint)
+	}
 }
 
 type organizerCheckpointListResponse struct {
