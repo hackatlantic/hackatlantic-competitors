@@ -35,11 +35,11 @@ describe("Volunteer check-in", () => {
     expect(api.lookupScannerPass).toHaveBeenCalledTimes(1);
     expect(api.lookupScannerPass).toHaveBeenCalledWith({ qrToken: token });
     expect(api.redeemScannerPass).not.toHaveBeenCalled();
-    expect(screen.getByText("Ready to check in")).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Checked in" })).toBeNull();
-    expect((screen.getByLabelText("Scan point") as HTMLSelectElement).value).toBe("entrance");
-    fireEvent.click(screen.getByRole("button", { name: "Check in at Main entrance" }));
-    await screen.findByRole("heading", { name: "Checked in" });
+    expect(screen.getByText("Ready to confirm")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Recorded" })).toBeNull();
+    expect((screen.getByLabelText("What are you scanning for?") as HTMLSelectElement).value).toBe("entrance");
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Main entrance" }));
+    await screen.findByRole("heading", { name: "Recorded" });
     expect(api.redeemScannerPass).toHaveBeenCalledWith(expect.objectContaining({ qrToken: token, checkpointId: "entrance" }));
     fireEvent.click(screen.getByRole("button", { name: "Scan next attendee" }));
     await waitFor(() => expect(camera.start).toHaveBeenCalledTimes(2));
@@ -50,7 +50,7 @@ describe("Volunteer check-in", () => {
     render(<ScannerWorkflow />);
     const button = await screen.findByRole("button", { name: "Scan ticket" });
     expect((button as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText("Scan point"), { target: { value: "lunch" } });
+    fireEvent.change(screen.getByLabelText("What are you scanning for?"), { target: { value: "lunch" } });
     expect((button as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -62,43 +62,57 @@ describe("Volunteer check-in", () => {
     fireEvent.click(screen.getByText("Camera not working? Enter a code"));
     fireEvent.change(screen.getByLabelText("QR code"), { target: { value: token } });
     fireEvent.click(screen.getByRole("button", { name: "Verify code" }));
-    const checkIn = await screen.findByRole("button", { name: "Check in at Main entrance" });
+    const checkIn = await screen.findByRole("button", { name: "Confirm Main entrance" });
     fireEvent.click(checkIn); fireEvent.click(checkIn);
     expect(api.redeemScannerPass).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("heading", { name: "Checked in" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Recorded" })).toBeNull();
     await act(async () => complete({ outcome: "redeemed" }));
-    await screen.findByRole("heading", { name: "Checked in" });
+    await screen.findByRole("heading", { name: "Recorded" });
+  });
+  it("records only the selected meal and retains that choice for the next attendee", async () => {
+    api.listScannerCheckpoints.mockResolvedValue({ items: [point, { id: "lunch", name: "Saturday lunch" }], nextCursor: null });
+    render(<ScannerWorkflow />);
+    await screen.findByRole("button", { name: "Scan ticket" });
+    fireEvent.change(screen.getByLabelText("What are you scanning for?"), { target: { value: "lunch" } });
+    await scan();
+    expect(api.redeemScannerPass).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Saturday lunch" }));
+    await screen.findByRole("heading", { name: "Recorded" });
+    expect(api.redeemScannerPass).toHaveBeenCalledTimes(1);
+    expect(api.redeemScannerPass).toHaveBeenCalledWith(expect.objectContaining({ checkpointId: "lunch" }));
+    fireEvent.click(screen.getByRole("button", { name: "Scan next attendee" }));
+    expect((screen.getByLabelText("What are you scanning for?") as HTMLSelectElement).value).toBe("lunch");
   });
 
   it("retries an uncertain check-in with the SAME idempotency key", async () => {
     api.redeemScannerPass.mockRejectedValueOnce(new Error("offline"));
     render(<ScannerWorkflow />); await scan();
-    fireEvent.click(screen.getByRole("button", { name: "Check in at Main entrance" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Retry check-in" }));
-    await screen.findByRole("heading", { name: "Checked in" });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Main entrance" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Retry scan" }));
+    await screen.findByRole("heading", { name: "Recorded" });
     expect(api.redeemScannerPass.mock.calls[1][0]).toEqual(api.redeemScannerPass.mock.calls[0][0]);
   });
 
   it.each(["revoked_pass", "invalid_pass"])("does not offer check-in for %s", async (code) => {
     api.lookupScannerPass.mockRejectedValue(new ApiError(404, { code }));
     render(<ScannerWorkflow />); await scan();
-    expect(screen.queryByRole("button", { name: "Check in at Main entrance" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Confirm Main entrance" })).toBeNull();
     expect(api.redeemScannerPass).not.toHaveBeenCalled();
   });
 
   it("shows an already-used pass as a rejection, not a new check-in", async () => {
     api.redeemScannerPass.mockResolvedValue({ outcome: "already_exhausted" });
     render(<ScannerWorkflow />); await scan();
-    fireEvent.click(screen.getByRole("button", { name: "Check in at Main entrance" }));
-    await screen.findByRole("heading", { name: "Already checked in" });
-    expect(screen.queryByRole("heading", { name: "Checked in" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Main entrance" }));
+    await screen.findByRole("heading", { name: "Already recorded" });
+    expect(screen.queryByRole("heading", { name: "Recorded" })).toBeNull();
   });
 
   it("stops the camera and removes verification on sign-out", async () => {
     const view = render(<ScannerWorkflow />); await scan();
     auth.userId = null; view.rerender(<ScannerWorkflow />);
     expect(screen.queryByText("Alex Morgan")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Check in at Main entrance" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Confirm Main entrance" })).toBeNull();
     expect(camera.stop).toHaveBeenCalled();
   });
 

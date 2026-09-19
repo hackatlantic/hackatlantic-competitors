@@ -48,20 +48,20 @@ const outcomeCopy: Record<
   { title: string; message: string }
 > = {
   redeemed: {
-    title: "Checked in",
-    message: "Check-in recorded. You can scan the next pass.",
+    title: "Recorded",
+    message: "You can scan the next ticket.",
   },
   already_exhausted: {
-    title: "Already checked in",
-    message: "This pass has used its allowance at this scan point. Ask an organizer if help is needed.",
+    title: "Already recorded",
+    message: "This pass has already used its allowance for this selection. Ask an organizer if help is needed.",
   },
   not_entitled: {
     title: "Not available for this pass",
-    message: "This attendee does not have access at this scan point.",
+    message: "This pass cannot be used for this selection.",
   },
   outside_window: {
-    title: "Scan point closed",
-    message: "Check-in is not open here right now.",
+    title: "Scanning closed",
+    message: "Scanning is not open for this selection right now.",
   },
   invalid_pass: {
     title: "Pass not valid",
@@ -411,7 +411,7 @@ function ScannerSession() {
     }
 
     if (!activeCheckpoint) {
-      setError({ message: "Choose a scan point before checking in.", retryable: false });
+      setError({ message: "Choose what you’re scanning for first.", retryable: false });
       return;
     }
 
@@ -494,8 +494,8 @@ function ScannerSession() {
       <main className="scanner-page">
         <section className="scanner-panel scanner-state" aria-busy="true" aria-live="polite">
           <p className="eyebrow">Scanner</p>
-          <h1>Loading checkpoints</h1>
-          <p>Getting the active checkpoints available to your scanner account…</p>
+          <h1>Loading scanner</h1>
+          <p>Getting your scanning options…</p>
         </section>
       </main>
     );
@@ -507,7 +507,7 @@ function ScannerSession() {
         <section className="scanner-panel scanner-state scanner-error-state" aria-live="assertive">
           <p className="eyebrow">Scanner</p>
           <h1>Scanner unavailable</h1>
-          <p role="alert">Active checkpoints could not be loaded. Check the connection and try again.</p>
+          <p role="alert">Scanning options could not be loaded. Check the connection and try again.</p>
           <button
             className="button secondary"
             onClick={() => setReloadVersion((version) => version + 1)}
@@ -525,8 +525,8 @@ function ScannerSession() {
       <main className="scanner-page">
         <section className="scanner-panel scanner-state" aria-live="polite">
           <p className="eyebrow">Scanner</p>
-          <h1>No active checkpoints</h1>
-          <p>There are no checkpoints available for scanning right now.</p>
+          <h1>Scanning isn’t available yet</h1>
+          <p>Ask the event lead to enable scanning, then reload this page.</p>
         </section>
       </main>
     );
@@ -538,21 +538,21 @@ function ScannerSession() {
         <Link className="staff-link" href="/">
           ← Back to dashboard
         </Link>
-        <h1 id="scanner-heading">Check in attendees</h1>
+        <h1 id="scanner-heading">Scan tickets</h1>
         <p className="scanner-summary">
-          Scan a ticket, check the name, then confirm check-in.
+          Choose once. Scan a ticket, check the name, and confirm.
         </p>
 
         <form className="scanner-form" hidden={Boolean(lookup) || Boolean(result)} onSubmit={handleLookup}>
           <div className="scanner-field">
-            <label htmlFor="scanner-checkpoint">Scan point</label>
+            <label htmlFor="scanner-checkpoint">What are you scanning for?</label>
             <select
               disabled={busy}
               id="scanner-checkpoint"
               onChange={(event) => handleCheckpointChange(event.target.value)}
               value={checkpointId}
             >
-              <option value="">Choose where you’re scanning</option>
+              <option value="">Choose entrance or a meal</option>
               {checkpoints.map((checkpoint) => (
                 <option key={checkpoint.id} value={checkpoint.id}>
                   {checkpoint.name}
@@ -627,7 +627,7 @@ function ScannerSession() {
               aria-busy="true"
               aria-live="polite"
             >
-              <p>{pendingAction === "lookup" ? "Verifying pass…" : "Recording check-in…"}</p>
+              <p>{pendingAction === "lookup" ? "Verifying pass…" : "Recording scan…"}</p>
             </motion.section>
           ) : null}
 
@@ -640,12 +640,12 @@ function ScannerSession() {
               key={`lookup-${lookup.qrToken}`}
               aria-live="polite"
             >
-              <h2>Ready to check in</h2>
+              <h2>Ready to confirm</h2>
               <p>
-                <strong>{lookup.response.attendee.displayName}</strong> · {activeCheckpoint?.name || "Choose a scan point"}.
+                <strong>{lookup.response.attendee.displayName}</strong> · {activeCheckpoint?.name || "Choose what to scan for"}.
                 {activeCheckpoint
-                  ? " Check the name, then tap Check in. Entry has not been recorded yet."
-                  : " Choose a scan point to continue."}
+                  ? " Check the name, then confirm. This scan hasn’t been recorded yet."
+                  : " Choose what you’re scanning for to continue."}
               </p>
               <div className="scanner-actions">
               <button
@@ -656,10 +656,10 @@ function ScannerSession() {
                 type="button"
               >
                 {pendingAction === "redeem"
-                  ? "Checking in…"
+                  ? "Recording…"
                   : activeCheckpoint
-                    ? `Check in at ${activeCheckpoint.name}`
-                    : "Choose a scan point"}
+                    ? `Confirm ${activeCheckpoint.name}`
+                    : "Choose what to scan for"}
               </button>
                 <button className="button secondary" type="button" disabled={busy} onClick={handleScanAnother}>Cancel and scan another</button>
               </div>
@@ -672,7 +672,7 @@ function ScannerSession() {
         ) : null}
 
         {result?.kind === "redemption" ? (
-          <ScanOutcome outcome={result.response.outcome} attendee={result.response.attendee} />
+          <ScanOutcome outcome={result.response.outcome} attendee={result.response.attendee} checkpointName={result.response.checkpoint?.name ?? activeCheckpoint?.name} />
         ) : null}
 
         {result ? (
@@ -694,7 +694,7 @@ function ScannerSession() {
                   onClick={handleRetryRedemption}
                   type="button"
                 >
-                  Retry check-in
+                  Retry scan
                 </button>
               ) : null}
             </div>
@@ -708,9 +708,10 @@ function ScannerSession() {
 type ScanOutcomeProps = {
   outcome: ScannerRedemptionOutcome;
   attendee?: ScannerRedemptionResponse["attendee"];
+  checkpointName?: string;
 };
 
-function ScanOutcome({ outcome, attendee }: ScanOutcomeProps) {
+function ScanOutcome({ outcome, attendee, checkpointName }: ScanOutcomeProps) {
   const reducedMotion = useReducedMotion();
   const copy = outcomeCopy[outcome];
 
@@ -724,6 +725,7 @@ function ScanOutcome({ outcome, attendee }: ScanOutcomeProps) {
       aria-live={outcome === "redeemed" ? "polite" : "assertive"}
     >
       <h2>{copy.title}</h2>
+      {checkpointName ? <p className="scanner-result-context">{checkpointName}</p> : null}
       <p>
         {attendee?.displayName ? <strong>{attendee.displayName}. </strong> : null}
         {copy.message}

@@ -1299,19 +1299,35 @@ input[type="checkbox"] {
   }
 }
 
-/* Event-day workflows: one action at a time, secondary setup kept out of the way. */
+/* Check-in and attendance: one action at a time. */
 .organizer-operations [hidden] { display: none !important; }
 .scanner-panel [hidden] { display: none !important; }
 .organizer-operations { padding: clamp(16px, 3vw, 28px); }
 .organizer-operations h2 { font-family: var(--font-display); text-transform: none; letter-spacing: -0.03em; line-height: 1.15; }
 .organizer-operations .staff-actions { background: transparent; border: 0; padding: 0; }
-.event-day-navigation { display: flex; gap: 8px; padding: 6px; background: #e4eeec; border-radius: 12px; width: fit-content; margin-bottom: 24px; }
-.event-day-navigation button { padding: 12px 20px; border: 0; border-radius: 8px; background: transparent; color: var(--brand-navy); box-shadow: none; font: 600 0.95rem/1.4 var(--font-body, sans-serif); text-transform: none; }
-.event-day-navigation button[aria-pressed="true"] { background: var(--brand-navy); color: white; }
-.event-day-overview { display: grid; gap: 20px; min-width: 0; }
-.event-day-overview h2 { margin: 0 0 8px; font-size: clamp(1.6rem, 3vw, 2.3rem); }
-.event-day-overview .operations-field { max-width: 480px; }
-.event-day-overview .staff-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.check-in-overview { display: grid; gap: 24px; min-width: 0; }
+.staff-content-header-compact { padding-block: 16px 24px; margin-bottom: 24px; border: 0; }
+.staff-content-header-compact h1 { font-size: clamp(2.5rem, 6vw, 4rem); }
+.check-in-overview h2 { margin: 0; font-size: clamp(1.4rem, 3vw, 1.8rem); }
+.check-in-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; }
+.check-in-actions .button { min-height: 52px; }
+.check-in-actions .staff-link { padding-block: 12px; }
+.check-in-selection { display: grid; gap: 8px; max-width: 480px; }
+.check-in-selection select, .check-in-search input { width: 100%; min-width: 0; min-height: 48px; padding: 12px 14px; background: white; color: var(--brand-navy); border: 1px solid var(--brand-line); border-radius: 10px; font: inherit; }
+.check-in-count-note { margin: -12px 0 0; font-size: 0.88rem; }
+.check-in-search, .check-in-recent { display: grid; gap: 16px; border-top: 1px solid var(--brand-line); padding-top: 24px; min-width: 0; }
+.check-in-search form { display: grid; gap: 8px; }
+.check-in-search-controls { display: flex; gap: 12px; }
+.check-in-search-controls .button { flex-shrink: 0; }
+.check-in-search-results { list-style: none; padding: 0; margin: 0; }
+.check-in-search-results a { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--brand-line); }
+.check-in-search-results a > span:first-child { display: grid; gap: 4px; overflow-wrap: anywhere; min-width: 0; }
+.check-in-search-results a > span > span { font-size: 0.9rem; color: var(--brand-muted); }
+.check-in-recent .operations-section-heading { margin: 0; align-items: center; }
+.check-in-recent .operations-section-heading .button { padding: 10px 16px; }
+.event-day-recent strong { overflow-wrap: anywhere; }
+.check-in-dashboard :is(input, select):focus-visible { outline: 3px solid var(--brand-teal-dark); outline-offset: 3px; }
+.scanner-result-context { font-weight: 650; }
 .event-day-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
 .event-day-stats > div { padding: 24px; background: #edf7f5; border: 1px solid var(--brand-line); border-radius: 14px; }
 .event-day-stats dt { font-size: 0.9rem; color: var(--brand-muted); }
@@ -1339,15 +1355,15 @@ input[type="checkbox"] {
 .scanner-manual[open] { display: grid; gap: 12px; }
 .scanner-panel input, .event-setup input { min-height: 48px; }
 .scanner-panel .scanner-actions:empty { display: none; }
-.event-day-navigation button:focus-visible, .operations-advanced summary:focus-visible, .scanner-manual summary:focus-visible { outline: 3px solid var(--brand-teal-dark); outline-offset: 4px; }
+.operations-advanced summary:focus-visible, .scanner-manual summary:focus-visible { outline: 3px solid var(--brand-teal-dark); outline-offset: 4px; }
 @media (max-width: 600px) {
   .event-day-stats { gap: 10px; }
   .event-day-stats > div { padding: 16px; }
-  .event-day-overview .operations-section-heading { align-items: stretch; flex-direction: column; gap: 16px; }
-  .event-day-overview .staff-actions > .button { flex: 1 1 100%; }
+  .check-in-actions { gap: 12px; }
+  .check-in-actions > .button { width: 100%; }
+  .check-in-search-controls { flex-wrap: wrap; }
+  .check-in-search-controls .button { width: 100%; }
   .operations-advanced { padding: 14px; }
-  .event-day-navigation { width: 100%; }
-  .event-day-navigation button { flex: 1; padding-inline: 8px; }
   .attendance-next-step .button { width: 100%; }
   .application-panel-submitted > .application-rsvp { margin-inline: 0; }
 }
