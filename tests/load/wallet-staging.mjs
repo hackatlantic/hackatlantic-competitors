@@ -27,7 +27,11 @@ async function request(path, identity, {method="GET", body, expected=200}={}) {
   if (identity) headers.Authorization = "Bearer " + (await sessionTokens([identity]))[0];
   const response = await fetch(STAGING_ORIGIN + path, {method, headers, redirect:"error", signal:AbortSignal.timeout(30000), body:body===undefined?undefined:JSON.stringify(body)});
   const json = await response.json().catch(()=>({}));
-  requireTest(response.status === expected, `Staging request failed expected status (${method}, ${expected}, got ${response.status})`);
+  if (response.status !== expected) {
+    const error = new Error(`Staging request failed expected status (${method}, ${expected}, got ${response.status})`);
+    error.status = response.status;
+    throw error;
+  }
   if (path.includes("google-wallet")) requireTest(response.headers.get("cache-control")==="no-store", "Wallet response must not be cached");
   return json;
 }
@@ -134,8 +138,27 @@ function cleanup() {
 async function verifyRestored() {
   process.env.LOAD_TEST_AUTH_SECRET=output("load_test_auth_secret");
   const ctx=load();
-  requireTest((await request("/versionz")).gitSha===ctx.gitSha,"Restoration changed API image");
-  if (ctx.attendee) await request("/v1/attendee/pass/google-wallet",{userId:ctx.attendee.clerk_user_id},{method:"POST",expected:503});
+  // App Platform can briefly return a gateway error after Terraform reports ACTIVE.
+  // Retry only transport/readiness failures, never a wrong image or enabled Wallet flag.
+  const deadline=Date.now()+120000;
+  for (;;) {
+    try {
+      await request("/readyz");
+      requireTest((await request("/versionz")).gitSha===ctx.gitSha,"Restoration changed API image");
+      if (ctx.attendee) {
+        const owner={userId:ctx.attendee.clerk_user_id};
+        const pass=await request("/v1/attendee/pass",owner);
+        requireTest(pass.googleWalletAvailable===false,"Restoration left Wallet enabled");
+        await request("/v1/attendee/pass/google-wallet",owner,{method:"POST",expected:503});
+      }
+      break;
+    } catch(error) {
+      const transient=[502,503,504].includes(error.status) || error.name==="TimeoutError" || error.message==="fetch failed";
+      if (!transient || Date.now()>=deadline) throw error;
+      console.log("Waiting for restored staging API readiness; retrying a transient gateway/transport response.");
+      await new Promise(resolve=>setTimeout(resolve,5000));
+    }
+  }
   if (existsSync(evidencePath)) {const e=JSON.parse(readFileSync(evidencePath));e.walletDisabledAfterTest=true;e.staffCleanupPassed=true;save(evidencePath,e);}
   console.log("Verified Wallet is disabled again and the original staging API image is unchanged.");
 }
