@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       staging_only:
-        description: "Deploy and validate staging without any production promotion"
+        description: "API-only staging rehearsal; no production frontend build or promotion"
         type: boolean
         default: false
 
@@ -87,6 +87,7 @@ jobs:
 
   frontend-stage:
     name: Build staged Vercel production
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.staging_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -117,6 +118,7 @@ jobs:
       group: staging-release
       cancel-in-progress: false
     needs: [image, frontend-stage]
+    if: ${{ always() && needs.image.result == 'success' && (needs.frontend-stage.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.staging_only)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -159,7 +161,12 @@ jobs:
           printf '%s' "${TF_VARS_JSON}" > ci.auto.tfvars.json
       - run: terraform init -input=false -backend-config=backend.hcl.example
         working-directory: infra/environments/staging
-      - run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
+      - if: ${{ github.event_name != 'workflow_dispatch' || !inputs.staging_only }}
+        run: terraform apply -input=false -auto-approve -var="api_image_digest=${{ needs.image.outputs.digest }}"
+        working-directory: infra/environments/staging
+      - name: Deploy API-only staging candidate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.staging_only }}
+        run: terraform apply -input=false -auto-approve -target=module.platform.digitalocean_app.api -var="api_image_digest=${{ needs.image.outputs.digest }}"
         working-directory: infra/environments/staging
       - name: Resolve staging API endpoint
         shell: bash
@@ -192,8 +199,10 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - if: ${{ github.event_name != 'workflow_dispatch' || !inputs.staging_only }}
+        run: npx playwright install --with-deps chromium
       - name: Verify authenticated staging journeys
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.staging_only }}
         run: npm run test:e2e
         env:
           API_BASE_URL: ${{ env.STAGING_API_URL }}
@@ -205,6 +214,9 @@ jobs:
           E2E_ADMIN_EMAIL: ${{ vars.E2E_ADMIN_EMAIL }}
           E2E_SCANNER_EMAIL: ${{ vars.E2E_SCANNER_EMAIL }}
           E2E_FULL_LIFECYCLE: "true"
+      - name: Record API-only rehearsal scope
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.staging_only }}
+        run: echo 'API-only staging rehearsal. Browser journeys and Wallet device verification were not run; production promotion is disabled.' >> "$GITHUB_STEP_SUMMARY"
       - name: Materialize realistic scanner release-gate fixture inputs
         shell: bash
         run: |

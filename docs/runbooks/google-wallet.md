@@ -119,9 +119,11 @@ just to configure the cloud deployment).
 ## Limits and release gate
 
 After PR checks pass, a branch rehearsal can use the existing Release workflow
-with `staging_only=true`. This skips the production job entirely while retaining
-the staging checks. Do not approve or trigger a normal production release as a
-substitute for a staging-only test.
+with `staging_only=true` from the permitted `staging` branch. This is explicitly
+API-only: it skips the production-configured Vercel candidate and browser journeys,
+targets only the staging API resource, retains API smoke/scanner checks, and skips
+the production job entirely. It is not proof of frontend or Wallet device success.
+Do not approve or trigger a normal production release as a substitute for this test.
 
 A separate `3388000000023208272.hackatlantic_2026_test` class is approved for
 synthetic device tests. It is labeled TEST and is not an admission ticket.
