@@ -172,6 +172,10 @@ Always-run steps remove temporary staff access and restore the disabled Wallet
 configuration with the original image. If restoration fails or the job is forcibly
 terminated, inspect staging immediately and restore `GOOGLE_WALLET_ENABLED=false`
 before another release. The workflow shares the staging release concurrency lock.
+Restoration verifies readiness, the unchanged version and a false Wallet feature
+flag. A public disabled-export response of 504 is retained as an explicit warning
+and a **failed 503 HTTP contract** in the evidence, not counted as a successful 503.
+A returned save link, enabled flag, or unexpected status fails restoration validation.
 
 Only an encrypted synthetic-pass handoff and sanitized results are uploaded, with
 one-day artifact retention. No service-account key, database password or scanner
