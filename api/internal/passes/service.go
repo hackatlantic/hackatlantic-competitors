@@ -343,6 +343,19 @@ func (s *Service) Revoke(ctx context.Context, actor users.User, passID string) (
 // value deterministically derived from the pass ID and server-only QR pepper.
 // Claim credentials remain random and unrecoverable after issuance.
 func (s *Service) WebPass(ctx context.Context, actor users.User) (WebPass, error) {
+	return s.webPass(ctx, actor, "")
+}
+
+// WalletPass only exports a released pass for a confirmed RSVP in the configured
+// active cycle. A generic web pass must never be labelled with another event.
+func (s *Service) WalletPass(ctx context.Context, actor users.User, cycleSlug string) (WebPass, error) {
+	if cycleSlug == "" {
+		return WebPass{}, ErrNotFound
+	}
+	return s.webPass(ctx, actor, cycleSlug)
+}
+
+func (s *Service) webPass(ctx context.Context, actor users.User, cycleSlug string) (WebPass, error) {
 	if !actor.HasRole(users.RoleApplicant) {
 		return WebPass{}, ErrForbidden
 	}
@@ -353,7 +366,14 @@ func (s *Service) WebPass(ctx context.Context, actor users.User) (WebPass, error
 	ctx, cancel := context.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
 	var row safePassRow
-	err = s.pool.QueryRow(ctx, `SELECT passes.id, passes.attendee_id, attendees.display_name, passes.status, passes.issued_at, passes.revoked_at FROM ats.passes JOIN ats.attendees ON attendees.id = passes.attendee_id JOIN ats.applications ON applications.id = attendees.application_id WHERE attendees.user_id = $1 AND passes.status = 'active' AND applications.status = 'accepted' AND applications.decision_released_at IS NOT NULL`, userID).Scan(&row.id, &row.attendeeID, &row.displayName, &row.status, &row.issuedAt, &row.revokedAt)
+	err = s.pool.QueryRow(ctx, `SELECT passes.id, passes.attendee_id, attendees.display_name, passes.status, passes.issued_at, passes.revoked_at FROM ats.passes JOIN ats.attendees ON attendees.id = passes.attendee_id JOIN ats.applications ON applications.id = attendees.application_id WHERE attendees.user_id = $1 AND passes.status = 'active' AND applications.status = 'accepted' AND applications.decision_released_at IS NOT NULL
+      AND ($2::text = '' OR EXISTS (
+        SELECT 1 FROM ats.application_cycles c
+        JOIN ats.decisions d ON d.id = applications.current_decision_id AND d.application_id = applications.id
+        JOIN ats.attendance_responses r ON r.decision_id = d.id AND r.status = 'confirmed'
+        WHERE c.id = applications.cycle_id AND c.active AND c.slug = $2
+          AND d.outcome = 'accepted' AND d.released_at IS NOT NULL
+      ))`, userID, cycleSlug).Scan(&row.id, &row.attendeeID, &row.displayName, &row.status, &row.issuedAt, &row.revokedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return WebPass{}, ErrNotFound
 	}

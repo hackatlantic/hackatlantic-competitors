@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      staging_only:
+        description: "Deploy and validate staging without any production promotion"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -127,6 +132,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
       TF_VAR_api_observability_env: ${{ secrets.API_OBSERVABILITY_ENV_JSON }}
+      TF_VAR_api_wallet_env: ${{ secrets.API_WALLET_ENV_JSON || '{}' }}
       DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
       SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
       SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
@@ -241,6 +247,8 @@ jobs:
 
   production:
     name: Promote production
+    # A staging-only rehearsal must never reach the production approval/apply job.
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.staging_only }}
     needs: [image, frontend-stage, staging]
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -259,6 +267,7 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       TF_VARS_JSON: ${{ secrets.TFVARS_PRODUCTION_JSON }}
       TF_VAR_api_observability_env: ${{ secrets.API_OBSERVABILITY_ENV_JSON }}
+      TF_VAR_api_wallet_env: ${{ secrets.API_WALLET_ENV_JSON || '{}' }}
       DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
       SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}

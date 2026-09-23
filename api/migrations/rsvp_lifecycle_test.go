@@ -119,6 +119,20 @@ func TestRSVPLifecycleAuthorizationConcurrencyAndDecisionChanges(t *testing.T) {
 	}
 	var issued lifecyclePassResponse
 	decodeIntakeResponse(t, issuedResponse, &issued)
+	walletPass, err := passService.WalletPass(ctx, owner, "rsvp-cycle")
+	if err != nil || walletPass.ID != issued.ID || walletPass.QRToken != issued.QRToken {
+		t.Fatalf("Wallet must use the released web QR: %v", err)
+	}
+	for _, test := range []struct {
+		actor users.User
+		cycle string
+	}{
+		{other, "rsvp-cycle"}, {owner, "different-cycle"}, {owner, ""},
+	} {
+		if _, err := passService.WalletPass(ctx, test.actor, test.cycle); !errors.Is(err, passes.ErrNotFound) {
+			t.Fatalf("Wallet eligibility bypass: %v", err)
+		}
+	}
 	assertDecisionStatus(t, request(http.MethodPut, "rsvp-owner", payload), http.StatusOK)
 	if again := read(); !again.RespondedAt.Equal(*confirmed.RespondedAt) || again.LockVersion != 1 {
 		t.Fatal("repeated response was not idempotent")
@@ -129,6 +143,9 @@ func TestRSVPLifecycleAuthorizationConcurrencyAndDecisionChanges(t *testing.T) {
 	assertDecisionStatus(t, request(http.MethodPut, "rsvp-owner", payload), http.StatusOK)
 	if read().Status != "declined" {
 		t.Fatal("decline was not persisted")
+	}
+	if _, err := passService.WalletPass(ctx, owner, "rsvp-cycle"); !errors.Is(err, passes.ErrNotFound) {
+		t.Fatalf("declined RSVP exported to Wallet: %v", err)
 	}
 	assertDecisionStatus(t, intakeRequest(t, server.URL, http.MethodPost, issuePath, "rsvp-admin", nil), http.StatusConflict)
 	assertDecisionStatus(t, intakeRequest(t, server.URL, http.MethodPost, "/v1/admin/passes/"+issued.ID+"/reissue", "rsvp-admin", nil), http.StatusConflict)

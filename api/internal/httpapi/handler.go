@@ -72,6 +72,7 @@ type Dependencies struct {
 	Decisions        decisionLifecycleService
 	RSVPs            rsvpService
 	Passes           passLifecycleService
+	GoogleWallet     googleWalletSigner
 	Checkpoints      checkpointService
 	Redemptions      redemptionService
 	Operations       organizerOperationsService
@@ -216,6 +217,7 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	mux.HandleFunc("GET /v1/admin/exports/attendance.csv", exportOrganizerRedemptionsHandler(dependencies, operations.ExportAttendance))
 	mux.HandleFunc("GET /v1/admin/exports/reconciliation.csv", exportOrganizerRedemptionsHandler(dependencies, operations.ExportReconciliation))
 	mux.HandleFunc("GET /v1/attendee/pass", webPassHandler(dependencies))
+	mux.HandleFunc("POST /v1/attendee/pass/google-wallet", googleWalletHandler(dependencies))
 	mux.HandleFunc("GET /v1/claim/{claimToken}", claimPassHandler(dependencies, dependencies.ClaimRateLimiter))
 	mux.HandleFunc("GET /v1/checkpoints", listScannerCheckpointsHandler(dependencies))
 	mux.HandleFunc("POST /v1/scans/lookup", scannerLookupHandler(dependencies))

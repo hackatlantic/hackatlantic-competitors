@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { ApiError, createApiClient, type AuthenticatedAttendeePass } from "@/lib/api";
 import { PassQrCode } from "@/components/pass-qr-code";
+import { GoogleWalletButton } from "@/components/google-wallet-button";
 
 type PassState =
   | { kind: "loading" }
@@ -35,7 +36,7 @@ export function EventTicket({ pass }: { pass: AuthenticatedAttendeePass }) {
         </div>
         <dl className="ticket-details">
           <div><dt>Check-in date</dt><dd><time dateTime="2026-09-26">Sat, Sep 26</time></dd></div>
-          <div><dt>Check-in time</dt><dd><time dateTime="2026-09-26T09:30:00-03:00">9:30 AM <span>ADT</span></time></dd></div>
+          <div><dt>Check-in time</dt><dd><time dateTime="2026-09-26T10:00:00-03:00">10:00 AM <span>ADT</span></time></dd></div>
           <div className="ticket-location"><dt>Location</dt><dd>UNB · Head Hall Atrium</dd></div>
         </dl>
       </div>
@@ -44,6 +45,7 @@ export function EventTicket({ pass }: { pass: AuthenticatedAttendeePass }) {
         <div className="ticket-scan-heading"><h2>Ready for check-in</h2><span>ADMIT ONE</span></div>
         <div className="ticket-code"><PassQrCode value={pass.qrToken} /></div>
         <p className="ticket-scan-copy">Show this code to a volunteer at the entrance.</p>
+        {pass.googleWalletAvailable && <GoogleWalletButton />}
         <p className="ticket-private">This pass is yours. Keep your QR code private.</p>
       </div>
     </article>
@@ -75,7 +77,7 @@ export function EventPass() {
   if (isLoaded && !userId) {
     return <section className="ticket-message"><h1>Sign in to view your pass</h1><p>Return to the dashboard to sign in.</p></section>;
   }
-  if (isLoaded && state.kind === "ready" && state.userId === userId) return <EventTicket pass={state.pass} />;
+  if (isLoaded && state.kind === "ready" && state.userId === userId) return <EventTicket key={`${userId}:${state.pass.id}`} pass={state.pass} />;
   const loading = !isLoaded || state.kind === "loading" || state.kind === "ready";
   return (
     <section className="ticket-message" aria-live="polite" aria-busy={loading}>

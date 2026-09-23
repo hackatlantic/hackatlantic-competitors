@@ -26,9 +26,11 @@ jobs:
           - environment: staging
             directory: infra/environments/staging
             tfvars_secret: TFVARS_STAGING_JSON
+            wallet_secret: API_WALLET_STAGING_ENV_JSON
           - environment: production
             directory: infra/environments/production
             tfvars_secret: TFVARS_PRODUCTION_JSON
+            wallet_secret: API_WALLET_PRODUCTION_ENV_JSON
           - environment: observability
             directory: infra/observability
             tfvars_secret: TFVARS_OBSERVABILITY_JSON
@@ -39,6 +41,7 @@ jobs:
       DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
       TF_VARS_JSON: ${{ secrets[matrix.tfvars_secret] }}
       TF_VAR_api_observability_env: ${{ secrets.API_OBSERVABILITY_ENV_JSON }}
+      TF_VAR_api_wallet_env: ${{ (matrix.wallet_secret && secrets[matrix.wallet_secret]) || '{}' }}
       DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
       SPACES_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
       SPACES_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}

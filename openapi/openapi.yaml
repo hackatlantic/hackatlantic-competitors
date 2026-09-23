@@ -891,6 +891,35 @@ paths:
           $ref: "#/components/responses/PassNotFound"
         "503":
           $ref: "#/components/responses/PassDependencyUnavailable"
+  /v1/attendee/pass/google-wallet:
+    post:
+      operationId: createGoogleWalletPass
+      summary: Create a signed Google Wallet save link for the authenticated attendee
+      description: Requires an active released pass, current confirmed RSVP and the configured active event. No attendee ID or QR is accepted from the caller. Save links are bearer credentials and must not be logged or cached.
+      tags: [Passes]
+      security:
+        - clerkBearer: []
+      responses:
+        "200":
+          description: A private server-signed Google Wallet save link
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [saveUrl]
+                properties:
+                  saveUrl:
+                    type: string
+                    format: uri
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/ApplicantRequired"
+        "404":
+          $ref: "#/components/responses/PassNotFound"
+        "503":
+          description: Google Wallet is disabled or the save link could not be signed; the web pass remains available
   /v1/claim/{claimToken}:
     get:
       operationId: resolveClaimPass
@@ -2369,6 +2398,9 @@ components:
       additionalProperties: false
       required: [id, attendeeId, displayName, status, issuedAt, qrToken]
       properties:
+        googleWalletAvailable:
+          type: boolean
+          description: Whether Google Wallet export is configured. Eligibility is rechecked on export.
         id:
           type: string
           format: uuid

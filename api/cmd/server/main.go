@@ -29,6 +29,7 @@ import (
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/reviews"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/rsvps"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/users"
+	"github.com/hackatlantic/hackatlantic-competitors/api/internal/wallet"
 )
 
 const (
@@ -170,6 +171,15 @@ func main() {
 		),
 		Resumes:        resumes.NewService(pool.Pool, resumeStore, durationEnv("DATABASE_QUERY_TIMEOUT", 5*time.Second)),
 		AllowedOrigins: commaSeparatedEnv("CORS_ALLOWED_ORIGINS"),
+	}
+	googleWallet, err := wallet.LoadGoogle(os.Getenv)
+	if err != nil {
+		logger.Error("configure Google Wallet", "error", err)
+		os.Exit(1)
+	}
+	// Avoid a typed nil in the optional transport dependency.
+	if googleWallet != nil {
+		dependencies.GoogleWallet = googleWallet
 	}
 	if verifier, resolver, err := clerkDependencies(lifecycleCtx, configureCtx, pool.Pool, loadTestAuthSecret != ""); err != nil {
 		logger.Error("configure Clerk authentication", "error", err)

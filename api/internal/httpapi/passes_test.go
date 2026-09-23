@@ -16,6 +16,10 @@ type passTestService struct {
 	claimCalls int
 }
 
+func (service *passTestService) WalletPass(ctx context.Context, actor users.User, _ string) (passes.WebPass, error) {
+	return service.WebPass(ctx, actor)
+}
+
 func TestPassIssuanceRequiresConfirmedRSVPError(t *testing.T) {
 	response := httptest.NewRecorder()
 	writePassError(response, passes.ErrRSVPRequired)

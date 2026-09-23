@@ -51,6 +51,8 @@ describe("Event pass", () => {
     expect(screen.getByText("Test Attendee")).toBeTruthy();
     expect(screen.getByText("UNB · Head Hall Atrium")).toBeTruthy();
     expect(screen.getByText("Sat, Sep 26")).toBeTruthy();
+    expect(screen.getByText("10:00 AM").getAttribute("datetime")).toBe("2026-09-26T10:00:00-03:00");
+    expect(screen.queryByText("9:30 AM")).toBeNull();
     expect(screen.getByRole("img", { name: /QR code/ })).toBeTruthy();
     expect(screen.queryByText(pass.qrToken)).toBeNull();
   });
