@@ -155,6 +155,33 @@ Before production enablement:
 
 ## References
 
+### Isolated staging API rehearsal
+
+The existing **Staging ATS load profiles** workflow has a `wallet-device` profile.
+Run it only from the protected `staging` branch, supplying a local RSA public key
+(3072 bits or stronger) in `wallet_delivery_public_key`; keep the private key local.
+This is a bounded functional rehearsal, not a performance benchmark.
+
+It checks the known staging database and TEST class, preserves the deployed image,
+briefly enables Wallet, and creates one synthetic attendee plus temporary staff
+identities. It exercises authenticated export eligibility, repeated saves, matching
+web/Wallet QR values, first/duplicate redemption, revocation, replacement and
+attendee-level redemption limits. Existing cycles and application forms are not edited.
+
+Always-run steps remove temporary staff access and restore the disabled Wallet
+configuration with the original image. If restoration fails or the job is forcibly
+terminated, inspect staging immediately and restore `GOOGLE_WALLET_ENABLED=false`
+before another release. The workflow shares the staging release concurrency lock.
+
+Only an encrypted synthetic-pass handoff and sanitized results are uploaded, with
+one-day artifact retention. No service-account key, database password or scanner
+session is included. Synthetic ledger records remain in staging. An unused test
+checkpoint and replacement pass are retained for the subsequent physical-device
+test; they grant no production access. Automated API success alone does not prove
+Android camera scanning. The real save-and-scan check remains a separate release gate.
+
+### Official documentation
+
 - [Authentication and service accounts](https://developers.google.com/wallet/tickets/events/getting-started/auth/rest)
 - [Event ticket object](https://developers.google.com/wallet/reference/rest/v1/eventticketobject)
 - [JWT fields](https://developers.google.com/wallet/reference/rest/v1/Jwt)
