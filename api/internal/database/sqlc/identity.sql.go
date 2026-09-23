@@ -168,6 +168,48 @@ func (q *Queries) ListUserRoles(ctx context.Context, userID pgtype.UUID) ([]stri
 	return items, nil
 }
 
+const lookupScannerUserByEmail = `-- name: LookupScannerUserByEmail :many
+SELECT u.id, u.clerk_user_id,
+    EXISTS (SELECT 1 FROM ats.user_roles r WHERE r.user_id = u.id AND r.role = 'scanner') AS scanner_access,
+    EXISTS (SELECT 1 FROM ats.admin_email_allowlist a WHERE a.normalized_email = lower(btrim(u.primary_email))) AS is_admin
+FROM ats.users u
+WHERE lower(btrim(u.primary_email)) = $1::text
+ORDER BY u.id
+LIMIT 2
+`
+
+type LookupScannerUserByEmailRow struct {
+	ID            pgtype.UUID `json:"id"`
+	ClerkUserID   string      `json:"clerk_user_id"`
+	ScannerAccess bool        `json:"scanner_access"`
+	IsAdmin       bool        `json:"is_admin"`
+}
+
+func (q *Queries) LookupScannerUserByEmail(ctx context.Context, email string) ([]LookupScannerUserByEmailRow, error) {
+	rows, err := q.db.Query(ctx, lookupScannerUserByEmail, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LookupScannerUserByEmailRow{}
+	for rows.Next() {
+		var i LookupScannerUserByEmailRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClerkUserID,
+			&i.ScannerAccess,
+			&i.IsAdmin,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeScannerRole = `-- name: RevokeScannerRole :one
 WITH removed AS (
     DELETE FROM ats.user_roles

@@ -1,24 +1,30 @@
-# Production platform engineering
+# Platform engineering
 
-The platform preserves the product’s PaaS architecture while adding reproducible infrastructure, immutable delivery, supply-chain evidence, telemetry, and tested recovery. Kubernetes is intentionally absent: this workload does not need an orchestrator to demonstrate reliable operations.
+The platform keeps a PaaS architecture while adding reproducible infrastructure, immutable delivery, supply-chain evidence, and a deliberately small observability footprint. Kubernetes is intentionally absent: this workload does not need an orchestrator to demonstrate reliable operations.
+
+## Current status
+
+The Terraform roots, protected delivery workflow, Grafana dashboard configuration, and staging-only k6 profiles are in the repository. The Grafana dashboard is provisioned, but the API metrics exporter has not yet been deployed and verified. Cloudflare DNS cutover and operational backup/restore evidence are deferred; they must not be described as live safeguards. See [the Grafana runbook](runbooks/grafana-essentials.md) and [measurement record](evidence/measurements.md) for the current evidence boundary.
 
 ## Runtime architecture
 
 ```mermaid
 flowchart LR
-    U["Applicants, admins, scanners"] --> CF["Cloudflare DNS and edge"]
-    CF --> V["Vercel Next.js"]
-    CF --> DO["DigitalOcean App Platform\nGo API by image digest"]
+    U["Applicants, admins, scanners"] --> V["Vercel Next.js"]
+    U --> DO["DigitalOcean App Platform\nGo API by image digest"]
     V --> DO
     DO --> SB["Supabase PostgreSQL\nprivate ats schema"]
     DO --> SP["Private Spaces\nrésumés"]
     DO --> CL["Clerk authentication"]
-    DO --> GC["Grafana Cloud OTLP"]
-    BK["Nightly encrypted backup"] --> BS["Separate private backup Space"]
-    SB --> BK
+    DO -. "after exporter rollout" .-> GC["Grafana Cloud metrics"]
 ```
 
 Staging and production have separate databases, storage, Clerk instances, API applications, and frontend configuration. Production data is never copied to staging.
+
+### Deferred extensions
+
+- Cloudflare remains an optional DNS/edge migration. The current working DNS and TLS path stays in place until a specific need justifies a separately reviewed cutover.
+- Encrypted backups and restore drills have code/runbook support, but become an operational control only after a successful scheduled backup and recorded restore exercise.
 
 ## Release architecture
 
@@ -71,8 +77,8 @@ Telemetry must never contain applicant names, emails, schools, résumé identifi
 | Migration breaks production | Fresh/upgrade tests and PRE_DEPLOY job | Staging release gate |
 | Failed release remains active | Smoke gate and prior-deployment rollback | Deliberately broken staging exercise |
 | Operator destroys production resource | Separate workspaces, protected environment, `prevent_destroy` | No-replacement production plan |
-| Database loss or corruption | Encrypted retained backups and approved restore drills | Monthly RTO report |
-| DNS cutover interrupts web or email | Full inventory/parity checks and staged DNSSEC | Before/after probes and mail verification |
+| Database loss or corruption | Planned encrypted backups and approved restore drills | Successful scheduled backup and monthly RTO report |
+| DNS cutover interrupts web or email | Optional future cutover: full inventory/parity checks and staged DNSSEC | Before/after probes and mail verification |
 
 ## Evidence
 

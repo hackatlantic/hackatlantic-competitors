@@ -1,0 +1,2367 @@
+{
+  "schemaVersion": 1,
+  "recordedOn": "2026-09-03",
+  "notes": [
+    "Staging only. No causal before/after optimization claim.",
+    "Null means not measured or unavailable, never zero.",
+    "Pool gauges are 30-second samples filtered to source timestamps inside each measured window; they may miss brief activity.",
+    "Initial applicant runs used the existing simplified staging form, not the current production form.",
+    "HTTP contention failed; preserved as a failure despite correct ledger atomicity.",
+    "Staging candidate containment and restoration passed; the five-minute end-to-end criterion was not met."
+  ],
+  "workflowHistory": [
+    {
+      "id": 33706214681,
+      "label": "applicant-sustained",
+      "conclusion": "success"
+    },
+    {
+      "id": 33706868836,
+      "label": "applicant-deadline",
+      "conclusion": "success"
+    },
+    {
+      "id": 33707641714,
+      "label": "scanner-repeatability",
+      "conclusion": "failure"
+    },
+    {
+      "id": 33707641714,
+      "label": "scanner-repeatability-attempt-2-third-job-only",
+      "conclusion": "success"
+    },
+    {
+      "id": 33711277613,
+      "label": "scanner-contention",
+      "conclusion": "failure"
+    },
+    {
+      "id": 33711427592,
+      "label": "scanner-spike",
+      "conclusion": "success"
+    },
+    {
+      "id": 33711524311,
+      "label": "unhealthy-staging-candidate",
+      "conclusion": "success",
+      "acceptanceCaveat": "Workflow restoration-after-request gate passed; total detection plus restoration exceeded five minutes."
+    }
+  ],
+  "runs": [
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33706214681",
+      "artifact": "applicant-sustained-33706214681-1",
+      "context": {
+        "startedAt": "2026-09-03T02:04:54.863Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "e4076da18c21e2117c3491eed6a1e3db7d0665a0",
+        "runID": "33706214681",
+        "repetition": "1",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "sustained",
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T02:13:47.898Z",
+        "deploymentUnchanged": true,
+        "elapsedSeconds": 533.035,
+        "completedScansPerMinute": null
+      },
+      "httpRequests": 300,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {
+        "submit": 442.57917984999983,
+        "create": 370.89063999999996,
+        "draft": 468.1185489,
+        "form": 281.43091145
+      },
+      "uploadWallClockP95Milliseconds": 425.3499999999999,
+      "completedJourneys": 50,
+      "completedScans": 0,
+      "contentionRedeemed": 0,
+      "contentionExhausted": 0,
+      "idempotencyMismatchRate": null,
+      "droppedIterations": 0,
+      "ledger": {
+        "expected": 50,
+        "submitted": 50,
+        "lostAnswers": 0,
+        "persistedResumes": 50,
+        "resumeMismatches": 0,
+        "duplicateApplications": 0
+      },
+      "poolTelemetry": {
+        "runID": "33706214681",
+        "repetition": "1",
+        "profile": "sustained",
+        "startedAt": "2026-09-03T02:04:54.863Z",
+        "finishedAt": "2026-09-03T02:13:47.898Z",
+        "stepSeconds": 30,
+        "note": "Only source samples timestamped within the recorded window; sampled gauges, not proof of the instantaneous peak",
+        "metrics": {
+          "open": {
+            "query": "sum(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401094))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788401124,
+                    "2"
+                  ],
+                  [
+                    1788401154,
+                    "2"
+                  ],
+                  [
+                    1788401184,
+                    "2"
+                  ],
+                  [
+                    1788401214,
+                    "2"
+                  ],
+                  [
+                    1788401244,
+                    "2"
+                  ],
+                  [
+                    1788401274,
+                    "2"
+                  ],
+                  [
+                    1788401304,
+                    "3"
+                  ],
+                  [
+                    1788401334,
+                    "3"
+                  ],
+                  [
+                    1788401364,
+                    "3"
+                  ],
+                  [
+                    1788401394,
+                    "3"
+                  ],
+                  [
+                    1788401424,
+                    "3"
+                  ],
+                  [
+                    1788401454,
+                    "3"
+                  ],
+                  [
+                    1788401484,
+                    "3"
+                  ],
+                  [
+                    1788401514,
+                    "3"
+                  ],
+                  [
+                    1788401544,
+                    "3"
+                  ],
+                  [
+                    1788401574,
+                    "3"
+                  ],
+                  [
+                    1788401604,
+                    "3"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 17,
+            "sampledMaximum": 3
+          },
+          "inUse": {
+            "query": "sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401094))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788401124,
+                    "0"
+                  ],
+                  [
+                    1788401154,
+                    "0"
+                  ],
+                  [
+                    1788401184,
+                    "0"
+                  ],
+                  [
+                    1788401214,
+                    "0"
+                  ],
+                  [
+                    1788401244,
+                    "0"
+                  ],
+                  [
+                    1788401274,
+                    "0"
+                  ],
+                  [
+                    1788401304,
+                    "0"
+                  ],
+                  [
+                    1788401334,
+                    "1"
+                  ],
+                  [
+                    1788401364,
+                    "1"
+                  ],
+                  [
+                    1788401394,
+                    "1"
+                  ],
+                  [
+                    1788401424,
+                    "0"
+                  ],
+                  [
+                    1788401454,
+                    "0"
+                  ],
+                  [
+                    1788401484,
+                    "1"
+                  ],
+                  [
+                    1788401514,
+                    "0"
+                  ],
+                  [
+                    1788401544,
+                    "0"
+                  ],
+                  [
+                    1788401574,
+                    "0"
+                  ],
+                  [
+                    1788401604,
+                    "0"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 17,
+            "sampledMaximum": 1
+          },
+          "limit": {
+            "query": "sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401094))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788401124,
+                    "5"
+                  ],
+                  [
+                    1788401154,
+                    "5"
+                  ],
+                  [
+                    1788401184,
+                    "5"
+                  ],
+                  [
+                    1788401214,
+                    "5"
+                  ],
+                  [
+                    1788401244,
+                    "5"
+                  ],
+                  [
+                    1788401274,
+                    "5"
+                  ],
+                  [
+                    1788401304,
+                    "5"
+                  ],
+                  [
+                    1788401334,
+                    "5"
+                  ],
+                  [
+                    1788401364,
+                    "5"
+                  ],
+                  [
+                    1788401394,
+                    "5"
+                  ],
+                  [
+                    1788401424,
+                    "5"
+                  ],
+                  [
+                    1788401454,
+                    "5"
+                  ],
+                  [
+                    1788401484,
+                    "5"
+                  ],
+                  [
+                    1788401514,
+                    "5"
+                  ],
+                  [
+                    1788401544,
+                    "5"
+                  ],
+                  [
+                    1788401574,
+                    "5"
+                  ],
+                  [
+                    1788401604,
+                    "5"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 17,
+            "sampledMaximum": 5
+          },
+          "utilizationPercent": {
+            "query": "100 * (sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401094))) / (sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401094)))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788401124,
+                    "0"
+                  ],
+                  [
+                    1788401154,
+                    "0"
+                  ],
+                  [
+                    1788401184,
+                    "0"
+                  ],
+                  [
+                    1788401214,
+                    "0"
+                  ],
+                  [
+                    1788401244,
+                    "0"
+                  ],
+                  [
+                    1788401274,
+                    "0"
+                  ],
+                  [
+                    1788401304,
+                    "0"
+                  ],
+                  [
+                    1788401334,
+                    "20"
+                  ],
+                  [
+                    1788401364,
+                    "20"
+                  ],
+                  [
+                    1788401394,
+                    "20"
+                  ],
+                  [
+                    1788401424,
+                    "0"
+                  ],
+                  [
+                    1788401454,
+                    "0"
+                  ],
+                  [
+                    1788401484,
+                    "20"
+                  ],
+                  [
+                    1788401514,
+                    "0"
+                  ],
+                  [
+                    1788401544,
+                    "0"
+                  ],
+                  [
+                    1788401574,
+                    "0"
+                  ],
+                  [
+                    1788401604,
+                    "0"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 17,
+            "sampledMaximum": 20
+          }
+        }
+      }
+    },
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33706868836",
+      "artifact": "applicant-deadline-33706868836-1",
+      "context": {
+        "startedAt": "2026-09-03T02:15:46.265Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "fd2302aa70c23854c0c0dba80cf6765c0fa0d9c2",
+        "runID": "33706868836",
+        "repetition": "1",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "deadline",
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T02:25:47.811Z",
+        "deploymentUnchanged": true,
+        "elapsedSeconds": 601.546,
+        "completedScansPerMinute": null
+      },
+      "httpRequests": 250,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {
+        "submit": 417.89097435
+      },
+      "uploadWallClockP95Milliseconds": null,
+      "completedJourneys": 250,
+      "completedScans": 0,
+      "contentionRedeemed": 0,
+      "contentionExhausted": 0,
+      "idempotencyMismatchRate": null,
+      "droppedIterations": 0,
+      "ledger": {
+        "expected": 250,
+        "submitted": 250,
+        "lostAnswers": 0,
+        "persistedResumes": 250,
+        "resumeMismatches": 0,
+        "duplicateApplications": 0
+      },
+      "poolTelemetry": {
+        "runID": "33706868836",
+        "repetition": "1",
+        "profile": "deadline",
+        "startedAt": "2026-09-03T02:15:46.265Z",
+        "finishedAt": "2026-09-03T02:25:47.811Z",
+        "stepSeconds": 30,
+        "note": "Only source samples timestamped within the recorded window; sampled gauges, not proof of the instantaneous peak",
+        "metrics": {
+          "open": {
+            "query": "sum(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401746))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788401776,
+                    "5"
+                  ],
+                  [
+                    1788401806,
+                    "5"
+                  ],
+                  [
+                    1788401836,
+                    "5"
+                  ],
+                  [
+                    1788401866,
+                    "5"
+                  ],
+                  [
+                    1788401896,
+                    "5"
+                  ],
+                  [
+                    1788401926,
+                    "5"
+                  ],
+                  [
+                    1788401956,
+                    "4"
+                  ],
+                  [
+                    1788401986,
+                    "4"
+                  ],
+                  [
+                    1788402016,
+                    "4"
+                  ],
+                  [
+                    1788402046,
+                    "4"
+                  ],
+                  [
+                    1788402076,
+                    "4"
+                  ],
+                  [
+                    1788402106,
+                    "4"
+                  ],
+                  [
+                    1788402136,
+                    "4"
+                  ],
+                  [
+                    1788402166,
+                    "4"
+                  ],
+                  [
+                    1788402196,
+                    "4"
+                  ],
+                  [
+                    1788402226,
+                    "4"
+                  ],
+                  [
+                    1788402256,
+                    "4"
+                  ],
+                  [
+                    1788402286,
+                    "4"
+                  ],
+                  [
+                    1788402316,
+                    "4"
+                  ],
+                  [
+                    1788402346,
+                    "4"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "inUse": {
+            "query": "sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401746))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788401776,
+                    "0"
+                  ],
+                  [
+                    1788401806,
+                    "0"
+                  ],
+                  [
+                    1788401836,
+                    "0"
+                  ],
+                  [
+                    1788401866,
+                    "0"
+                  ],
+                  [
+                    1788401896,
+                    "0"
+                  ],
+                  [
+                    1788401926,
+                    "0"
+                  ],
+                  [
+                    1788401956,
+                    "0"
+                  ],
+                  [
+                    1788401986,
+                    "0"
+                  ],
+                  [
+                    1788402016,
+                    "0"
+                  ],
+                  [
+                    1788402046,
+                    "0"
+                  ],
+                  [
+                    1788402076,
+                    "0"
+                  ],
+                  [
+                    1788402106,
+                    "0"
+                  ],
+                  [
+                    1788402136,
+                    "0"
+                  ],
+                  [
+                    1788402166,
+                    "0"
+                  ],
+                  [
+                    1788402196,
+                    "0"
+                  ],
+                  [
+                    1788402226,
+                    "0"
+                  ],
+                  [
+                    1788402256,
+                    "0"
+                  ],
+                  [
+                    1788402286,
+                    "0"
+                  ],
+                  [
+                    1788402316,
+                    "0"
+                  ],
+                  [
+                    1788402346,
+                    "0"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 0
+          },
+          "limit": {
+            "query": "sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401746))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788401776,
+                    "5"
+                  ],
+                  [
+                    1788401806,
+                    "5"
+                  ],
+                  [
+                    1788401836,
+                    "5"
+                  ],
+                  [
+                    1788401866,
+                    "5"
+                  ],
+                  [
+                    1788401896,
+                    "5"
+                  ],
+                  [
+                    1788401926,
+                    "5"
+                  ],
+                  [
+                    1788401956,
+                    "5"
+                  ],
+                  [
+                    1788401986,
+                    "5"
+                  ],
+                  [
+                    1788402016,
+                    "5"
+                  ],
+                  [
+                    1788402046,
+                    "5"
+                  ],
+                  [
+                    1788402076,
+                    "5"
+                  ],
+                  [
+                    1788402106,
+                    "5"
+                  ],
+                  [
+                    1788402136,
+                    "5"
+                  ],
+                  [
+                    1788402166,
+                    "5"
+                  ],
+                  [
+                    1788402196,
+                    "5"
+                  ],
+                  [
+                    1788402226,
+                    "5"
+                  ],
+                  [
+                    1788402256,
+                    "5"
+                  ],
+                  [
+                    1788402286,
+                    "5"
+                  ],
+                  [
+                    1788402316,
+                    "5"
+                  ],
+                  [
+                    1788402346,
+                    "5"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "utilizationPercent": {
+            "query": "100 * (sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401746))) / (sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788401746)))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788401776,
+                    "0"
+                  ],
+                  [
+                    1788401806,
+                    "0"
+                  ],
+                  [
+                    1788401836,
+                    "0"
+                  ],
+                  [
+                    1788401866,
+                    "0"
+                  ],
+                  [
+                    1788401896,
+                    "0"
+                  ],
+                  [
+                    1788401926,
+                    "0"
+                  ],
+                  [
+                    1788401956,
+                    "0"
+                  ],
+                  [
+                    1788401986,
+                    "0"
+                  ],
+                  [
+                    1788402016,
+                    "0"
+                  ],
+                  [
+                    1788402046,
+                    "0"
+                  ],
+                  [
+                    1788402076,
+                    "0"
+                  ],
+                  [
+                    1788402106,
+                    "0"
+                  ],
+                  [
+                    1788402136,
+                    "0"
+                  ],
+                  [
+                    1788402166,
+                    "0"
+                  ],
+                  [
+                    1788402196,
+                    "0"
+                  ],
+                  [
+                    1788402226,
+                    "0"
+                  ],
+                  [
+                    1788402256,
+                    "0"
+                  ],
+                  [
+                    1788402286,
+                    "0"
+                  ],
+                  [
+                    1788402316,
+                    "0"
+                  ],
+                  [
+                    1788402346,
+                    "0"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 0
+          }
+        }
+      }
+    },
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33707641714",
+      "artifact": "scanner-repeatability-33707641714-1",
+      "context": {
+        "startedAt": "2026-09-03T02:35:02.227Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "5145b12563d18b998c81e16bb9c9a0b5dcbaa320",
+        "runID": "33707641714",
+        "repetition": "1",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "repeatability",
+        "form": {
+          "id": "5f531002-9625-4b12-8272-74144637bced",
+          "version": 1,
+          "resumeRequired": true,
+          "questionCount": 3
+        },
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T02:45:09.350Z",
+        "deploymentUnchanged": true,
+        "elapsedSeconds": 607.123,
+        "completedScansPerMinute": 282.34805797177836
+      },
+      "httpRequests": 5714,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {
+        "lookup": 277.89493159999995,
+        "redemption": 516.9435701999998
+      },
+      "uploadWallClockP95Milliseconds": null,
+      "completedJourneys": 0,
+      "completedScans": 2857,
+      "contentionRedeemed": 0,
+      "contentionExhausted": 0,
+      "idempotencyMismatchRate": null,
+      "droppedIterations": 0,
+      "ledger": {
+        "verified": true,
+        "profile": "repeatability",
+        "redemptions": 2857,
+        "duplicateAttendees": 0,
+        "overLimitRedemptions": 0
+      },
+      "poolTelemetry": {
+        "runID": "33707641714",
+        "repetition": "1",
+        "profile": "repeatability",
+        "startedAt": "2026-09-03T02:35:02.227Z",
+        "finishedAt": "2026-09-03T02:45:09.350Z",
+        "stepSeconds": 30,
+        "note": "Only source samples timestamped within the recorded window; sampled gauges, not proof of the instantaneous peak",
+        "metrics": {
+          "open": {
+            "query": "sum(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788402902))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788402932,
+                    "5"
+                  ],
+                  [
+                    1788402962,
+                    "5"
+                  ],
+                  [
+                    1788402992,
+                    "5"
+                  ],
+                  [
+                    1788403022,
+                    "5"
+                  ],
+                  [
+                    1788403052,
+                    "5"
+                  ],
+                  [
+                    1788403082,
+                    "5"
+                  ],
+                  [
+                    1788403112,
+                    "5"
+                  ],
+                  [
+                    1788403142,
+                    "5"
+                  ],
+                  [
+                    1788403172,
+                    "5"
+                  ],
+                  [
+                    1788403202,
+                    "5"
+                  ],
+                  [
+                    1788403232,
+                    "5"
+                  ],
+                  [
+                    1788403262,
+                    "5"
+                  ],
+                  [
+                    1788403292,
+                    "5"
+                  ],
+                  [
+                    1788403322,
+                    "5"
+                  ],
+                  [
+                    1788403352,
+                    "5"
+                  ],
+                  [
+                    1788403382,
+                    "5"
+                  ],
+                  [
+                    1788403412,
+                    "5"
+                  ],
+                  [
+                    1788403442,
+                    "5"
+                  ],
+                  [
+                    1788403472,
+                    "5"
+                  ],
+                  [
+                    1788403502,
+                    "5"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "inUse": {
+            "query": "sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788402902))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788402932,
+                    "4"
+                  ],
+                  [
+                    1788402962,
+                    "3"
+                  ],
+                  [
+                    1788402992,
+                    "1"
+                  ],
+                  [
+                    1788403022,
+                    "4"
+                  ],
+                  [
+                    1788403052,
+                    "0"
+                  ],
+                  [
+                    1788403082,
+                    "3"
+                  ],
+                  [
+                    1788403112,
+                    "4"
+                  ],
+                  [
+                    1788403142,
+                    "5"
+                  ],
+                  [
+                    1788403172,
+                    "5"
+                  ],
+                  [
+                    1788403202,
+                    "5"
+                  ],
+                  [
+                    1788403232,
+                    "2"
+                  ],
+                  [
+                    1788403262,
+                    "3"
+                  ],
+                  [
+                    1788403292,
+                    "0"
+                  ],
+                  [
+                    1788403322,
+                    "4"
+                  ],
+                  [
+                    1788403352,
+                    "3"
+                  ],
+                  [
+                    1788403382,
+                    "5"
+                  ],
+                  [
+                    1788403412,
+                    "2"
+                  ],
+                  [
+                    1788403442,
+                    "2"
+                  ],
+                  [
+                    1788403472,
+                    "3"
+                  ],
+                  [
+                    1788403502,
+                    "2"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "limit": {
+            "query": "sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788402902))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788402932,
+                    "5"
+                  ],
+                  [
+                    1788402962,
+                    "5"
+                  ],
+                  [
+                    1788402992,
+                    "5"
+                  ],
+                  [
+                    1788403022,
+                    "5"
+                  ],
+                  [
+                    1788403052,
+                    "5"
+                  ],
+                  [
+                    1788403082,
+                    "5"
+                  ],
+                  [
+                    1788403112,
+                    "5"
+                  ],
+                  [
+                    1788403142,
+                    "5"
+                  ],
+                  [
+                    1788403172,
+                    "5"
+                  ],
+                  [
+                    1788403202,
+                    "5"
+                  ],
+                  [
+                    1788403232,
+                    "5"
+                  ],
+                  [
+                    1788403262,
+                    "5"
+                  ],
+                  [
+                    1788403292,
+                    "5"
+                  ],
+                  [
+                    1788403322,
+                    "5"
+                  ],
+                  [
+                    1788403352,
+                    "5"
+                  ],
+                  [
+                    1788403382,
+                    "5"
+                  ],
+                  [
+                    1788403412,
+                    "5"
+                  ],
+                  [
+                    1788403442,
+                    "5"
+                  ],
+                  [
+                    1788403472,
+                    "5"
+                  ],
+                  [
+                    1788403502,
+                    "5"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "utilizationPercent": {
+            "query": "100 * (sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788402902))) / (sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788402902)))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788402932,
+                    "80"
+                  ],
+                  [
+                    1788402962,
+                    "60"
+                  ],
+                  [
+                    1788402992,
+                    "20"
+                  ],
+                  [
+                    1788403022,
+                    "80"
+                  ],
+                  [
+                    1788403052,
+                    "0"
+                  ],
+                  [
+                    1788403082,
+                    "60"
+                  ],
+                  [
+                    1788403112,
+                    "80"
+                  ],
+                  [
+                    1788403142,
+                    "100"
+                  ],
+                  [
+                    1788403172,
+                    "100"
+                  ],
+                  [
+                    1788403202,
+                    "100"
+                  ],
+                  [
+                    1788403232,
+                    "40"
+                  ],
+                  [
+                    1788403262,
+                    "60"
+                  ],
+                  [
+                    1788403292,
+                    "0"
+                  ],
+                  [
+                    1788403322,
+                    "80"
+                  ],
+                  [
+                    1788403352,
+                    "60"
+                  ],
+                  [
+                    1788403382,
+                    "100"
+                  ],
+                  [
+                    1788403412,
+                    "40"
+                  ],
+                  [
+                    1788403442,
+                    "40"
+                  ],
+                  [
+                    1788403472,
+                    "60"
+                  ],
+                  [
+                    1788403502,
+                    "40"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 100
+          }
+        }
+      }
+    },
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33707641714",
+      "artifact": "scanner-repeatability-33707641714-2",
+      "context": {
+        "startedAt": "2026-09-03T02:53:34.487Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "5145b12563d18b998c81e16bb9c9a0b5dcbaa320",
+        "runID": "33707641714",
+        "repetition": "2",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "repeatability",
+        "form": {
+          "id": "5f531002-9625-4b12-8272-74144637bced",
+          "version": 1,
+          "resumeRequired": true,
+          "questionCount": 3
+        },
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T03:03:41.312Z",
+        "deploymentUnchanged": true,
+        "elapsedSeconds": 606.825,
+        "completedScansPerMinute": 283.2777159807193
+      },
+      "httpRequests": 5730,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {
+        "lookup": 257.4155515999999,
+        "redemption": 505.8417057999999
+      },
+      "uploadWallClockP95Milliseconds": null,
+      "completedJourneys": 0,
+      "completedScans": 2865,
+      "contentionRedeemed": 0,
+      "contentionExhausted": 0,
+      "idempotencyMismatchRate": null,
+      "droppedIterations": 0,
+      "ledger": {
+        "verified": true,
+        "profile": "repeatability",
+        "redemptions": 2865,
+        "duplicateAttendees": 0,
+        "overLimitRedemptions": 0
+      },
+      "poolTelemetry": {
+        "runID": "33707641714",
+        "repetition": "2",
+        "profile": "repeatability",
+        "startedAt": "2026-09-03T02:53:34.487Z",
+        "finishedAt": "2026-09-03T03:03:41.312Z",
+        "stepSeconds": 30,
+        "note": "Only source samples timestamped within the recorded window; sampled gauges, not proof of the instantaneous peak",
+        "metrics": {
+          "open": {
+            "query": "sum(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788404014))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788404044,
+                    "5"
+                  ],
+                  [
+                    1788404074,
+                    "5"
+                  ],
+                  [
+                    1788404104,
+                    "5"
+                  ],
+                  [
+                    1788404134,
+                    "5"
+                  ],
+                  [
+                    1788404164,
+                    "5"
+                  ],
+                  [
+                    1788404194,
+                    "5"
+                  ],
+                  [
+                    1788404224,
+                    "5"
+                  ],
+                  [
+                    1788404254,
+                    "5"
+                  ],
+                  [
+                    1788404284,
+                    "5"
+                  ],
+                  [
+                    1788404314,
+                    "5"
+                  ],
+                  [
+                    1788404344,
+                    "5"
+                  ],
+                  [
+                    1788404374,
+                    "5"
+                  ],
+                  [
+                    1788404404,
+                    "5"
+                  ],
+                  [
+                    1788404434,
+                    "5"
+                  ],
+                  [
+                    1788404464,
+                    "5"
+                  ],
+                  [
+                    1788404494,
+                    "5"
+                  ],
+                  [
+                    1788404524,
+                    "5"
+                  ],
+                  [
+                    1788404554,
+                    "5"
+                  ],
+                  [
+                    1788404584,
+                    "5"
+                  ],
+                  [
+                    1788404614,
+                    "5"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "inUse": {
+            "query": "sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788404014))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788404044,
+                    "3"
+                  ],
+                  [
+                    1788404074,
+                    "4"
+                  ],
+                  [
+                    1788404104,
+                    "4"
+                  ],
+                  [
+                    1788404134,
+                    "3"
+                  ],
+                  [
+                    1788404164,
+                    "2"
+                  ],
+                  [
+                    1788404194,
+                    "2"
+                  ],
+                  [
+                    1788404224,
+                    "3"
+                  ],
+                  [
+                    1788404254,
+                    "4"
+                  ],
+                  [
+                    1788404284,
+                    "2"
+                  ],
+                  [
+                    1788404314,
+                    "3"
+                  ],
+                  [
+                    1788404344,
+                    "4"
+                  ],
+                  [
+                    1788404374,
+                    "3"
+                  ],
+                  [
+                    1788404404,
+                    "0"
+                  ],
+                  [
+                    1788404434,
+                    "3"
+                  ],
+                  [
+                    1788404464,
+                    "1"
+                  ],
+                  [
+                    1788404494,
+                    "5"
+                  ],
+                  [
+                    1788404524,
+                    "3"
+                  ],
+                  [
+                    1788404554,
+                    "0"
+                  ],
+                  [
+                    1788404584,
+                    "3"
+                  ],
+                  [
+                    1788404614,
+                    "3"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "limit": {
+            "query": "sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788404014))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788404044,
+                    "5"
+                  ],
+                  [
+                    1788404074,
+                    "5"
+                  ],
+                  [
+                    1788404104,
+                    "5"
+                  ],
+                  [
+                    1788404134,
+                    "5"
+                  ],
+                  [
+                    1788404164,
+                    "5"
+                  ],
+                  [
+                    1788404194,
+                    "5"
+                  ],
+                  [
+                    1788404224,
+                    "5"
+                  ],
+                  [
+                    1788404254,
+                    "5"
+                  ],
+                  [
+                    1788404284,
+                    "5"
+                  ],
+                  [
+                    1788404314,
+                    "5"
+                  ],
+                  [
+                    1788404344,
+                    "5"
+                  ],
+                  [
+                    1788404374,
+                    "5"
+                  ],
+                  [
+                    1788404404,
+                    "5"
+                  ],
+                  [
+                    1788404434,
+                    "5"
+                  ],
+                  [
+                    1788404464,
+                    "5"
+                  ],
+                  [
+                    1788404494,
+                    "5"
+                  ],
+                  [
+                    1788404524,
+                    "5"
+                  ],
+                  [
+                    1788404554,
+                    "5"
+                  ],
+                  [
+                    1788404584,
+                    "5"
+                  ],
+                  [
+                    1788404614,
+                    "5"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "utilizationPercent": {
+            "query": "100 * (sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788404014))) / (sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788404014)))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788404044,
+                    "60"
+                  ],
+                  [
+                    1788404074,
+                    "80"
+                  ],
+                  [
+                    1788404104,
+                    "80"
+                  ],
+                  [
+                    1788404134,
+                    "60"
+                  ],
+                  [
+                    1788404164,
+                    "40"
+                  ],
+                  [
+                    1788404194,
+                    "40"
+                  ],
+                  [
+                    1788404224,
+                    "60"
+                  ],
+                  [
+                    1788404254,
+                    "80"
+                  ],
+                  [
+                    1788404284,
+                    "40"
+                  ],
+                  [
+                    1788404314,
+                    "60"
+                  ],
+                  [
+                    1788404344,
+                    "80"
+                  ],
+                  [
+                    1788404374,
+                    "60"
+                  ],
+                  [
+                    1788404404,
+                    "0"
+                  ],
+                  [
+                    1788404434,
+                    "60"
+                  ],
+                  [
+                    1788404464,
+                    "20"
+                  ],
+                  [
+                    1788404494,
+                    "100"
+                  ],
+                  [
+                    1788404524,
+                    "60"
+                  ],
+                  [
+                    1788404554,
+                    "0"
+                  ],
+                  [
+                    1788404584,
+                    "60"
+                  ],
+                  [
+                    1788404614,
+                    "60"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 100
+          }
+        }
+      }
+    },
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33707641714",
+      "artifact": "scanner-repeatability-33707641714-3",
+      "context": {
+        "startedAt": "2026-09-03T03:14:33.487Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "5145b12563d18b998c81e16bb9c9a0b5dcbaa320",
+        "runID": "33707641714",
+        "repetition": "3",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "repeatability",
+        "form": {
+          "id": "5f531002-9625-4b12-8272-74144637bced",
+          "version": 1,
+          "resumeRequired": true,
+          "questionCount": 3
+        },
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T03:24:40.587Z",
+        "deploymentUnchanged": true,
+        "elapsedSeconds": 607.1,
+        "completedScansPerMinute": 276.13243287761486
+      },
+      "httpRequests": 5588,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {
+        "redemption": 587.9836930499999,
+        "lookup": 343.8178284
+      },
+      "uploadWallClockP95Milliseconds": null,
+      "completedJourneys": 0,
+      "completedScans": 2794,
+      "contentionRedeemed": 0,
+      "contentionExhausted": 0,
+      "idempotencyMismatchRate": null,
+      "droppedIterations": 0,
+      "ledger": {
+        "verified": true,
+        "profile": "repeatability",
+        "redemptions": 2794,
+        "duplicateAttendees": 0,
+        "overLimitRedemptions": 0
+      },
+      "poolTelemetry": {
+        "runID": "33707641714",
+        "repetition": "3",
+        "profile": "repeatability",
+        "startedAt": "2026-09-03T03:14:33.487Z",
+        "finishedAt": "2026-09-03T03:24:40.587Z",
+        "stepSeconds": 30,
+        "note": "Only source samples timestamped within the recorded window; sampled gauges, not proof of the instantaneous peak",
+        "metrics": {
+          "open": {
+            "query": "sum(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405273))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788405303,
+                    "5"
+                  ],
+                  [
+                    1788405333,
+                    "5"
+                  ],
+                  [
+                    1788405363,
+                    "5"
+                  ],
+                  [
+                    1788405393,
+                    "5"
+                  ],
+                  [
+                    1788405423,
+                    "5"
+                  ],
+                  [
+                    1788405453,
+                    "5"
+                  ],
+                  [
+                    1788405483,
+                    "5"
+                  ],
+                  [
+                    1788405513,
+                    "5"
+                  ],
+                  [
+                    1788405543,
+                    "5"
+                  ],
+                  [
+                    1788405573,
+                    "5"
+                  ],
+                  [
+                    1788405603,
+                    "5"
+                  ],
+                  [
+                    1788405633,
+                    "5"
+                  ],
+                  [
+                    1788405663,
+                    "5"
+                  ],
+                  [
+                    1788405693,
+                    "5"
+                  ],
+                  [
+                    1788405723,
+                    "5"
+                  ],
+                  [
+                    1788405753,
+                    "5"
+                  ],
+                  [
+                    1788405783,
+                    "5"
+                  ],
+                  [
+                    1788405813,
+                    "5"
+                  ],
+                  [
+                    1788405843,
+                    "5"
+                  ],
+                  [
+                    1788405873,
+                    "5"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "inUse": {
+            "query": "sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405273))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788405303,
+                    "3"
+                  ],
+                  [
+                    1788405333,
+                    "2"
+                  ],
+                  [
+                    1788405363,
+                    "2"
+                  ],
+                  [
+                    1788405393,
+                    "3"
+                  ],
+                  [
+                    1788405423,
+                    "0"
+                  ],
+                  [
+                    1788405453,
+                    "0"
+                  ],
+                  [
+                    1788405483,
+                    "4"
+                  ],
+                  [
+                    1788405513,
+                    "3"
+                  ],
+                  [
+                    1788405543,
+                    "2"
+                  ],
+                  [
+                    1788405573,
+                    "4"
+                  ],
+                  [
+                    1788405603,
+                    "5"
+                  ],
+                  [
+                    1788405633,
+                    "2"
+                  ],
+                  [
+                    1788405663,
+                    "1"
+                  ],
+                  [
+                    1788405693,
+                    "3"
+                  ],
+                  [
+                    1788405723,
+                    "3"
+                  ],
+                  [
+                    1788405753,
+                    "2"
+                  ],
+                  [
+                    1788405783,
+                    "1"
+                  ],
+                  [
+                    1788405813,
+                    "1"
+                  ],
+                  [
+                    1788405843,
+                    "1"
+                  ],
+                  [
+                    1788405873,
+                    "0"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "limit": {
+            "query": "sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405273))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788405303,
+                    "5"
+                  ],
+                  [
+                    1788405333,
+                    "5"
+                  ],
+                  [
+                    1788405363,
+                    "5"
+                  ],
+                  [
+                    1788405393,
+                    "5"
+                  ],
+                  [
+                    1788405423,
+                    "5"
+                  ],
+                  [
+                    1788405453,
+                    "5"
+                  ],
+                  [
+                    1788405483,
+                    "5"
+                  ],
+                  [
+                    1788405513,
+                    "5"
+                  ],
+                  [
+                    1788405543,
+                    "5"
+                  ],
+                  [
+                    1788405573,
+                    "5"
+                  ],
+                  [
+                    1788405603,
+                    "5"
+                  ],
+                  [
+                    1788405633,
+                    "5"
+                  ],
+                  [
+                    1788405663,
+                    "5"
+                  ],
+                  [
+                    1788405693,
+                    "5"
+                  ],
+                  [
+                    1788405723,
+                    "5"
+                  ],
+                  [
+                    1788405753,
+                    "5"
+                  ],
+                  [
+                    1788405783,
+                    "5"
+                  ],
+                  [
+                    1788405813,
+                    "5"
+                  ],
+                  [
+                    1788405843,
+                    "5"
+                  ],
+                  [
+                    1788405873,
+                    "5"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 5
+          },
+          "utilizationPercent": {
+            "query": "100 * (sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405273))) / (sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405273)))",
+            "samples": [
+              {
+                "metric": {},
+                "values": [
+                  [
+                    1788405303,
+                    "60"
+                  ],
+                  [
+                    1788405333,
+                    "40"
+                  ],
+                  [
+                    1788405363,
+                    "40"
+                  ],
+                  [
+                    1788405393,
+                    "60"
+                  ],
+                  [
+                    1788405423,
+                    "0"
+                  ],
+                  [
+                    1788405453,
+                    "0"
+                  ],
+                  [
+                    1788405483,
+                    "80"
+                  ],
+                  [
+                    1788405513,
+                    "60"
+                  ],
+                  [
+                    1788405543,
+                    "40"
+                  ],
+                  [
+                    1788405573,
+                    "80"
+                  ],
+                  [
+                    1788405603,
+                    "100"
+                  ],
+                  [
+                    1788405633,
+                    "40"
+                  ],
+                  [
+                    1788405663,
+                    "20"
+                  ],
+                  [
+                    1788405693,
+                    "60"
+                  ],
+                  [
+                    1788405723,
+                    "60"
+                  ],
+                  [
+                    1788405753,
+                    "40"
+                  ],
+                  [
+                    1788405783,
+                    "20"
+                  ],
+                  [
+                    1788405813,
+                    "20"
+                  ],
+                  [
+                    1788405843,
+                    "20"
+                  ],
+                  [
+                    1788405873,
+                    "0"
+                  ]
+                ]
+              }
+            ],
+            "sampleCount": 20,
+            "sampledMaximum": 100
+          }
+        }
+      }
+    },
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33711277613",
+      "artifact": "scanner-contention-33711277613-1",
+      "context": {
+        "startedAt": "2026-09-03T03:25:30.894Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "adac50cfeb24c8296a126af161eca479dc95b816",
+        "runID": "33711277613",
+        "repetition": "1",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "contention",
+        "form": {
+          "id": "5f531002-9625-4b12-8272-74144637bced",
+          "version": 1,
+          "resumeRequired": true,
+          "questionCount": 3
+        },
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T03:25:56.964Z",
+        "deploymentUnchanged": true,
+        "elapsedSeconds": 26.07,
+        "completedScansPerMinute": null
+      },
+      "httpRequests": 300,
+      "httpFailureRate": 0.29333333333333333,
+      "operationP95Milliseconds": {},
+      "uploadWallClockP95Milliseconds": null,
+      "completedJourneys": 0,
+      "completedScans": 0,
+      "contentionRedeemed": 1,
+      "contentionExhausted": 76,
+      "idempotencyMismatchRate": 0.88,
+      "droppedIterations": 0,
+      "ledger": {
+        "verified": true,
+        "profile": "contention",
+        "redemptions": 1,
+        "duplicateAttendees": 0,
+        "overLimitRedemptions": 0
+      },
+      "poolTelemetry": {
+        "runID": "33711277613",
+        "repetition": "1",
+        "profile": "contention",
+        "startedAt": "2026-09-03T03:25:30.894Z",
+        "finishedAt": "2026-09-03T03:25:56.964Z",
+        "stepSeconds": 30,
+        "note": "Only source samples timestamped within the recorded window; sampled gauges, not proof of the instantaneous peak",
+        "metrics": {
+          "open": {
+            "query": "sum(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405930))",
+            "samples": [],
+            "sampleCount": 0,
+            "sampledMaximum": null
+          },
+          "inUse": {
+            "query": "sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405930))",
+            "samples": [],
+            "sampleCount": 0,
+            "sampledMaximum": null
+          },
+          "limit": {
+            "query": "sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405930))",
+            "samples": [],
+            "sampleCount": 0,
+            "sampledMaximum": null
+          },
+          "utilizationPercent": {
+            "query": "100 * (sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405930))) / (sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788405930)))",
+            "samples": [],
+            "sampleCount": 0,
+            "sampledMaximum": null
+          }
+        }
+      }
+    },
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33711427592",
+      "artifact": "scanner-spike-33711427592-1",
+      "context": {
+        "startedAt": "2026-09-03T03:28:21.713Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "adac50cfeb24c8296a126af161eca479dc95b816",
+        "runID": "33711427592",
+        "repetition": "1",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "spike",
+        "form": {
+          "id": "5f531002-9625-4b12-8272-74144637bced",
+          "version": 1,
+          "resumeRequired": true,
+          "questionCount": 3
+        },
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T03:28:44.166Z",
+        "deploymentUnchanged": true,
+        "elapsedSeconds": 22.453,
+        "completedScansPerMinute": 267.224869727876
+      },
+      "httpRequests": 200,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {},
+      "uploadWallClockP95Milliseconds": null,
+      "completedJourneys": 0,
+      "completedScans": 100,
+      "contentionRedeemed": 0,
+      "contentionExhausted": 0,
+      "idempotencyMismatchRate": null,
+      "droppedIterations": 0,
+      "ledger": {
+        "verified": true,
+        "profile": "spike",
+        "redemptions": 100,
+        "duplicateAttendees": 0,
+        "overLimitRedemptions": 0
+      },
+      "poolTelemetry": {
+        "runID": "33711427592",
+        "repetition": "1",
+        "profile": "spike",
+        "startedAt": "2026-09-03T03:28:21.713Z",
+        "finishedAt": "2026-09-03T03:28:44.166Z",
+        "stepSeconds": 30,
+        "note": "Only source samples timestamped within the recorded window; sampled gauges, not proof of the instantaneous peak",
+        "metrics": {
+          "open": {
+            "query": "sum(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_open{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788406101))",
+            "samples": [],
+            "sampleCount": 0,
+            "sampledMaximum": null
+          },
+          "inUse": {
+            "query": "sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788406101))",
+            "samples": [],
+            "sampleCount": 0,
+            "sampledMaximum": null
+          },
+          "limit": {
+            "query": "sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788406101))",
+            "samples": [],
+            "sampleCount": 0,
+            "sampledMaximum": null
+          },
+          "utilizationPercent": {
+            "query": "100 * (sum(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_in_use{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788406101))) / (sum(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"} and (timestamp(db_client_connections_max{service_name=\"hackatlantic-ats-api\",deployment_environment_name=\"staging\"}) >= 1788406101)))",
+            "samples": [],
+            "sampleCount": 0,
+            "sampledMaximum": null
+          }
+        }
+      }
+    }
+  ],
+  "campaignStatus": "executed_with_acceptance_gaps",
+  "stagingFaultDrill": {
+    "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33711524311",
+    "testCommit": "adac50cfeb24c8296a126af161eca479dc95b816",
+    "report": {
+      "appID": "3aeb8f16-83d6-43d6-9eee-32ceeb17f26b",
+      "originalDeploymentID": "5b1c0cba-b03b-4115-8bec-a46e6cbc3976",
+      "injectedAt": "2026-09-03T03:29:25.064Z",
+      "originalDigest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+      "originalSHA": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+      "candidateHealthy": false,
+      "fault": "readiness path only; image and liveness unchanged",
+      "readinessSamples": 112,
+      "unhealthySamples": 0,
+      "candidateID": "2d62b920-dd79-4cc9-b6d9-6bb312716af9",
+      "candidatePhase": "ERROR",
+      "detectedAt": "2026-09-03T03:40:57.231Z",
+      "detectionSeconds": 692.167,
+      "healthCheckFailure": true,
+      "rollbackRequestedAt": "2026-09-03T03:40:57.885Z",
+      "restoredAt": "2026-09-03T03:41:21.692Z",
+      "recoverySeconds": 23.807,
+      "originalDigestRestored": true,
+      "readinessPassed": true,
+      "deploymentUnpinned": true
+    },
+    "injectionToRestorationSeconds": 716.628,
+    "fiveMinuteEndToEndTargetMet": false,
+    "productionDeploymentAttempted": false,
+    "nonDeployingPromotionCanary": "skipped",
+    "scope": "Readiness-path-only rejected candidate; prior healthy deployment kept serving."
+  },
+  "cleanup": {
+    "verifiedOn": "2026-09-03T03:44:13Z",
+    "temporaryStagingBranchPolicyRemoved": 58974493,
+    "remainingStagingBranchPolicies": [
+      {
+        "id": 58772100,
+        "name": "main"
+      },
+      {
+        "id": 58772112,
+        "name": "staging"
+      }
+    ],
+    "temporaryGrafanaTokenRevoked": true,
+    "localCollectorStopped": true,
+    "stagingRestored": true,
+    "productionChanged": false,
+    "publicAPIReadiness": {
+      "staging": "ready",
+      "production": "ready",
+      "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2"
+    },
+    "syntheticDatabaseRecordsPurged": false
+  }
+}

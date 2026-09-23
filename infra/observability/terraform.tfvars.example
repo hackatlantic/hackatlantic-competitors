@@ -1,8 +1,17 @@
-grafana_url                   = "https://hackatlantic.grafana.net/"
-prometheus_data_source_uid    = "grafanacloud-prom"
-discord_webhook_url           = "set-as-sensitive-workspace-variable"
-admin_alert_emails            = ["admin-alerts@hackatlantic.ca"]
-grafana_service_account_token = "set-as-sensitive-workspace-variable"
-grafana_sm_access_token        = "set-as-sensitive-workspace-variable"
-grafana_sm_url                 = "https://synthetic-monitoring-api-us-east.grafana.net"
-synthetic_probe_ids            = [1, 2]
+# Copy the actual values from your Grafana stack; these are placeholders.
+grafana_url                = "https://your-stack.grafana.net/"
+prometheus_data_source_uid = "your-prometheus-data-source-uid"
+admin_alert_emails         = ["replace-with-real-admin@example.com"]
+# Switch on only after live ingestion and email delivery are verified.
+enable_alerts              = false
+
+# Supply grafana_service_account_token through protected TFVARS_OBSERVABILITY_JSON.
+# Local-execution workspaces do not inject HCP workspace variables into runners.
+# This config token is NOT the metrics ingestion token used by the API.
+# Optional: include discord_webhook_url in the same protected payload.
+enable_synthetics           = false
+enable_operations_dashboard = false
+
+# Existing installations: retain these as true if their resources are managed.
+# Enabling synthetics also needs grafana_sm_access_token, grafana_sm_url, and
+# actual synthetic_probe_ids selected from the stack. Never assume probe IDs.

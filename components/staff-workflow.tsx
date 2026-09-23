@@ -10,6 +10,7 @@ type StaffPageFrameProps = {
   eyebrow: string;
   title: string;
   children: ReactNode;
+  compactHeader?: boolean;
 };
 
 export function StaffPageFrame({
@@ -17,6 +18,7 @@ export function StaffPageFrame({
   eyebrow,
   title,
   children,
+  compactHeader = false,
 }: StaffPageFrameProps) {
   return (
     <main className="staff-page">
@@ -30,19 +32,19 @@ export function StaffPageFrame({
           <Link href="/organizer/applications"><span>01</span>Applications</Link>
           <Link href="/reviewer/applications"><span>02</span>Review queue</Link>
           <Link href="/organizer/reviewers"><span>03</span>Access</Link>
-          <Link href="/organizer/operations"><span>04</span>Operations</Link>
+          <Link href="/organizer/operations"><span>04</span>Check-in</Link>
           <Link href="/scanner"><span>05</span>Scanner</Link>
         </nav>
         <Link className="staff-home-link" href="/">← Applicant view</Link>
       </aside>
 
       <section className="staff-content">
-        <header className="staff-content-header">
+        <header className={`staff-content-header${compactHeader ? " staff-content-header-compact" : ""}`}>
           <div>
-            <p className="eyebrow">{eyebrow}</p>
+            {compactHeader ? null : <p className="eyebrow">{eyebrow}</p>}
             <h1 id="staff-page-heading">{title}</h1>
           </div>
-          <span className="system-status"><i /> System live</span>
+          {compactHeader ? null : <span className="system-status"><i /> System live</span>}
         </header>
         <div className="staff-panel" aria-labelledby="staff-page-heading">{children}</div>
       </section>

@@ -62,12 +62,10 @@ export function ApplicantDecisionStatus({ decision, onRetry, state }: ApplicantD
   return (
     <section className={`application-decision decision-${decision.outcome}`} aria-live="polite">
       <h2>Decision</h2>
-      <p>
-        Your application decision: <strong className="decision-outcome">{outcomeLabel}</strong>.
+      <p className="overview-status">
+        <strong className="decision-outcome">{outcomeLabel}</strong>
       </p>
-      <p>
-        Released <time dateTime={decision.releasedAt}>{displayTimestamp(decision.releasedAt)}</time>.
-      </p>
+      <time dateTime={decision.releasedAt}>{displayTimestamp(decision.releasedAt)}</time>
     </section>
   );
 }

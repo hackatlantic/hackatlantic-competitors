@@ -441,6 +441,7 @@ textarea:focus-visible {
 .submitted-confirmation,
 .application-decision,
 .application-pass,
+.application-resume-summary,
 .form-intro,
 .resume-summary,
 .decision-current,
@@ -466,23 +467,55 @@ textarea:focus-visible {
   display: contents;
 }
 
+/* Conditional controls enter gently but unmount immediately when irrelevant,
+   so an exiting field can never remain in the keyboard tab order. */
+.application-question-group.conditional-question {
+  display: block;
+}
+
+.application-motion-button {
+  gap: 0.55rem;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+/* Motion owns this transform; don't combine it with the global hover rule. */
+.button.application-motion-button:not(:disabled):hover,
+.button.application-motion-button:not(:disabled):active {
+  transform: none;
+}
+
+.application-busy-indicator {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: application-pending-spin 800ms linear infinite;
+}
+
+@keyframes application-pending-spin {
+  to { transform: rotate(360deg); }
+}
+
+.application-form .save-state {
+  color: var(--brand-muted);
+}
+
+.application-form :is(input, textarea, select),
+.application-form :is(.boolean-options, .choice-options) label {
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.application-form :is(.boolean-options, .choice-options) label:has(input:focus-visible) {
+  outline: 3px solid var(--brand-teal);
+  outline-offset: 3px;
+}
+
 .application-form-section-heading {
-  display: grid;
-  grid-template-columns: minmax(72px, auto) 1fr;
-  gap: 18px;
-  align-items: baseline;
   margin-top: 18px;
   padding: 22px 0 10px;
   border-top: 1px solid var(--brand-line);
-}
-
-.application-form-section-heading span {
-  color: var(--brand-teal-dark);
-  font-family: var(--font-mono), monospace;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .application-form-section-heading h2 {
@@ -528,6 +561,51 @@ textarea:focus-visible {
   color: var(--brand-navy);
   background: var(--brand-white);
   box-shadow: none;
+}
+
+.application-resume-summary p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.application-resume-summary strong {
+  color: var(--brand-navy);
+}
+
+.question-field input:not([type="radio"]):not([type="checkbox"]):not([type="file"]),
+.question-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 3.25rem;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.question-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.question-field.has-error input:not([type="radio"]):not([type="checkbox"]),
+.question-field.has-error select,
+.question-field.has-error textarea,
+.question-field.has-error fieldset {
+  border-color: #b42318;
+  background: #fff5f4;
+  box-shadow: 0 0 0 3px rgb(180 35 24 / 14%);
+}
+
+.question-field.has-error fieldset {
+  padding: 0.85rem;
+  border: 1px solid #b42318;
+  border-radius: 10px;
 }
 
 .question-field textarea:focus,
@@ -599,6 +677,32 @@ input[type="checkbox"] {
 }
 
 /* Organizer, reviewer, and scanner surfaces */
+
+.scanner-access-manager {
+  display: grid;
+  gap: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+
+.scanner-access-result {
+  padding: clamp(1rem, 3vw, 1.5rem);
+  border: 1px solid var(--brand-line);
+  border-radius: 12px;
+  background: #edf7f5;
+}
+
+.scanner-access-result h2 {
+  margin-top: 0;
+}
+
+.scanner-access-email {
+  overflow-wrap: anywhere;
+}
+
+.scanner-access-result .button.secondary {
+  border-color: var(--brand-line);
+  color: var(--brand-navy);
+}
 
 .staff-page,
 .scanner-page {
@@ -984,8 +1088,285 @@ input[type="checkbox"] {
   }
 }
 
+.application-panel-submitted .application-heading {
+  margin-top: clamp(2rem, 5vw, 3.75rem);
+  margin-bottom: 0;
+  padding-bottom: clamp(1rem, 2.5vw, 1.6rem);
+}
+
+.application-panel-submitted h1 {
+  max-width: none;
+  font-size: clamp(3.25rem, 6vw, 5.25rem);
+}
+
+.application-overview,
+.attendance-overview {
+  margin-left: clamp(1rem, 4vw, 3.5rem);
+  margin-right: clamp(1rem, 4vw, 3.5rem);
+}
+
+.application-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.application-overview > :is(.submitted-confirmation, .application-decision, .application-resume-summary) {
+  min-width: 0;
+  min-height: 142px;
+  margin: 0;
+  padding: 20px;
+  background: var(--brand-white);
+}
+
+.application-overview h2 {
+  margin: 0 0 18px;
+  color: var(--brand-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.application-overview .overview-status,
+.application-overview .application-resume-summary p {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.08;
+  overflow-wrap: anywhere;
+}
+
+.application-overview time,
+.application-overview .application-resume-summary > span {
+  display: block;
+  color: var(--brand-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.attendance-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+  align-items: stretch;
+  gap: 16px;
+  margin-top: 32px;
+  margin-bottom: 40px;
+}
+
+.application-rsvp,
+.attendance-overview .application-pass {
+  min-width: 0;
+  min-height: 100%;
+  margin: 0;
+  padding: clamp(22px, 3vw, 30px);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--radius);
+  text-align: left;
+  background: var(--brand-white);
+}
+
+.application-rsvp {
+  border-left: 4px solid var(--brand-teal-dark);
+}
+
+.attendance-overview .application-pass {
+  background: #edf7f5;
+}
+
+.event-card-heading {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 22px;
+}
+
+.event-card-heading h2 {
+  margin: 0;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 3vw, 2.2rem);
+  line-height: 1;
+}
+
+.event-card-kicker {
+  color: var(--brand-teal-dark);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.application-rsvp p,
+.attendance-overview .application-pass p {
+  line-height: 1.5;
+}
+
+.rsvp-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--brand-line);
+  border-radius: 10px;
+  color: var(--brand-muted);
+  background: #f7fbfa;
+  font-size: 0.8rem;
+}
+
+.rsvp-status strong {
+  color: var(--brand-navy);
+  font-size: 0.88rem;
+}
+
+.rsvp-help {
+  max-width: 55ch;
+  margin: 18px 0 0;
+  color: var(--brand-muted);
+}
+
+.rsvp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.rsvp-actions .button {
+  min-height: 44px;
+  white-space: normal;
+}
+
+.rsvp-confirmation {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--brand-line);
+}
+
+.rsvp-confirmed strong { color: #08614e; }
+.rsvp-declined strong { color: #8c3827; }
+.rsvp-summary { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 20px 24px; }
+.rsvp-summary small { flex-basis: 100%; color: var(--brand-muted); }
+
+@media (max-width: 850px) {
+  .application-overview,
+  .attendance-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .application-overview > :is(.submitted-confirmation, .application-decision, .application-resume-summary) {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .application-panel-submitted h1 {
+    font-size: clamp(3rem, 15vw, 4rem);
+  }
+
+  .application-overview,
+  .attendance-overview {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .rsvp-status {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .rsvp-actions { flex-direction: column; }
+  .rsvp-actions .button { width: 100%; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .button {
+  .button,
+  .application-form :is(input, textarea, select),
+  .application-form :is(.boolean-options, .choice-options) label {
     transition: none;
   }
+
+  .application-busy-indicator {
+    animation: none;
+  }
+}
+
+/* Check-in and attendance: one action at a time. */
+.organizer-operations [hidden] { display: none !important; }
+.scanner-panel [hidden] { display: none !important; }
+.organizer-operations { padding: clamp(16px, 3vw, 28px); }
+.organizer-operations h2 { font-family: var(--font-display); text-transform: none; letter-spacing: -0.03em; line-height: 1.15; }
+.organizer-operations .staff-actions { background: transparent; border: 0; padding: 0; }
+.check-in-overview { display: grid; gap: 24px; min-width: 0; }
+.staff-content-header-compact { padding-block: 16px 24px; margin-bottom: 24px; border: 0; }
+.staff-content-header-compact h1 { font-size: clamp(2.5rem, 6vw, 4rem); }
+.check-in-overview h2 { margin: 0; font-size: clamp(1.4rem, 3vw, 1.8rem); }
+.check-in-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; }
+.check-in-actions .button { min-height: 52px; }
+.check-in-actions .staff-link { padding-block: 12px; }
+.check-in-selection { display: grid; gap: 8px; max-width: 480px; }
+.check-in-setup { display: grid; justify-items: start; gap: 16px; padding: 24px; border: 1px solid var(--brand-line); border-radius: 16px; background: white; }
+.check-in-setup p { margin: 0; }
+.check-in-setup .button { min-height: 48px; max-width: 100%; white-space: normal; }
+.check-in-selection select, .check-in-search input { width: 100%; min-width: 0; min-height: 48px; padding: 12px 14px; background: white; color: var(--brand-navy); border: 1px solid var(--brand-line); border-radius: 10px; font: inherit; }
+.check-in-count-note { margin: -12px 0 0; font-size: 0.88rem; }
+.check-in-search, .check-in-recent { display: grid; gap: 16px; border-top: 1px solid var(--brand-line); padding-top: 24px; min-width: 0; }
+.check-in-search form { display: grid; gap: 8px; }
+.check-in-search-controls { display: flex; gap: 12px; }
+.check-in-search-controls .button { flex-shrink: 0; }
+.check-in-search-results { list-style: none; padding: 0; margin: 0; }
+.check-in-search-results a { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--brand-line); }
+.check-in-search-results a > span:first-child { display: grid; gap: 4px; overflow-wrap: anywhere; min-width: 0; }
+.check-in-search-results a > span > span { font-size: 0.9rem; color: var(--brand-muted); }
+.check-in-recent .operations-section-heading { margin: 0; align-items: center; }
+.check-in-recent .operations-section-heading .button { padding: 10px 16px; }
+.event-day-recent strong { overflow-wrap: anywhere; }
+.check-in-dashboard :is(input, select):focus-visible { outline: 3px solid var(--brand-teal-dark); outline-offset: 3px; }
+.scanner-result-context { font-weight: 650; }
+.event-day-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.event-day-stats > div { padding: 24px; background: #edf7f5; border: 1px solid var(--brand-line); border-radius: 14px; }
+.event-day-stats dt { font-size: 0.9rem; color: var(--brand-muted); }
+.event-day-stats dd { margin: 10px 0 0; font-size: clamp(2.5rem, 6vw, 4rem); color: var(--brand-navy); font-weight: 700; line-height: 1.1; }
+.event-day-recent { padding: 0; margin: 0; list-style: none; }
+.event-day-recent li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--brand-line); }
+.event-day-recent li > div { display: grid; gap: 4px; overflow-wrap: anywhere; }
+.event-day-recent span, .event-day-recent time { color: var(--brand-muted); font-size: 0.88rem; }
+.event-day-recent time { flex-shrink: 0; }
+.operations-advanced { margin: 16px 0; border: 1px solid var(--brand-line); border-radius: 12px; padding: 18px; }
+.operations-advanced > summary, .scanner-manual > summary { cursor: pointer; font-weight: 650; color: var(--brand-navy); min-height: 32px; }
+.operations-advanced .operations-section { border: 0; margin-bottom: 0; }
+.attendee-search-result { width: 100%; padding: 14px; border: 1px solid var(--brand-line); border-radius: 8px; background: white; text-align: left; text-transform: none; overflow-wrap: anywhere; box-shadow: none; }
+.selected-attendee { overflow-wrap: anywhere; }
+.application-panel-submitted > .application-rsvp { margin: 24px clamp(1rem, 4vw, 3.5rem); min-height: auto; }
+.attendance-next-step { padding: 0; margin: 12px 0 0; border: 0; background: transparent; }
+.attendance-next-step .button { margin-top: 16px; }
+.application-rsvp .event-card-heading { margin-bottom: 12px; }
+.application-rsvp .rsvp-help { margin-top: 0; }
+.scanner-panel h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1.1; letter-spacing: -0.04em; text-transform: none; }
+.scanner-panel .scanner-result-valid { background: #edf3f7; border: 1px solid #9baebc; box-shadow: none; }
+.scanner-panel .scanner-result-redeemed { background: #d9f4e8; border: 2px solid #16845d; box-shadow: none; }
+.scanner-panel .scanner-result h2 { font-size: 1.65rem; line-height: 1.2; }
+.scanner-manual { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--brand-line); }
+.scanner-manual[open] { display: grid; gap: 12px; }
+.scanner-panel input, .event-setup input { min-height: 48px; }
+.scanner-panel .scanner-actions:empty { display: none; }
+.operations-advanced summary:focus-visible, .scanner-manual summary:focus-visible { outline: 3px solid var(--brand-teal-dark); outline-offset: 4px; }
+@media (max-width: 600px) {
+  .event-day-stats { gap: 10px; }
+  .event-day-stats > div { padding: 16px; }
+  .check-in-actions { gap: 12px; }
+  .check-in-actions > .button { width: 100%; }
+  .check-in-search-controls { flex-wrap: wrap; }
+  .check-in-search-controls .button { width: 100%; }
+  .operations-advanced { padding: 14px; }
+  .attendance-next-step .button { width: 100%; }
+  .application-panel-submitted > .application-rsvp { margin-inline: 0; }
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { AnimatePresence, motion } from "framer-motion";
-import { ApplicantPass } from "@/components/applicant-pass";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { ApplicationButton } from "@/components/application-motion";
+import { ApplicantRSVP } from "@/components/applicant-rsvp";
 import {
   ApplicantDecisionStatus,
   type DecisionLoadState,
@@ -97,8 +98,38 @@ function displayTimestamp(value: string): string {
   }).format(timestamp);
 }
 
+function focusFirstInvalidField(
+  form: CurrentApplicationForm,
+  errors: FieldErrors,
+  reducedMotion: boolean,
+): void {
+  const questionIndex = form.questions.findIndex(
+    (question) => errors[question.key],
+  );
+  const fieldId =
+    questionIndex >= 0
+      ? `question-field-${questionIndex}`
+      : errors.resume
+        ? "application-resume-field"
+        : null;
+
+  if (!fieldId) {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    const field = document.getElementById(fieldId);
+    field?.scrollIntoView?.({ behavior: reducedMotion ? "instant" : "smooth", block: "center" });
+    field
+      ?.querySelector<HTMLElement>("input:not([type='hidden']), select, textarea")
+      ?.focus({ preventScroll: true });
+  });
+}
+
 export function ApplicantDashboard() {
   const { getToken, isLoaded } = useAuth();
+  const reducedMotion = Boolean(useReducedMotion());
+  const feedbackTransition = { duration: reducedMotion ? 0 : 0.18 };
   const client = useMemo(() => createApiClient({ getToken }), [getToken]);
   const [currentForm, setCurrentForm] = useState<CurrentApplicationForm | null>(
     null,
@@ -226,6 +257,14 @@ export function ApplicantDashboard() {
     setNotice("");
     try {
       setResume(await client.uploadApplicationResume(application.id, file));
+      setFieldErrors((current) => {
+        if (!current.resume) {
+          return current;
+        }
+        const next = { ...current };
+        delete next.resume;
+        return next;
+      });
       setNotice("Resume uploaded.");
     } catch (error) {
       setNotice(errorMessage(error, "Unable to upload your resume."));
@@ -263,11 +302,21 @@ export function ApplicantDashboard() {
       return next;
     });
     setFieldErrors((current) => {
-      if (!current[key]) {
+      const dependentErrorKeys = (currentForm?.questions ?? [])
+        .filter(
+          (question) =>
+            question.showWhen?.key === key &&
+            value !== question.showWhen.equals,
+        )
+        .map((question) => question.key);
+      if (!current[key] && dependentErrorKeys.every((errorKey) => !current[errorKey])) {
         return current;
       }
       const next = { ...current };
       delete next[key];
+      for (const errorKey of dependentErrorKeys) {
+        delete next[errorKey];
+      }
       return next;
     });
     setNotice("");
@@ -283,6 +332,7 @@ export function ApplicantDashboard() {
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
       setNotice("Fix the highlighted responses before saving.");
+      focusFirstInvalidField(currentForm, clientErrors, reducedMotion);
       return;
     }
 
@@ -326,14 +376,14 @@ export function ApplicantDashboard() {
     if (!currentForm || !application || application.status !== "draft") {
       return;
     }
-    if (currentForm.resumeRequired && !resume) {
-      setNotice("Upload your PDF resume before submitting your application.");
-      return;
-    }
     const clientErrors = validateApplicationAnswers(currentForm, answers, true);
+    if (currentForm.resumeRequired && !resume) {
+      clientErrors.resume = "A PDF resume is required.";
+    }
     if (Object.keys(clientErrors).length > 0) {
       setFieldErrors(clientErrors);
-      setNotice("Complete the highlighted questions before submitting.");
+      setNotice("Complete the highlighted fields before submitting.");
+      focusFirstInvalidField(currentForm, clientErrors, reducedMotion);
       return;
     }
 
@@ -353,8 +403,10 @@ export function ApplicantDashboard() {
       replaceApplication(submittedApplication);
       setNotice("Your application has been submitted.");
     } catch (error) {
-      setFieldErrors(validationErrors(error));
+      const serverErrors = validationErrors(error);
+      setFieldErrors(serverErrors);
       setNotice(errorMessage(error, "Unable to submit your application."));
+      focusFirstInvalidField(currentForm, serverErrors, reducedMotion);
 
       if (error instanceof ApiError && error.status === 409) {
         try {
@@ -398,8 +450,8 @@ export function ApplicantDashboard() {
         <p className="error-message" role="alert">
           {loadError || "Your application could not be loaded."}
         </p>
-        <button
-          className="button secondary"
+        <ApplicationButton
+          className="secondary"
           onClick={() => {
             setLoading(true);
             void loadDashboard();
@@ -407,7 +459,7 @@ export function ApplicantDashboard() {
           type="button"
         >
           Try again
-        </button>
+        </ApplicationButton>
       </section>
     );
   }
@@ -415,13 +467,18 @@ export function ApplicantDashboard() {
   const questions = currentForm?.questions ?? [];
   const submitted = application.status === "submitted";
   const resumeUploadField = currentForm ? (
-    <div className="question-field resume-upload-field">
+    <div
+      className={`question-field resume-upload-field${fieldErrors.resume ? " has-error" : ""}`}
+      id="application-resume-field"
+    >
       <label htmlFor="application-resume">
         Resume{currentForm.resumeRequired ? <span aria-hidden="true"> *</span> : " (Optional)"}
       </label>
       <p>Upload one PDF, up to 5 MB. Uploading another PDF replaces the current resume.</p>
       <input
         accept="application/pdf,.pdf"
+        aria-invalid={Boolean(fieldErrors.resume)}
+        aria-describedby={fieldErrors.resume ? "application-resume-error" : undefined}
         disabled={busyAction !== null}
         id="application-resume"
         onChange={(event) => {
@@ -436,6 +493,7 @@ export function ApplicantDashboard() {
       <p
         aria-live="polite"
         className={resume || !currentForm.resumeRequired ? "resume-summary" : "field-error"}
+        id={fieldErrors.resume ? "application-resume-error" : undefined}
       >
         {busyAction === "uploading-resume"
           ? "Uploading resume…"
@@ -449,39 +507,27 @@ export function ApplicantDashboard() {
   ) : null;
 
   return (
-    <motion.section
-      className="application-panel"
+    <section
+      className={`application-panel${submitted ? " application-panel-submitted" : ""}`}
       aria-labelledby="application-heading"
-      layout
-      transition={{ layout: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
     >
       <div className="application-progress" aria-label="Application progress">
         <div className="progress-step complete"><span>01</span><strong>Account</strong></div>
         <div className={`progress-step ${submitted ? "complete" : "current"}`}><span>02</span><strong>Application</strong></div>
         <div className={`progress-step ${decisionState === "ready" ? "complete" : submitted ? "current" : ""}`}><span>03</span><strong>Decision</strong></div>
-        <div className={`progress-step ${decision?.outcome === "accepted" ? "current" : ""}`}><span>04</span><strong>Event pass</strong></div>
+        <div className={`progress-step ${decision?.outcome === "accepted" ? "current" : ""}`}><span>04</span><strong>Attendance & pass</strong></div>
       </div>
       <div className="application-heading">
-        <div>
-          <p className="eyebrow">Applicant field notes · {application.formVersion.toString().padStart(2, "0")}</p>
-          <h1 id="application-heading">Your application</h1>
-        </div>
-        <motion.span
-          className={`status-pill ${submitted ? "submitted" : "draft"}`}
-          layout
-        >
-          {submitted ? "Submitted" : "Draft"}
-        </motion.span>
+        <h1 id="application-heading">Your application</h1>
       </div>
 
-      <p className="application-summary">
-        Form version {application.formVersion}.{" "}
-        {submitted
-          ? "Your submitted application is no longer editable."
-          : currentForm
+      {!submitted ? (
+        <p className="application-summary">
+          {currentForm
             ? "Your answers are only visible to you until you submit this application."
             : "This draft can no longer be changed or submitted because the application window is closed."}
-      </p>
+        </p>
+      ) : null}
 
       <AnimatePresence initial={false}>
         {notice ? (
@@ -489,7 +535,8 @@ export function ApplicantDashboard() {
             animate={{ height: "auto", opacity: 1, y: 0 }}
             className="application-notice"
             exit={{ height: 0, opacity: 0, y: -8 }}
-            initial={{ height: 0, opacity: 0, y: -8 }}
+            initial={reducedMotion ? false : { height: 0, opacity: 0, y: -8 }}
+            transition={feedbackTransition}
             key={notice}
             role="status"
           >
@@ -500,29 +547,36 @@ export function ApplicantDashboard() {
 
       {submitted ? (
         <>
-          <div className="submitted-confirmation" aria-live="polite">
-            <h2>Application submitted</h2>
-            {application.submittedAt ? (
-              <p>
-                Submitted <time dateTime={application.submittedAt}>{displayTimestamp(application.submittedAt)}</time>.
-              </p>
-            ) : (
-              <p>Your application was submitted successfully.</p>
-            )}
-          </div>
-          <ApplicantDecisionStatus
-            decision={decision}
-            onRetry={() => void loadReleasedDecision(application.id)}
-            state={decisionState}
-          />
-          {resume ? (
-            <p className="resume-summary">
-              Resume attached: <strong>{resume.originalFilename}</strong>
-            </p>
-          ) : null}
           {decisionState === "ready" && decision?.outcome === "accepted" ? (
-            <ApplicantPass />
+            <ApplicantRSVP key={`${application.id}-${decision.releasedAt}`} applicationId={application.id} />
           ) : null}
+          <div className="application-overview" aria-label="Application overview">
+            <motion.section
+              className="submitted-confirmation"
+              aria-live="polite"
+              initial={reducedMotion ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={feedbackTransition}
+            >
+              <h2>Application</h2>
+              <p className="overview-status">Submitted</p>
+              {application.submittedAt ? (
+                <time dateTime={application.submittedAt}>{displayTimestamp(application.submittedAt)}</time>
+              ) : null}
+            </motion.section>
+            <ApplicantDecisionStatus
+              decision={decision}
+              onRetry={() => void loadReleasedDecision(application.id)}
+              state={decisionState}
+            />
+            {resume ? (
+              <section className="application-resume-summary" aria-labelledby="resume-summary-heading">
+                <h2 id="resume-summary-heading">Resume</h2>
+                <p><strong>{resume.originalFilename}</strong></p>
+                <span>Attached</span>
+              </section>
+            ) : null}
+          </div>
         </>
       ) : currentForm ? (
         <form className="application-form" noValidate onSubmit={submitApplication}>
@@ -554,14 +608,22 @@ export function ApplicantDashboard() {
               .join(" ") || undefined;
 
             return (
-              <div className="application-question-group" key={question.key}>
+              <motion.div
+                className={`application-question-group${question.showWhen ? " conditional-question" : ""}`}
+                key={question.key}
+                initial={question.showWhen && !reducedMotion ? { opacity: 0, y: 6 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={feedbackTransition}
+              >
                 {startsSection ? (
                   <div className="application-form-section-heading">
-                    <span>Part {question.section?.startsWith("Build") ? "1" : "2"}</span>
                     <h2>{question.section}</h2>
                   </div>
                 ) : null}
-              <div className="question-field">
+              <div
+                className={`question-field${fieldErrors[question.key] ? " has-error" : ""}`}
+                id={`question-field-${index}`}
+              >
                 {question.type === "boolean" ? (
                   <fieldset
                     aria-describedby={describedBy}
@@ -678,13 +740,20 @@ export function ApplicantDashboard() {
                   </>
                 )}
                 {fieldErrors[question.key] ? (
-                  <p className="field-error" id={errorId} role="alert">
+                  <motion.p
+                    className="field-error"
+                    id={errorId}
+                    role="alert"
+                    initial={reducedMotion ? false : { opacity: 0, y: -3 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={feedbackTransition}
+                  >
                     {fieldErrors[question.key]}
-                  </p>
+                  </motion.p>
                 ) : null}
               </div>
               {currentForm.resumeAfterQuestionKey === question.key ? resumeUploadField : null}
-              </div>
+              </motion.div>
             );
           })}
 
@@ -696,24 +765,29 @@ export function ApplicantDashboard() {
                 <motion.span
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -5 }}
-                  initial={{ opacity: 0, y: 5 }}
-                  key={isDirty ? "dirty" : "saved"}
+                  initial={reducedMotion ? false : { opacity: 0, y: 5 }}
+                  transition={feedbackTransition}
+                  key={busyAction ?? (isDirty ? "dirty" : "saved")}
                 >
-                  {isDirty ? "Unsaved changes" : "All changes saved"}
+                  {busyAction === "saving" ? "Saving your changes…"
+                    : busyAction === "submitting" ? "Submitting your application…"
+                      : busyAction === "uploading-resume" ? "Uploading your resume…"
+                        : isDirty ? "Unsaved changes" : "All changes saved"}
                 </motion.span>
               </AnimatePresence>
             </div>
-            <button
-              className="button secondary"
+            <ApplicationButton
+              className="secondary"
               disabled={busyAction !== null}
+              pending={busyAction === "saving"}
               onClick={() => void saveDraft()}
               type="button"
             >
               {busyAction === "saving" ? "Saving…" : "Save draft"}
-            </button>
-            <button className="button primary" disabled={busyAction !== null} type="submit">
+            </ApplicationButton>
+            <ApplicationButton className="primary" disabled={busyAction !== null} pending={busyAction === "submitting"} type="submit">
               {busyAction === "submitting" ? "Submitting…" : "Submit application"}
-            </button>
+            </ApplicationButton>
           </div>
         </form>
       ) : (
@@ -725,6 +799,6 @@ export function ApplicantDashboard() {
           </p>
         </div>
       )}
-    </motion.section>
+    </section>
   );
 }

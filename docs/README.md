@@ -1,4 +1,6 @@
-# Implementation guide
+# Technical documentation
+
+Start with the public [README](../README.md) and [architecture overview](../ARCHITECTURE.md). This directory contains the detailed technical, operational, and product documentation that backs those concise entry points.
 
 This directory is the handoff contract for milestone-based implementation.
 Read these files before making changes:
@@ -16,6 +18,7 @@ Read these files before making changes:
 11. [PORTFOLIO_EVIDENCE.md](PORTFOLIO_EVIDENCE.md)
 12. [SECRETS_AND_ENVIRONMENTS.md](SECRETS_AND_ENVIRONMENTS.md)
 13. [runbooks/load-test.md](runbooks/load-test.md)
+14. [runbooks/grafana-essentials.md](runbooks/grafana-essentials.md)
 
 ## Authority
 

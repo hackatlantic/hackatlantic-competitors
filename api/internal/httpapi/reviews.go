@@ -10,6 +10,7 @@ import (
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/decisions"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/passes"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/reviews"
+	"github.com/hackatlantic/hackatlantic-competitors/api/internal/rsvps"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/users"
 )
 
@@ -25,8 +26,13 @@ type reviewWorkflowService interface {
 }
 
 type organizerApplicationListResponse struct {
-	Items      []reviews.Application `json:"items"`
-	NextCursor *string               `json:"nextCursor"`
+	Items      []organizerApplicationResponse `json:"items"`
+	NextCursor *string                        `json:"nextCursor"`
+}
+
+type organizerApplicationResponse struct {
+	reviews.Application
+	RSVP *rsvps.Response `json:"rsvp,omitempty"`
 }
 
 type reviewerApplicationListResponse struct {
@@ -36,6 +42,7 @@ type reviewerApplicationListResponse struct {
 
 type organizerApplicationDetailResponse struct {
 	reviews.Application
+	RSVP            *rsvps.Response          `json:"rsvp,omitempty"`
 	CurrentDecision *decisions.Decision      `json:"currentDecision,omitempty"`
 	AttendeePass    *passes.OrganizerSummary `json:"attendeePass,omitempty"`
 }
@@ -66,6 +73,11 @@ func listOrganizerApplicationsHandler(dependencies Dependencies) http.HandlerFun
 		if !ok {
 			return
 		}
+		rsvpFilter := request.URL.Query().Get("rsvp")
+		if !rsvps.ValidFilter(rsvpFilter) {
+			writeError(w, http.StatusUnprocessableEntity, "invalid_filter", "The RSVP filter is invalid.")
+			return
+		}
 		service, ok := workflowService(w, dependencies)
 		if !ok {
 			return
@@ -78,7 +90,30 @@ func listOrganizerApplicationsHandler(dependencies Dependencies) http.HandlerFun
 			writeWorkflowError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, organizerApplicationListResponse{Items: items})
+		ids := make([]string, len(items))
+		for i := range items {
+			ids[i] = items[i].ID
+		}
+		responses := map[string]rsvps.Response{}
+		if dependencies.RSVPs != nil {
+			responses, err = dependencies.RSVPs.ForOrganizer(request.Context(), organizer, ids)
+			if err != nil {
+				writeRSVPError(w, err)
+				return
+			}
+		}
+		projected := make([]organizerApplicationResponse, 0, len(items))
+		for _, item := range items {
+			response := organizerApplicationResponse{Application: item}
+			if rsvp, ok := responses[item.ID]; ok {
+				response.RSVP = &rsvp
+			}
+			if rsvpFilter != "" && (response.RSVP == nil || response.RSVP.Status != rsvpFilter) {
+				continue
+			}
+			projected = append(projected, response)
+		}
+		writeJSON(w, http.StatusOK, organizerApplicationListResponse{Items: projected})
 	}
 }
 
@@ -98,6 +133,16 @@ func getOrganizerApplicationHandler(dependencies Dependencies) http.HandlerFunc 
 			return
 		}
 		response := organizerApplicationDetailResponse{Application: application}
+		if dependencies.RSVPs != nil {
+			responses, err := dependencies.RSVPs.ForOrganizer(request.Context(), organizer, []string{application.ID})
+			if err != nil {
+				writeRSVPError(w, err)
+				return
+			}
+			if rsvp, ok := responses[application.ID]; ok {
+				response.RSVP = &rsvp
+			}
+		}
 		if dependencies.Decisions != nil {
 			decision, err := dependencies.Decisions.CurrentForOrganizer(request.Context(), organizer, application.ID)
 			if err != nil && !errors.Is(err, decisions.ErrNoCurrentDecision) {

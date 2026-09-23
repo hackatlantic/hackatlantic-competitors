@@ -1,0 +1,27 @@
+{
+  "id": "3388000000023208272.hackatlantic_2026",
+  "issuerName": "Hack Atlantic",
+  "reviewStatus": "DRAFT",
+  "eventName": { "defaultValue": { "language": "en-CA", "value": "Hack Atlantic 2026" } },
+  "eventId": "hackatlantic_2026",
+  "logo": {
+    "sourceUri": { "uri": "https://apply.hackatlantic.ca/hackatlantic-logo.jpg" },
+    "contentDescription": { "defaultValue": { "language": "en-CA", "value": "Hack Atlantic logo" } }
+  },
+  "venue": {
+    "name": { "defaultValue": { "language": "en-CA", "value": "UNB - Head Hall Atrium" } },
+    "address": { "defaultValue": { "language": "en-CA", "value": "Fredericton, New Brunswick, Canada" } }
+  },
+  "dateTime": {
+    "doorsOpen": "2026-09-26T10:00:00-03:00",
+    "start": "2026-09-26T10:00:00-03:00",
+    "end": "2026-09-27T15:00:00-03:00",
+    "customDoorsOpenLabel": { "defaultValue": { "language": "en-CA", "value": "Check-in opens" } }
+  },
+  "textModulesData": [
+    { "id": "dates", "header": "Event dates", "body": "September 26-27, 2026" }
+  ],
+  "linksModuleData": { "uris": [{ "uri": "https://apply.hackatlantic.ca/event-pass", "description": "Open your web pass", "id": "web_pass" }] },
+  "countryCode": "CA",
+  "hexBackgroundColor": "#132432"
+}

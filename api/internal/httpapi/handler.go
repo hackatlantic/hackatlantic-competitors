@@ -55,6 +55,7 @@ type UserResolver interface {
 }
 
 type staffRoleService interface {
+	LookupScannerUser(context.Context, users.User, string) (users.ScannerAccessUser, error)
 	GrantScannerRole(context.Context, users.User, string) error
 	RevokeScannerRole(context.Context, users.User, string) error
 }
@@ -69,7 +70,9 @@ type Dependencies struct {
 	Applications     applicationIntakeService
 	Reviews          reviewWorkflowService
 	Decisions        decisionLifecycleService
+	RSVPs            rsvpService
 	Passes           passLifecycleService
+	GoogleWallet     googleWalletSigner
 	Checkpoints      checkpointService
 	Redemptions      redemptionService
 	Operations       organizerOperationsService
@@ -181,11 +184,14 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	mux.HandleFunc("PUT /v1/applications/{applicationId}/resume", uploadApplicationResumeHandler(dependencies))
 	mux.HandleFunc("GET /v1/applications/{applicationId}/resume", getApplicantResumeHandler(dependencies))
 	mux.HandleFunc("GET /v1/applications/{applicationId}/decision", getApplicantDecisionHandler(dependencies))
+	mux.HandleFunc("GET /v1/applications/{applicationId}/rsvp", applicantRSVPHandler(dependencies))
+	mux.HandleFunc("PUT /v1/applications/{applicationId}/rsvp", applicantRSVPHandler(dependencies))
 	mux.HandleFunc("GET /v1/admin/applications", listOrganizerApplicationsHandler(dependencies))
 	mux.HandleFunc("GET /v1/admin/applications/{applicationId}", getOrganizerApplicationHandler(dependencies))
 	mux.HandleFunc("GET /v1/admin/applications/{applicationId}/resume", getAdminResumeHandler(dependencies))
 	mux.HandleFunc("POST /v1/admin/applications/{applicationId}/assignments", assignReviewerHandler(dependencies))
 	mux.HandleFunc("PUT /v1/admin/users/{userId}/roles/reviewer", grantReviewerRoleHandler(dependencies))
+	mux.HandleFunc("POST /v1/admin/users/scanner-access/lookup", lookupScannerUserHandler(dependencies))
 	mux.HandleFunc("PUT /v1/admin/users/{userId}/roles/scanner", grantScannerRoleHandler(dependencies))
 	mux.HandleFunc("DELETE /v1/admin/users/{userId}/roles/scanner", revokeScannerRoleHandler(dependencies))
 	mux.HandleFunc("POST /v1/admin/applications/{applicationId}/decisions", recordDecisionHandler(dependencies))
@@ -198,6 +204,8 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	mux.HandleFunc("PATCH /v1/admin/activities/{activityId}", updateOrganizerActivityHandler(dependencies))
 	mux.HandleFunc("DELETE /v1/admin/activities/{activityId}", deleteOrganizerActivityHandler(dependencies))
 	mux.HandleFunc("GET /v1/admin/checkpoints", listOrganizerCheckpointsHandler(dependencies))
+	mux.HandleFunc("GET /v1/admin/attendance-summary", organizerAttendanceSummaryHandler(dependencies))
+	mux.HandleFunc("POST /v1/admin/check-in/entrance", enableOrganizerEntranceHandler(dependencies))
 	mux.HandleFunc("POST /v1/admin/checkpoints", createOrganizerCheckpointHandler(dependencies))
 	mux.HandleFunc("PATCH /v1/admin/checkpoints/{checkpointId}", updateOrganizerCheckpointHandler(dependencies))
 	mux.HandleFunc("DELETE /v1/admin/checkpoints/{checkpointId}", deleteOrganizerCheckpointHandler(dependencies))
@@ -209,6 +217,7 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	mux.HandleFunc("GET /v1/admin/exports/attendance.csv", exportOrganizerRedemptionsHandler(dependencies, operations.ExportAttendance))
 	mux.HandleFunc("GET /v1/admin/exports/reconciliation.csv", exportOrganizerRedemptionsHandler(dependencies, operations.ExportReconciliation))
 	mux.HandleFunc("GET /v1/attendee/pass", webPassHandler(dependencies))
+	mux.HandleFunc("POST /v1/attendee/pass/google-wallet", googleWalletHandler(dependencies))
 	mux.HandleFunc("GET /v1/claim/{claimToken}", claimPassHandler(dependencies, dependencies.ClaimRateLimiter))
 	mux.HandleFunc("GET /v1/checkpoints", listScannerCheckpointsHandler(dependencies))
 	mux.HandleFunc("POST /v1/scans/lookup", scannerLookupHandler(dependencies))

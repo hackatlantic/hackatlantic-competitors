@@ -16,8 +16,8 @@ export default async function OrganizerReviewersPage() {
       title="Scanner access"
     >
       <p className="staff-summary">
-        Admin access comes only from the backend privileged-email allowlist. Grant or
-        revoke scanner access here for event volunteers who do not need ATS access.
+        Find a volunteer by email to grant or revoke scanner access. Scanners can
+        check attendee passes without access to applications or review notes.
       </p>
       <ScannerRoleForm />
     </StaffPageFrame>

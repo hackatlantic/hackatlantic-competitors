@@ -24,6 +24,8 @@ func (resolver operationsTestUsers) Resolve(context.Context, string) (users.User
 }
 
 type operationsTestService struct {
+	summary               operations.AttendanceSummary
+	entranceCycle         string
 	activities            []operations.Activity
 	checkpoints           []operations.Checkpoint
 	counts                []operations.CheckpointCount
@@ -35,6 +37,15 @@ type operationsTestService struct {
 	entitlementAttendee   string
 	entitlementCheckpoint string
 	exportKind            operations.ExportKind
+}
+
+func (service *operationsTestService) GetAttendanceSummary(context.Context, users.User) (operations.AttendanceSummary, error) {
+	return service.summary, service.err
+}
+
+func (service *operationsTestService) EnableEntrance(_ context.Context, _ users.User, cycle string) (operations.Checkpoint, error) {
+	service.entranceCycle = cycle
+	return operations.Checkpoint{CycleID: cycle, Name: "Main entrance", DefaultAllowed: true, DefaultMaxRedemptions: 1, Active: true}, service.err
 }
 
 func (service *operationsTestService) ListActivities(context.Context, users.User) ([]operations.Activity, error) {

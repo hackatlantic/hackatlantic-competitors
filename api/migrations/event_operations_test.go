@@ -40,6 +40,8 @@ type eventCountResponse struct {
 	Items []struct {
 		CheckpointID     string `json:"checkpointId"`
 		TotalRedemptions int64  `json:"totalRedemptions"`
+		UniqueAttendees  int64  `json:"uniqueAttendees"`
+		ConfirmedRSVPs   int64  `json:"confirmedRsvps"`
 	} `json:"items"`
 }
 
@@ -190,7 +192,7 @@ func TestEventAdministrationOperationsAreAuditedAndExportsAreMinimal(t *testing.
 	}
 	var counts eventCountResponse
 	decodeIntakeResponse(t, countsResponse, &counts)
-	if len(counts.Items) != 1 || counts.Items[0].CheckpointID != checkpoint.ID || counts.Items[0].TotalRedemptions != 1 {
+	if len(counts.Items) != 1 || counts.Items[0].CheckpointID != checkpoint.ID || counts.Items[0].TotalRedemptions != 1 || counts.Items[0].UniqueAttendees != 1 || counts.Items[0].ConfirmedRSVPs != 0 {
 		t.Fatalf("unexpected operational count: %+v", counts)
 	}
 
@@ -311,6 +313,46 @@ func TestEventAdministrationOperationsAreAuditedAndExportsAreMinimal(t *testing.
 	}
 	if exportCount != 2 || !exportKinds["attendance"] || !exportKinds["reconciliation"] {
 		t.Fatalf("unexpected redemption export audit metadata: count=%d kinds=%+v", exportCount, exportKinds)
+	}
+
+	// Repeated uses do not inflate unique attendance. Only the current accepted
+	// decision's confirmed response contributes to the event's expected total.
+	if _, err := pool.Exec(ctx, `INSERT INTO ats.redemptions (pass_id, attendee_id, checkpoint_id, cycle_id, ordinal, scanner_user_id, idempotency_key) VALUES ($1, $2, $3, $4, 2, $5, gen_random_uuid())`, passID, attendeeID, checkpoint.ID, cycleID, scannerID); err != nil {
+		t.Fatal(err)
+	}
+	var confirmedDecision string
+	if err := pool.QueryRow(ctx, `INSERT INTO ats.decisions(application_id, outcome, decided_by, released_at, released_by) VALUES ($1, 'accepted', $2, now(), $2) RETURNING id::text`, applicationID, organizerID).Scan(&confirmedDecision); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE ats.applications SET current_decision_id = $2 WHERE id = $1`, applicationID, confirmedDecision); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO ats.attendance_responses(decision_id, status, responded_by) VALUES ($1, 'confirmed', $2)`, confirmedDecision, attendeeUserID); err != nil {
+		t.Fatal(err)
+	}
+	decodeIntakeResponse(t, intakeRequest(t, server.URL, http.MethodGet, "/v1/admin/redemptions/counts", "clerk-m7-organizer", nil), &counts)
+	if counts.Items[0].TotalRedemptions != 2 || counts.Items[0].UniqueAttendees != 1 || counts.Items[0].ConfirmedRSVPs != 1 {
+		t.Fatalf("repeat scans inflated attendance: %+v", counts)
+	}
+	var summary operations.AttendanceSummary
+	decodeIntakeResponse(t, intakeRequest(t, server.URL, http.MethodGet, "/v1/admin/attendance-summary", "clerk-m7-organizer", nil), &summary)
+	if summary.CycleID != cycleID || summary.ConfirmedRSVPs != 1 {
+		t.Fatalf("independent RSVP total: %+v", summary)
+	}
+	var replacementDecision string
+	if err := pool.QueryRow(ctx, `INSERT INTO ats.decisions(application_id, outcome, decided_by, supersedes_id) VALUES ($1, 'accepted', $2, $3) RETURNING id::text`, applicationID, organizerID, confirmedDecision).Scan(&replacementDecision); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE ats.applications SET current_decision_id = $2 WHERE id = $1`, applicationID, replacementDecision); err != nil {
+		t.Fatal(err)
+	}
+	decodeIntakeResponse(t, intakeRequest(t, server.URL, http.MethodGet, "/v1/admin/redemptions/counts", "clerk-m7-organizer", nil), &counts)
+	if counts.Items[0].ConfirmedRSVPs != 0 {
+		t.Fatalf("superseded RSVP was counted: %+v", counts)
+	}
+	decodeIntakeResponse(t, intakeRequest(t, server.URL, http.MethodGet, "/v1/admin/attendance-summary", "clerk-m7-organizer", nil), &summary)
+	if summary.ConfirmedRSVPs != 0 {
+		t.Fatalf("summary included superseded RSVP: %+v", summary)
 	}
 }
 

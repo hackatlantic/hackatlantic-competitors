@@ -1,64 +1,75 @@
 # HackAtlantic ATS
 
-HackAtlantic's application tracking and event operations system.
+HackAtlantic ATS is the application, review, attendee-pass, and event-operations system for HackAtlantic. It is deliberately a small PaaS deployment: a Next.js web app, a Go API, managed PostgreSQL, private object storage, and a digest-pinned release pipeline. The API—not the browser—owns every authorization decision and all durable event state.
 
-This repository is a small monorepo:
+## What it does
 
-- `app/`, `components/`, and `lib/` contain the Next.js frontend.
-- `api/` contains the Go API and database migrations.
-- `openapi/` contains the HTTP contract.
-- `infra/` contains environment-isolated Terraform and import guidance.
-- `observability/` contains versioned Grafana dashboards.
-- `.github/workflows/` contains CI, immutable release, drift, backup, and restore automation.
-- `docs/` contains the architecture and implementation handoff.
+- Lets applicants save and submit a versioned HackAtlantic application.
+- Gives organizers private review, decision, attendee, pass, and event controls.
+- Lets authorised staff scan QR passes and redeem checkpoint entitlements atomically.
+- Keeps résumés private and serves them only through the authorised API.
 
-Clerk authenticates applicants, admins, and scanners. The
-frontend calls the Go API, which owns the full application, decision, attendee,
-pass, and redemption lifecycle. The Go API is the only application component
-allowed to access PostgreSQL.
+## Architecture at a glance
 
-## Start here
+```mermaid
+flowchart LR
+  Person[Applicants, organisers, and scanners] --> Web[Next.js on Vercel]
+  Web -->|Clerk session JWT| API[Go API on DigitalOcean App Platform]
+  API --> DB[(Supabase PostgreSQL: private ats schema)]
+  API --> Files[Private DigitalOcean Spaces]
+  API --> Clerk[Clerk]
+  API -. metrics, after configuration .-> Grafana[Grafana Cloud]
+```
 
-Read [docs/README.md](docs/README.md) before implementing a milestone.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for runtime boundaries, deployment, and the atomic redemption sequence. See [docs/README.md](docs/README.md) for the complete operator and implementation guide.
 
-## Local commands
+## Repository map
 
-```text
+| Path | Purpose |
+| --- | --- |
+| `app/`, `components/`, `lib/` | Next.js applicant, organiser, pass, and scanner UI |
+| `api/` | Go HTTP API, domain services, SQL, and forward-only migrations |
+| `openapi/` | Implemented HTTP contract |
+| `infra/` | Isolated Terraform roots and reusable platform module |
+| `observability/` | Versioned Grafana dashboard definitions |
+| `tests/load/` | Staging-only k6 profiles and synthetic fixtures |
+| `docs/` | Design, security, deployment, operations, and evidence records |
+
+## Run locally
+
+Prerequisites: Node.js, Go, Docker Desktop, and a local `.env` based on `.env.example` plus `api/.env.example`. Never copy production secrets locally.
+
+```bash
 npm install
-npm run dev
-npm run api:dev
+docker compose up -d
 npm run api:migrate
 npm run api:seed-intake
+npm run api:dev
+# In another terminal:
+npm run dev
+```
+
+Useful verification commands:
+
+```bash
 npm run lint
 npm run build
 npm run api:test
+npm run test:components
 ```
 
-On Windows machines where Avast HTTPS inspection is enabled, start the
-frontend with `npm run dev:windows`. It makes Node trust the already-installed
-Avast root certificate without disabling TLS verification.
+On Windows machines with Avast HTTPS inspection, use `npm run dev:windows` for the frontend rather than disabling TLS verification.
 
-Local PostgreSQL and the API are described in `docker-compose.yml`. Copy
-`.env.example` and `api/.env.example` when configuring a local environment.
+## Environments and delivery
 
-## Development intake fixture
+Pull requests run application, migration, security, container, and Terraform checks. A merge to `main` builds one immutable API image, tests that exact digest in staging, then requires the protected production deployment gate before the same digest is promoted. Database migrations are forward-only.
 
-After the local database is running and migrated, seed the active published form
-with one cross-platform Compose command:
+Staging uses synthetic data. Production applicant data is never copied to staging. Current operational details are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/runbooks/release.md](docs/runbooks/release.md), and [docs/runbooks/load-test.md](docs/runbooks/load-test.md).
 
-```text
-docker compose run --rm --entrypoint /seed-intake migrate
-```
+## Contributing and conduct
 
-The fixture is idempotent. It refuses to replace a different active cycle.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations. Security issues belong in [docs/SECURITY.md](docs/SECURITY.md), not public issue threads.
 
-## Current status
+## Honest project status
 
-Milestones 1–7 are implemented. The repository now covers application intake,
-private drafts and submission, organizer/reviewer workflows, decisions and
-attendee conversion, pass issuance/revocation/reissue, mobile QR scanning,
-atomic entitlement-aware redemption, and organizer event operations/exports.
-
-The next planned product slice is Milestone 8: Apple Wallet and Google Wallet
-provider adapters. Email outbox records are transactional; production provider
-delivery workers and the Milestone 9 readiness work remain to be completed.
+The core ATS lifecycle, role model, QR redemption, staging k6 workflows, Terraform roots, and release pipeline are implemented. Grafana dashboard and alert configuration is provisioned, while live API metric ingestion is being connected; do not treat empty panels as evidence of availability. See [docs/evidence/measurements.md](docs/evidence/measurements.md) for which k6 and recovery numbers are valid for public claims.

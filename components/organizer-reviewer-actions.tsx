@@ -2,7 +2,8 @@
 
 import { useAuth } from "@clerk/nextjs";
 import { type FormEvent, useMemo, useState } from "react";
-import { createApiClient } from "@/lib/api";
+import { createApiClient, type ScannerAccessUser } from "@/lib/api";
+import { ApplicationButton } from "@/components/application-motion";
 
 type ActionState = "idle" | "saving";
 
@@ -62,27 +63,40 @@ export function ReviewerRoleForm() {
 export function ScannerRoleForm() {
   const { getToken } = useAuth();
   const client = useMemo(() => createApiClient({ getToken }), [getToken]);
-  const [userId, setUserId] = useState("");
-  const [actionState, setActionState] = useState<"idle" | "granting" | "revoking">("idle");
+  const [email, setEmail] = useState("");
+  const [target, setTarget] = useState<ScannerAccessUser | null>(null);
+  const [actionState, setActionState] = useState<"idle" | "searching" | "granting" | "revoking">("idle");
   const [message, setMessage] = useState("");
   const success = message === "Scanner role granted." || message === "Scanner role revoked.";
 
-  const changeScannerRole = async (action: "grant" | "revoke") => {
-    const targetUserId = userId.trim();
-    if (!targetUserId) {
-      setMessage("Enter a local user ID.");
-      return;
+  const findVolunteer = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (actionState !== "idle") return;
+    setTarget(null);
+    setMessage("");
+    setActionState("searching");
+    try {
+      setTarget(await client.lookupScannerUser(email.trim()));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to find this account. Try again.");
+    } finally {
+      setActionState("idle");
     }
+  };
+
+  const changeScannerRole = async (action: "grant" | "revoke") => {
+    if (!target?.canManage || actionState !== "idle") return;
     setActionState(action === "grant" ? "granting" : "revoking");
     setMessage("");
     try {
       if (action === "grant") {
-        await client.grantScannerRole(targetUserId);
+        await client.grantScannerRole(target.id);
         setMessage("Scanner role granted.");
       } else {
-        await client.revokeScannerRole(targetUserId);
+        await client.revokeScannerRole(target.id);
         setMessage("Scanner role revoked.");
       }
+      setTarget({ ...target, scannerAccess: action === "grant" });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to change scanner access.");
     } finally {
@@ -91,36 +105,54 @@ export function ScannerRoleForm() {
   };
 
   return (
-    <div className="reviewer-role-form">
-      <div>
-        <label htmlFor="scanner-user-id">Local user ID</label>
-        <input
-          autoComplete="off"
-          id="scanner-user-id"
-          onChange={(event) => setUserId(event.target.value)}
-          placeholder="Scanner UUID"
-          required
-          spellCheck={false}
-          value={userId}
-        />
-      </div>
-      <div className="staff-actions">
-        <button
-          className="button primary"
-          disabled={actionState !== "idle"}
-          onClick={() => void changeScannerRole("grant")}
-          type="button"
-        >
-          {actionState === "granting" ? "Granting…" : "Grant scanner role"}
-        </button>
-        <button
-          className="button secondary"
-          disabled={actionState !== "idle"}
-          onClick={() => void changeScannerRole("revoke")}
-          type="button"
-        >
-          {actionState === "revoking" ? "Revoking…" : "Revoke scanner role"}
-        </button>
+    <div className="scanner-access-manager">
+      <form className="reviewer-role-form" onSubmit={findVolunteer}>
+        <div className="operations-field">
+          <label htmlFor="scanner-email">Volunteer email</label>
+          <p id="scanner-email-help">Use their verified primary email. They need to sign up and open HackAtlantic once first.</p>
+          <input
+            aria-describedby="scanner-email-help"
+            autoComplete="off"
+            autoCapitalize="none"
+            disabled={actionState !== "idle"}
+            id="scanner-email"
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setTarget(null);
+              setMessage("");
+            }}
+            placeholder="volunteer@example.com"
+            required
+            spellCheck={false}
+            type="email"
+            value={email}
+          />
+        </div>
+        <ApplicationButton className="primary" disabled={actionState !== "idle"} pending={actionState === "searching"} type="submit">
+          {actionState === "searching" ? "Searching…" : "Find volunteer"}
+        </ApplicationButton>
+      </form>
+      <div aria-live="polite">
+        {target ? (
+          <section className="scanner-access-result" aria-label="Volunteer account">
+            <h2>{target.displayName || "Volunteer account"}</h2>
+            <p className="scanner-access-email">{target.email}</p>
+            <p>{target.scannerAccess ? "Scanner access is active." : "No scanner access yet."}</p>
+            {target.canManage ? (
+              <ApplicationButton
+                className={target.scannerAccess ? "secondary" : "primary"}
+                disabled={actionState !== "idle"}
+                pending={actionState === "granting" || actionState === "revoking"}
+                onClick={() => void changeScannerRole(target.scannerAccess ? "revoke" : "grant")}
+                type="button"
+              >
+                {actionState === "granting" ? "Granting…" : actionState === "revoking" ? "Revoking…" : target.scannerAccess ? "Revoke scanner role" : "Grant scanner role"}
+              </ApplicationButton>
+            ) : (
+              <p>Admin accounts already have scanner access. Admin and self-service access changes are not available here.</p>
+            )}
+          </section>
+        ) : null}
       </div>
       {message ? (
         <p className={success ? "application-notice" : "error-message"} role={success ? "status" : "alert"}>

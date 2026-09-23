@@ -20,7 +20,7 @@ export default function PrivacyPage() {
         <div className="legal-title-block">
           <p className="coordinate-label">HA / LEGAL–01</p>
           <h1>Privacy notice</h1>
-          <p className="legal-updated">Effective and last updated August 31, 2026</p>
+          <p className="legal-updated">Effective August 31, 2026 · Last updated September 23, 2026</p>
         </div>
 
         <div className="legal-summary">
@@ -74,6 +74,13 @@ export default function PrivacyPage() {
             authentication, Google when you choose Google sign-in, Vercel, DigitalOcean, Supabase and
             PostgreSQL infrastructure, and communications providers. These providers process data for
             us under their own security and privacy commitments.
+          </p>
+          <p>
+            If you choose Add to Google Wallet when available, we send Google your event ticket
+            details, pass identifier, QR credential, and display name when included. This lets you
+            save the ticket to your Google account. Application answers, your email address, and
+            your résumé are not included in the ticket payload. Saving is optional; you can continue
+            using your web pass instead. Google Wallet use is subject to Google&apos;s own privacy policy.
           </p>
           <p>
             We may disclose information when reasonably necessary to comply with law, protect people

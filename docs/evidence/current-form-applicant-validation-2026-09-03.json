@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "recordedOn": "2026-09-03",
+  "scope": "Approved staging-only current-form sustained and deadline applicant reruns",
+  "notes": [
+    "Original campaign results and failed contention test remain preserved separately.",
+    "Current form is matched to the approved schema in migration 000013; no production database access was used.",
+    "Form publication inserts a new immutable version only; existing application records are not migrated.",
+    "No API deployment, scanner test, locking, pool sizing or production configuration change.",
+    "API journeys use staging-only synthetic authentication; they do not measure browser rendering, Clerk sign-in, or every conditional-answer combination.",
+    "Physical GitHub runner location is uncontrolled. Changed form/upload workload prevents causal before/after optimization claims.",
+    "Pool telemetry was not collected for this rerun; null does not mean zero utilization.",
+    "Initial deadline run 33724749486 failed: 250 HTTP submissions succeeded, but an extra end-boundary callback aborted k6 (exit 108), and the SQL verifier produced no ledger. Its persistence result remains unverified.",
+    "Before the fresh deadline rerun, only the harness changed: expectations were moved from an oversized argv into SQL stdin, and one no-request end-boundary callback is counted separately. API, arrival rate, duration, workload and acceptance targets were unchanged."
+  ],
+  "workflowHistory": [
+    {
+      "id": 33723965114,
+      "profile": "applicant-sustained",
+      "conclusion": "success"
+    },
+    {
+      "id": 33724749486,
+      "profile": "applicant-deadline",
+      "conclusion": "failure"
+    },
+    {
+      "id": 33726354766,
+      "profile": "applicant-deadline",
+      "conclusion": "success"
+    }
+  ],
+  "runs": [
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33723965114",
+      "artifact": "applicant-sustained-33723965114-1",
+      "artifactFileSHA256": [
+        {
+          "name": "applicant-ledger.json",
+          "sha256": "0b351de4a9202afff0f22cef1683beacbf88299ce14c7b60e02e92ea712f9964"
+        },
+        {
+          "name": "benchmark-context.json",
+          "sha256": "d67a337f46dabf71394ac24eedca0dff1066792fd0e39828037c00e3776c580e"
+        },
+        {
+          "name": "form-alignment.json",
+          "sha256": "2cb9132cdd4c4732a5b306d743a117d7fd865017abc907b6ec644a8b7f10f46a"
+        },
+        {
+          "name": "profile-summary.json",
+          "sha256": "bbe9e4c5d06b837670652f233ab4d0d418fc8f4fdb0f5cfb2bb2777652c219d2"
+        }
+      ],
+      "workflowConclusion": "success",
+      "context": {
+        "startedAt": "2026-09-03T06:36:18.233Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "0820f3d669892fed8e1e26fe967a0e959e280919",
+        "runID": "33723965114",
+        "repetition": "1",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "sustained",
+        "form": {
+          "id": "ddbcded1-5128-4a39-9d00-0d12b688523b",
+          "version": 2,
+          "resumeRequired": false,
+          "questionCount": 9,
+          "schemaSHA256": "2cbcf487148f2c5ec14aad434fdb316ca488705784c6dc595efdf407c11c0a19",
+          "currentSchemaMatched": true,
+          "referenceSource": "api/migrations/000013_hackatlantic_application_form_v2.sql"
+        },
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T06:45:18.478Z",
+        "deploymentUnchanged": true,
+        "formUnchanged": true,
+        "elapsedSeconds": 540.245,
+        "completedScansPerMinute": null
+      },
+      "alignment": {
+        "before": {
+          "id": "5f531002-9625-4b12-8272-74144637bced",
+          "version": 1,
+          "schemaSHA256": "d07d4a117aeb5883e75963269841848955af389a4b3f8fb9961981000d3c6d97"
+        },
+        "after": {
+          "id": "ddbcded1-5128-4a39-9d00-0d12b688523b",
+          "version": 2,
+          "schemaSHA256": "2cbcf487148f2c5ec14aad434fdb316ca488705784c6dc595efdf407c11c0a19",
+          "resumeRequired": false,
+          "questionCount": 9
+        },
+        "publishedNewVersion": true,
+        "referenceSource": "api/migrations/000013_hackatlantic_application_form_v2.sql",
+        "existingApplicationsUpdated": false
+      },
+      "httpRequests": 275,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {
+        "create": 360.03552085,
+        "submit": 412.0848606,
+        "draft": 475.3315304,
+        "form": 264.32510769999993
+      },
+      "uploadWallClockP95Milliseconds": 399.59999999999997,
+      "completedJourneys": 50,
+      "journeySuccessRate": 1,
+      "answerMismatchCount": 0,
+      "droppedIterations": null,
+      "scheduledIterations": 50,
+      "endBoundaryCallbacks": null,
+      "verificationStatus": "passed",
+      "ledger": {
+        "expected": 50,
+        "submitted": 50,
+        "lostAnswers": 0,
+        "expectedResumes": 25,
+        "persistedResumes": 25,
+        "resumeMismatches": 0,
+        "submittedWithResume": 25,
+        "duplicateApplications": 0,
+        "wrongFormApplications": 0,
+        "submittedWithoutResume": 25
+      },
+      "poolTelemetry": null
+    },
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33724749486",
+      "artifact": "applicant-deadline-33724749486-1",
+      "artifactFileSHA256": [
+        {
+          "name": "benchmark-context.json",
+          "sha256": "9e09008675d86e1423dc276b7bd16c994d586882e0a1d769a355c6f20b935545"
+        },
+        {
+          "name": "form-alignment.json",
+          "sha256": "c4be998e54b4acabcaf79b2c58c7dde4df259771b7ae02a01c1fe24b7f799ffc"
+        },
+        {
+          "name": "profile-summary.json",
+          "sha256": "b80dfb5540b80ecafd97e4312647e6b47f5190c61873a02c32c8009bd6a025ae"
+        }
+      ],
+      "workflowConclusion": "failure",
+      "context": {
+        "startedAt": "2026-09-03T06:46:50.538Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "0820f3d669892fed8e1e26fe967a0e959e280919",
+        "runID": "33724749486",
+        "repetition": "1",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "deadline",
+        "form": {
+          "id": "ddbcded1-5128-4a39-9d00-0d12b688523b",
+          "version": 2,
+          "resumeRequired": false,
+          "questionCount": 9,
+          "schemaSHA256": "2cbcf487148f2c5ec14aad434fdb316ca488705784c6dc595efdf407c11c0a19",
+          "currentSchemaMatched": true,
+          "referenceSource": "api/migrations/000013_hackatlantic_application_form_v2.sql"
+        },
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T06:56:51.861Z",
+        "deploymentUnchanged": true,
+        "formUnchanged": true,
+        "elapsedSeconds": 601.323,
+        "completedScansPerMinute": null
+      },
+      "alignment": {
+        "before": {
+          "id": "ddbcded1-5128-4a39-9d00-0d12b688523b",
+          "version": 2,
+          "schemaSHA256": "2cbcf487148f2c5ec14aad434fdb316ca488705784c6dc595efdf407c11c0a19"
+        },
+        "after": {
+          "id": "ddbcded1-5128-4a39-9d00-0d12b688523b",
+          "version": 2,
+          "schemaSHA256": "2cbcf487148f2c5ec14aad434fdb316ca488705784c6dc595efdf407c11c0a19",
+          "resumeRequired": false,
+          "questionCount": 9
+        },
+        "publishedNewVersion": false,
+        "referenceSource": "api/migrations/000013_hackatlantic_application_form_v2.sql",
+        "existingApplicationsUpdated": false
+      },
+      "httpRequests": 250,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {
+        "submit": 424.7497236
+      },
+      "uploadWallClockP95Milliseconds": null,
+      "completedJourneys": 250,
+      "journeySuccessRate": 1,
+      "answerMismatchCount": 0,
+      "droppedIterations": 0,
+      "scheduledIterations": 251,
+      "endBoundaryCallbacks": null,
+      "verificationStatus": "unverified",
+      "ledger": null,
+      "poolTelemetry": null
+    },
+    {
+      "runUrl": "https://github.com/hackatlantic/hackatlantic-competitors/actions/runs/33726354766",
+      "artifact": "applicant-deadline-33726354766-1",
+      "artifactFileSHA256": [
+        {
+          "name": "applicant-ledger.json",
+          "sha256": "00021bcee082f015f469f8ee4b4130acee3b320fcc4f4dc8c5d6ac2c94e06245"
+        },
+        {
+          "name": "benchmark-context.json",
+          "sha256": "935a9fdae0e1f40c8fddc0c62ed3516ac97dba966eb68b888c6c9f9e75d0db26"
+        },
+        {
+          "name": "form-alignment.json",
+          "sha256": "c4be998e54b4acabcaf79b2c58c7dde4df259771b7ae02a01c1fe24b7f799ffc"
+        },
+        {
+          "name": "profile-summary.json",
+          "sha256": "b4444abeea14577234994f5beaa244c927dd1e6d9fcb0d8b92b1894023faa063"
+        }
+      ],
+      "workflowConclusion": "success",
+      "context": {
+        "startedAt": "2026-09-03T07:06:34.485Z",
+        "deployment": {
+          "gitSha": "21b1a585a75d6995a66a5261571a23eb9d6d72a2",
+          "digest": "sha256:affbccdda09a774498ddba395111ead18b0649a040d93269c9600bc843c15b6f",
+          "instanceSize": "apps-s-1vcpu-0.5gb",
+          "instanceCount": 1,
+          "region": "tor"
+        },
+        "testCommit": "a2646744cbea78a2179fefa9af3ec73d42a6ae3b",
+        "runID": "33726354766",
+        "repetition": "1",
+        "runner": "GitHub-hosted ubuntu-24.04; physical region not controlled",
+        "profile": "deadline",
+        "form": {
+          "id": "ddbcded1-5128-4a39-9d00-0d12b688523b",
+          "version": 2,
+          "resumeRequired": false,
+          "questionCount": 9,
+          "schemaSHA256": "2cbcf487148f2c5ec14aad434fdb316ca488705784c6dc595efdf407c11c0a19",
+          "currentSchemaMatched": true,
+          "referenceSource": "api/migrations/000013_hackatlantic_application_form_v2.sql"
+        },
+        "resumeBytes": 524288,
+        "resumeSHA256": "6ea3a1ad97ce843114c043efd4ccdb53122f7ef8275882edb838ebbd19454fea",
+        "finishedAt": "2026-09-03T07:16:36.565Z",
+        "deploymentUnchanged": true,
+        "formUnchanged": true,
+        "elapsedSeconds": 602.08,
+        "completedScansPerMinute": null
+      },
+      "alignment": {
+        "before": {
+          "id": "ddbcded1-5128-4a39-9d00-0d12b688523b",
+          "version": 2,
+          "schemaSHA256": "2cbcf487148f2c5ec14aad434fdb316ca488705784c6dc595efdf407c11c0a19"
+        },
+        "after": {
+          "id": "ddbcded1-5128-4a39-9d00-0d12b688523b",
+          "version": 2,
+          "schemaSHA256": "2cbcf487148f2c5ec14aad434fdb316ca488705784c6dc595efdf407c11c0a19",
+          "resumeRequired": false,
+          "questionCount": 9
+        },
+        "publishedNewVersion": false,
+        "referenceSource": "api/migrations/000013_hackatlantic_application_form_v2.sql",
+        "existingApplicationsUpdated": false
+      },
+      "httpRequests": 250,
+      "httpFailureRate": 0,
+      "operationP95Milliseconds": {
+        "submit": 435.91546975
+      },
+      "uploadWallClockP95Milliseconds": null,
+      "completedJourneys": 250,
+      "journeySuccessRate": 1,
+      "answerMismatchCount": 0,
+      "droppedIterations": 0,
+      "scheduledIterations": 251,
+      "endBoundaryCallbacks": 1,
+      "verificationStatus": "passed",
+      "ledger": {
+        "expected": 250,
+        "submitted": 250,
+        "lostAnswers": 0,
+        "expectedResumes": 0,
+        "persistedResumes": 0,
+        "resumeMismatches": 0,
+        "submittedWithResume": 0,
+        "duplicateApplications": 0,
+        "wrongFormApplications": 0,
+        "submittedWithoutResume": 250
+      },
+      "poolTelemetry": null
+    }
+  ]
+}

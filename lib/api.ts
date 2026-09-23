@@ -37,6 +37,14 @@ export type CurrentUser = {
   roles: CurrentUserRole[];
 };
 
+export type ScannerAccessUser = {
+  id: string;
+  email: string;
+  displayName: string | null;
+  scannerAccess: boolean;
+  canManage: boolean;
+};
+
 export type ApplicationQuestionType = "string" | "number" | "boolean";
 export type ApplicationQuestionControl = "text" | "email" | "textarea" | "select";
 
@@ -130,6 +138,20 @@ export type ApplicantReleasedDecision = {
   releasedAt: string;
 };
 
+export type RSVPStatus = "pending" | "confirmed" | "declined";
+export type AttendanceRSVP = {
+  applicationId: string;
+  decisionId: string;
+  status: RSVPStatus;
+  lockVersion: number;
+  respondedAt?: string;
+};
+export type RespondToRSVPRequest = {
+  decisionId: string;
+  status: Exclude<RSVPStatus, "pending">;
+  lockVersion: number;
+};
+
 export type OrganizerApplicationStatus =
   | "submitted"
   | "accepted"
@@ -159,6 +181,7 @@ export type AuthenticatedAttendeePass = Omit<
 > & {
   status: "active";
   qrToken: string;
+  googleWalletAvailable?: boolean;
 };
 
 export type PassIssuance = AttendeePass & {
@@ -309,10 +332,18 @@ export type UpdateOrganizerEntitlementRequest = {
   maxRedemptions: number;
 };
 
+export type OrganizerAttendanceSummary = {
+  cycleId: string;
+  cycleName: string;
+  confirmedRsvps: number;
+};
+
 export type OrganizerRedemptionCount = {
   checkpointId: string;
   checkpointName: string;
   totalRedemptions: number;
+  uniqueAttendees?: number;
+  confirmedRsvps?: number;
   lastRedeemedAt?: string | null;
 };
 
@@ -360,6 +391,7 @@ export type OrganizerApplication = {
   answers: ApplicationAnswers;
   currentDecision?: OrganizerDecision;
   attendeePass?: OrganizerAttendeePass;
+  rsvp?: AttendanceRSVP;
   createdAt: string;
   updatedAt: string;
 };
@@ -372,6 +404,7 @@ export type OrganizerApplicationListResponse = {
 export type OrganizerApplicationFilters = {
   status?: OrganizerApplicationStatus;
   q?: string;
+  rsvp?: RSVPStatus;
 };
 
 export type AssignReviewerRequest = {
@@ -443,6 +476,8 @@ export type ApiClient = {
   createApplication(): Promise<ApplicantApplication>;
   getMyApplications(): Promise<MyApplicationsResponse>;
   getApplicationDecision(applicationId: string): Promise<ApplicantReleasedDecision>;
+  getApplicationRSVP(applicationId: string): Promise<AttendanceRSVP>;
+  respondToRSVP(applicationId: string, response: RespondToRSVPRequest): Promise<AttendanceRSVP>;
   saveApplicationDraft(
     applicationId: string,
     request: SaveApplicationDraftRequest,
@@ -462,6 +497,7 @@ export type ApiClient = {
   ): Promise<OrganizerApplicationListResponse>;
   getOrganizerApplication(applicationId: string): Promise<OrganizerApplication>;
   getAttendeePass(): Promise<AuthenticatedAttendeePass>;
+  createGoogleWalletPass(): Promise<{ saveUrl: string }>;
   issueAttendeePass(attendeeId: string): Promise<PassIssuance>;
   revokeAttendeePass(passId: string): Promise<AttendeePass>;
   reissueAttendeePass(passId: string): Promise<PassIssuance>;
@@ -504,6 +540,8 @@ export type ApiClient = {
     checkpointId: string,
   ): Promise<void>;
   listOrganizerRedemptionCounts(): Promise<OrganizerRedemptionCountsResponse>;
+  getOrganizerAttendanceSummary(): Promise<OrganizerAttendanceSummary>;
+  enableOrganizerEntrance(cycleId: string): Promise<OrganizerCheckpoint>;
   listOrganizerRedemptions(): Promise<OrganizerRedemptionListResponse>;
   downloadOrganizerAttendanceCsv(
     filters?: OrganizerExportFilters,
@@ -517,6 +555,7 @@ export type ApiClient = {
   ): Promise<OrganizerDecision>;
   releaseOrganizerDecision(decisionId: string): Promise<OrganizerDecision>;
   grantReviewerRole(userId: string): Promise<void>;
+  lookupScannerUser(email: string): Promise<ScannerAccessUser>;
   grantScannerRole(userId: string): Promise<void>;
   revokeScannerRole(userId: string): Promise<void>;
   assignReviewer(
@@ -705,6 +744,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       if (filters.status) {
         searchParameters.set("status", filters.status);
       }
+      if (filters.rsvp) {
+        searchParameters.set("rsvp", filters.rsvp);
+      }
       if (filters.q) {
         searchParameters.set("q", filters.q);
       }
@@ -717,6 +759,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request<OrganizerApplication>(`/v1/admin/applications/${applicationId}`),
     getAttendeePass: () =>
       request<AuthenticatedAttendeePass>("/v1/attendee/pass"),
+    createGoogleWalletPass: () =>
+      request<{ saveUrl: string }>("/v1/attendee/pass/google-wallet", { method: "POST", cache: "no-store" }),
     issueAttendeePass: (attendeeId) =>
       request<PassIssuance>(`/v1/admin/attendees/${attendeeId}/passes`, {
         method: "POST",
@@ -800,6 +844,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       ),
     listOrganizerRedemptionCounts: () =>
       request<OrganizerRedemptionCountsResponse>("/v1/admin/redemptions/counts"),
+    getOrganizerAttendanceSummary: () => request<OrganizerAttendanceSummary>("/v1/admin/attendance-summary"),
+    enableOrganizerEntrance: (cycleId) => request<OrganizerCheckpoint>("/v1/admin/check-in/entrance", { method: "POST", body: JSON.stringify({ cycleId }) }),
     listOrganizerRedemptions: () =>
       request<OrganizerRedemptionListResponse>("/v1/admin/redemptions"),
     downloadOrganizerAttendanceCsv: (filters) =>
@@ -818,6 +864,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     grantReviewerRole: (userId) =>
       request<void>(`/v1/admin/users/${userId}/roles/reviewer`, {
         method: "PUT",
+      }),
+    lookupScannerUser: (email) =>
+      request<ScannerAccessUser>("/v1/admin/users/scanner-access/lookup", {
+        method: "POST",
+        body: JSON.stringify({ email }),
       }),
     grantScannerRole: (userId) =>
       request<void>(`/v1/admin/users/${userId}/roles/scanner`, {
@@ -839,6 +890,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request<ReviewerApplicationListResponse>("/v1/reviewer/assignments"),
     getApplicationDecision: (applicationId) =>
       request<ApplicantReleasedDecision>(`/v1/applications/${applicationId}/decision`),
+    getApplicationRSVP: (applicationId) =>
+      request<AttendanceRSVP>(`/v1/applications/${applicationId}/rsvp`),
+    respondToRSVP: (applicationId, response) =>
+      request<AttendanceRSVP>(`/v1/applications/${applicationId}/rsvp`, {
+        method: "PUT",
+        body: JSON.stringify(response),
+      }),
     getReviewerApplication: (applicationId) =>
       request<ReviewerApplication>(`/v1/reviewer/applications/${applicationId}`),
     saveReviewDraft: (applicationId, review) =>

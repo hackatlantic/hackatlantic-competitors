@@ -5,10 +5,11 @@ export default function OrganizerOperationsLoading() {
     <StaffPageFrame
       eyebrow="Admin workspace"
       role="admin"
-      title="Loading event operations"
+      title="Check-in"
+      compactHeader
     >
       <p className="staff-summary" aria-live="polite">
-        Loading authorized checkpoint and redemption operations…
+        Loading attendance…
       </p>
     </StaffPageFrame>
   );

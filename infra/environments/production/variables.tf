@@ -36,6 +36,27 @@ variable "api_env" {
   type      = map(string)
   sensitive = true
 }
+
+variable "api_observability_env" {
+  description = "Dedicated, protected metrics-only exporter settings merged into the API environment without rewriting the main api_env secret payload."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for key in keys(var.api_observability_env) : contains([
+        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_METRICS_HEADERS",
+        "OTEL_EXPORTER_OTLP_PROTOCOL",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+      ], key)
+    ])
+    error_message = "api_observability_env may only set approved OTLP exporter variables."
+  }
+}
 variable "alert_emails" {
   type    = list(string)
   default = []

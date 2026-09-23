@@ -132,6 +132,8 @@ type CheckpointCount struct {
 	CheckpointID     string     `json:"checkpointId"`
 	CheckpointName   string     `json:"checkpointName"`
 	TotalRedemptions int64      `json:"totalRedemptions"`
+	UniqueAttendees  int64      `json:"uniqueAttendees"`
+	ConfirmedRSVPs   int64      `json:"confirmedRsvps"`
 	LastRedeemedAt   *time.Time `json:"lastRedeemedAt,omitempty"`
 }
 
@@ -736,7 +738,12 @@ func (s *Service) ListCheckpointCounts(ctx context.Context, actor users.User) ([
 	}
 	ctx, cancel := context.WithTimeout(ctx, s.queryTimeout)
 	defer cancel()
-	rows, err := s.pool.Query(ctx, `SELECT checkpoint.id, checkpoint.name, COUNT(redemption.id), MAX(redemption.redeemed_at)
+	rows, err := s.pool.Query(ctx, `SELECT checkpoint.id, checkpoint.name, COUNT(redemption.id), MAX(redemption.redeemed_at),
+		COUNT(DISTINCT redemption.attendee_id),
+		(SELECT COUNT(*) FROM ats.applications application
+		 JOIN ats.attendance_responses response ON response.decision_id = application.current_decision_id
+		 WHERE application.cycle_id = checkpoint.cycle_id AND application.status = 'accepted'
+		 AND application.decision_released_at IS NOT NULL AND response.status = 'confirmed')
 		FROM ats.checkpoints checkpoint
 		LEFT JOIN ats.redemptions redemption ON redemption.checkpoint_id = checkpoint.id
 		GROUP BY checkpoint.id, checkpoint.name
@@ -751,7 +758,7 @@ func (s *Service) ListCheckpointCounts(ctx context.Context, actor users.User) ([
 		var count int64
 		var redeemedAt pgtype.Timestamptz
 		var countItem CheckpointCount
-		if err := rows.Scan(&id, &countItem.CheckpointName, &count, &redeemedAt); err != nil {
+		if err := rows.Scan(&id, &countItem.CheckpointName, &count, &redeemedAt, &countItem.UniqueAttendees, &countItem.ConfirmedRSVPs); err != nil {
 			return nil, fmt.Errorf("scan checkpoint count: %w", err)
 		}
 		countItem.CheckpointID = id.String()

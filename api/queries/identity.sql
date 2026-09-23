@@ -35,6 +35,15 @@ SELECT EXISTS (
     SELECT 1 FROM ats.users WHERE id = $1
 ) AS user_exists;
 
+-- name: LookupScannerUserByEmail :many
+SELECT u.id, u.clerk_user_id,
+    EXISTS (SELECT 1 FROM ats.user_roles r WHERE r.user_id = u.id AND r.role = 'scanner') AS scanner_access,
+    EXISTS (SELECT 1 FROM ats.admin_email_allowlist a WHERE a.normalized_email = lower(btrim(u.primary_email))) AS is_admin
+FROM ats.users u
+WHERE lower(btrim(u.primary_email)) = sqlc.arg('email')::text
+ORDER BY u.id
+LIMIT 2;
+
 -- name: GrantScannerRole :one
 WITH inserted AS (
     INSERT INTO ats.user_roles (user_id, role, created_by)

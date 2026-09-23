@@ -10,24 +10,41 @@ on:
         type: choice
         options:
           - scanner-release
+          - scanner-repeatability
           - scanner-spike
           - scanner-contention
           - applicant-sustained
           - applicant-deadline
           - applicant-stress
+      repetitions:
+        description: Fresh-fixture repetitions (run serially to avoid contaminating measurements)
+        required: true
+        default: "1"
+        type: choice
+        options: ["1", "3"]
+      align_current_form:
+        description: Publish the current nine-question optional-resume form to staging (applicant sustained/deadline only; existing applications unchanged)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: staging-load-${{ inputs.profile }}
+  group: staging-release
   cancel-in-progress: false
 
 jobs:
   load-test:
-    name: ${{ inputs.profile }}
+    name: ${{ inputs.profile }} / repetition ${{ matrix.repetition }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        repetition: ${{ fromJSON(inputs.repetitions == '3' && '[1,2,3]' || '[1]') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 40
     environment: staging
     env:
       API_BASE_URL: https://hackatlantic-api-staging-5c4l8.ondigitalocean.app
@@ -36,6 +53,10 @@ jobs:
       K6_SCANNER_FIXTURES: ../../.tmp/k6-staging-fixture.json
       TF_VARS_JSON: ${{ secrets.TFVARS_STAGING_JSON }}
       TF_TOKEN_app_terraform_io: ${{ secrets.HCP_TERRAFORM_TOKEN }}
+      DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+      K6_REPETITION: ${{ matrix.repetition }}
+      K6_SUMMARY_PATH: .tmp/profile-summary.json
+      K6_ALIGN_CURRENT_FORM: ${{ inputs.align_current_form }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
@@ -50,7 +71,20 @@ jobs:
       - name: Configure the selected fixed profile
         shell: bash
         run: |
+          if [[ "${K6_ALIGN_CURRENT_FORM}" == true && "${{ inputs.profile }}" != applicant-sustained && "${{ inputs.profile }}" != applicant-deadline ]]; then
+            echo 'Form alignment is only permitted for the two realistic applicant profiles' >&2
+            exit 1
+          fi
           case "${{ inputs.profile }}" in
+            scanner-repeatability)
+              cat >> "$GITHUB_ENV" <<'EOF'
+          K6_SCANNER_PROFILE=repeatability
+          K6_SCANNER_IDENTITIES=20
+          K6_SCANNER_PASS_COUNT=3500
+          K6_SCANNER_VUS=20
+          K6_APPLICANT_COUNT=0
+          EOF
+              ;;
             scanner-release)
               cat >> "$GITHUB_ENV" <<'EOF'
           K6_SCANNER_PROFILE=release
@@ -95,7 +129,7 @@ jobs:
             applicant-deadline)
               cat >> "$GITHUB_ENV" <<'EOF'
           K6_APPLICANT_PROFILE=deadline
-          K6_APPLICANT_COUNT=25
+          K6_APPLICANT_COUNT=250
           K6_APPLICANT_VUS=25
           K6_SCANNER_IDENTITIES=0
           K6_SCANNER_PASS_COUNT=0
@@ -134,6 +168,8 @@ jobs:
       - name: Refresh short-lived scanner authentication
         if: startsWith(inputs.profile, 'scanner-')
         run: node tests/load/staging-fixture.mjs refresh-scanner
+      - name: Refresh rolling ten-minute authentication for the full test window
+        run: node tests/load/staging-fixture.mjs refresh-all
       - name: Export scanner checkpoint to k6
         if: startsWith(inputs.profile, 'scanner-')
         shell: bash
@@ -141,6 +177,8 @@ jobs:
           set +x
           checkpoint_id="$(jq -er '.scanner.checkpointId' "${K6_FIXTURE_PATH}")"
           echo "CHECKPOINT_ID=${checkpoint_id}" >> "${GITHUB_ENV}"
+      - name: Record benchmark build, instance, region, and payload
+        run: node tests/load/benchmark-context.mjs start
       - name: Run scanner profile
         id: scanner_load
         if: startsWith(inputs.profile, 'scanner-')
@@ -154,6 +192,12 @@ jobs:
       - name: Verify scanner ledger correctness
         if: always() && startsWith(inputs.profile, 'scanner-')
         run: node tests/load/staging-fixture.mjs verify-scanner
+      - name: Verify submitted answers, unique applications, and resume checksums
+        if: always() && startsWith(inputs.profile, 'applicant-') && hashFiles('.tmp/profile-summary.json') != ''
+        run: node tests/load/staging-fixture.mjs verify-applicants
+      - name: Record completion and reject a mid-test deployment change
+        if: always() && hashFiles('.tmp/benchmark-context.json') != ''
+        run: node tests/load/benchmark-context.mjs finish
       - name: Publish concise results
         if: always()
         shell: bash
@@ -178,8 +222,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ inputs.profile }}-${{ github.run_id }}
-          path: .tmp/profile-summary.json
+          name: ${{ inputs.profile }}-${{ github.run_id }}-${{ matrix.repetition }}
+          path: |
+            .tmp/profile-summary.json
+            .tmp/benchmark-context.json
+            .tmp/scanner-ledger.json
+            .tmp/applicant-ledger.json
+            .tmp/form-alignment.json
           if-no-files-found: ignore
           retention-days: 30
       - name: Enforce the selected profile

@@ -72,6 +72,7 @@ type Querier interface {
 	LockCheckpointForRedemption(ctx context.Context, checkpointID pgtype.UUID) (LockCheckpointForRedemptionRow, error)
 	LockCurrentDecisionForRelease(ctx context.Context, id pgtype.UUID) (LockCurrentDecisionForReleaseRow, error)
 	LockPassForRedemptionByQRTokenHash(ctx context.Context, qrTokenHash []byte) (LockPassForRedemptionByQRTokenHashRow, error)
+	LookupScannerUserByEmail(ctx context.Context, email string) ([]LookupScannerUserByEmailRow, error)
 	OtherActiveApplicationCycleExists(ctx context.Context, id pgtype.UUID) (bool, error)
 	ReleaseDecision(ctx context.Context, arg ReleaseDecisionParams) (pgtype.Timestamptz, error)
 	ReplaceActivePass(ctx context.Context, arg ReplaceActivePassParams) error
