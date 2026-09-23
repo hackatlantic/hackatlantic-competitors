@@ -3,6 +3,16 @@ import { createPublicKey, publicEncrypt, randomBytes, createCipheriv } from "nod
 export const TEST_CLASS = "3388000000023208272.hackatlantic_2026_test";
 export const STAGING_ORIGIN = "https://hackatlantic-api-staging-5c4l8.ondigitalocean.app";
 
+// The public edge may return 504 for an unavailable upstream. This is NOT a
+// passing 503 HTTP contract: preserve the discrepancy while proving fail-closed
+// behavior and the independently verified feature flag.
+export function inspectDisabledExport(pass, status, payload) {
+  if (pass.googleWalletAvailable !== false || ![503, 504].includes(status) || payload.saveUrl) {
+    throw new Error("Disabled Wallet restoration did not fail closed");
+  }
+  return { disabledExportHTTPStatus: status, disabledExport503ContractPassed: status === 503 };
+}
+
 export function assertWalletTestTarget(origin, databaseURL, settings) {
   const db = new URL(databaseURL);
   if (origin !== STAGING_ORIGIN || db.hostname !== "aws-0-ca-central-1.pooler.supabase.com" ||

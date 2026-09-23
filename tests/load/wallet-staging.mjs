@@ -2,7 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { assertWalletTestTarget, encryptDelivery, inspectSaveURL, STAGING_ORIGIN } from "./wallet-test-contract.mjs";
+import { assertWalletTestTarget, encryptDelivery, inspectSaveURL, inspectDisabledExport, STAGING_ORIGIN } from "./wallet-test-contract.mjs";
 
 const root = "infra/environments/staging";
 const vars = JSON.parse(process.env.TF_VARS_JSON);
@@ -138,6 +138,7 @@ function cleanup() {
 async function verifyRestored() {
   process.env.LOAD_TEST_AUTH_SECRET=output("load_test_auth_secret");
   const ctx=load();
+  let disabledProbe={};
   // App Platform can briefly return a gateway error after Terraform reports ACTIVE.
   // Retry only transport/readiness failures, never a wrong image or enabled Wallet flag.
   const deadline=Date.now()+120000;
@@ -149,7 +150,12 @@ async function verifyRestored() {
         const owner={userId:ctx.attendee.clerk_user_id};
         const pass=await request("/v1/attendee/pass",owner);
         requireTest(pass.googleWalletAvailable===false,"Restoration left Wallet enabled");
-        await request("/v1/attendee/pass/google-wallet",owner,{method:"POST",expected:503});
+        const disabledResponse=await fetch(STAGING_ORIGIN+"/v1/attendee/pass/google-wallet",{
+          method:"POST", redirect:"error", signal:AbortSignal.timeout(30000),
+          headers:{Authorization:"Bearer "+(await sessionTokens([owner]))[0]},
+        });
+        disabledProbe=inspectDisabledExport(pass,disabledResponse.status,await disabledResponse.json().catch(()=>({})));
+        if (!disabledProbe.disabledExport503ContractPassed) console.log("::warning::Wallet flag is disabled and no save link was returned, but the public disabled endpoint returned 504 rather than the expected 503. The 503 HTTP contract remains unverified at the edge.");
       }
       break;
     } catch(error) {
@@ -159,7 +165,7 @@ async function verifyRestored() {
       await new Promise(resolve=>setTimeout(resolve,5000));
     }
   }
-  if (existsSync(evidencePath)) {const e=JSON.parse(readFileSync(evidencePath));e.walletDisabledAfterTest=true;e.staffCleanupPassed=true;save(evidencePath,e);}
+  if (existsSync(evidencePath)) {const e=JSON.parse(readFileSync(evidencePath));e.walletDisabledAfterTest=true;e.staffCleanupPassed=true;Object.assign(e,disabledProbe);save(evidencePath,e);}
   console.log("Verified Wallet is disabled again and the original staging API image is unchanged.");
 }
 

@@ -1,9 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, privateDecrypt, createDecipheriv } from "node:crypto";
-import { assertWalletTestTarget, encryptDelivery, inspectSaveURL, STAGING_ORIGIN, TEST_CLASS } from "./wallet-test-contract.mjs";
+import { assertWalletTestTarget, encryptDelivery, inspectSaveURL, inspectDisabledExport, STAGING_ORIGIN, TEST_CLASS } from "./wallet-test-contract.mjs";
 const db="postgresql://postgres.ovzrhurmiwqthfgycamx:fixture@aws-0-ca-central-1.pooler.supabase.com:5432/postgres";
 const settings={GOOGLE_WALLET_CLASS_ID:TEST_CLASS,GOOGLE_WALLET_ENABLED:"false"};
+test("restoration verifies disabled flag and records edge 504 as a failed 503 contract",()=>{
+  const pass={googleWalletAvailable:false};
+  assert.equal(inspectDisabledExport(pass,503,{}).disabledExport503ContractPassed,true);
+  assert.deepEqual(inspectDisabledExport(pass,504,{}),{disabledExportHTTPStatus:504,disabledExport503ContractPassed:false});
+  for(const [p,status,body] of [[{googleWalletAvailable:true},504,{}],[pass,200,{}],[pass,401,{}],[pass,504,{saveUrl:"unexpected"}]]) assert.throws(()=>inspectDisabledExport(p,status,body));
+});
 test("reject production, other database, real class, and enabled baseline",()=>{
   assert.doesNotThrow(()=>assertWalletTestTarget(STAGING_ORIGIN,db,settings));
   for(const [origin,url,config] of [["https://api.hackatlantic.ca",db,settings],[STAGING_ORIGIN,db.replace("ovzrhurmiwqthfgycamx","oizbfvfcownivwsrzlml"),settings],[STAGING_ORIGIN,db,{...settings,GOOGLE_WALLET_CLASS_ID:"3388000000023208272.hackatlantic_2026"}],[STAGING_ORIGIN,db,{...settings,GOOGLE_WALLET_ENABLED:"true"}]]) assert.throws(()=>assertWalletTestTarget(origin,url,config));
