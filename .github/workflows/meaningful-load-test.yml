@@ -16,6 +16,11 @@ on:
           - applicant-sustained
           - applicant-deadline
           - applicant-stress
+          - wallet-device
+      wallet_delivery_public_key:
+        description: RSA public key for encrypted synthetic Wallet pass delivery (wallet-device only)
+        type: string
+        required: false
       repetitions:
         description: Fresh-fixture repetitions (run serially to avoid contaminating measurements)
         required: true
@@ -36,7 +41,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  wallet-device:
+    if: inputs.profile == 'wallet-device'
+    uses: ./.github/workflows/wallet-staging-test.yml
+    with:
+      delivery_public_key: ${{ inputs.wallet_delivery_public_key }}
+    secrets: inherit
   load-test:
+    if: inputs.profile != 'wallet-device'
     name: ${{ inputs.profile }} / repetition ${{ matrix.repetition }}
     strategy:
       fail-fast: false

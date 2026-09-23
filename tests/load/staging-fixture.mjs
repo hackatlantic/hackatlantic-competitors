@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHmac, createHash, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { pathToFileURL } from "node:url";
 import { assertStagingTarget, applicantAnswers as expectedAnswers, fixedResume, RESUME_BYTES, shouldUpload } from "./profile-contract.mjs";
 import { currentIntakeSchema, CURRENT_SCHEMA_SHA256, FORM_SOURCE, schemaFingerprint, assertCurrentIntake, assertAlignmentScope, PUBLISH_CURRENT_FORM_SQL } from "./current-intake-form.mjs";
 import { jsonbInput } from "./sql-json-input.mjs";
@@ -593,10 +594,14 @@ async function cleanup() {
   console.log("Removed temporary staging admin and scanner privileges. Append-only synthetic redemption records remain isolated by their hat_load run identifiers.");
 }
 
-if (command === "prepare") await prepare();
-else if (command === "refresh-scanner") await refreshScanner();
-else if (command === "refresh-all") refreshAll();
-else if (command === "verify-scanner") verifyScanner();
-else if (command === "verify-applicants") verifyApplicants();
-else if (command === "cleanup") await cleanup();
-else throw new Error("usage: node tests/load/staging-fixture.mjs <prepare|refresh-scanner|verify-scanner|cleanup>");
+export { createIdentity, sessionTokens, seedAcceptedAttendees, psql, api };
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (command === "prepare") await prepare();
+  else if (command === "refresh-scanner") await refreshScanner();
+  else if (command === "refresh-all") refreshAll();
+  else if (command === "verify-scanner") verifyScanner();
+  else if (command === "verify-applicants") verifyApplicants();
+  else if (command === "cleanup") await cleanup();
+  else throw new Error("usage: node tests/load/staging-fixture.mjs <prepare|refresh-scanner|verify-scanner|cleanup>");
+}
