@@ -185,6 +185,7 @@ func main() {
 		dependencies.Verifier = verifier
 		dependencies.Users = resolver
 		dependencies.StaffRoles = resolver
+		dependencies.Volunteers = resolver
 	} else {
 		logger.Warn("Clerk authentication is disabled; protected routes reject every request")
 	}

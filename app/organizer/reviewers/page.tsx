@@ -2,6 +2,8 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { ScannerRoleForm } from "@/components/organizer-reviewer-actions";
 import { StaffPageFrame } from "@/components/staff-workflow";
+import { VolunteerApprovalQueue } from "@/components/volunteer-access";
+import "@/app/volunteer/volunteer.css";
 
 export default async function OrganizerReviewersPage() {
   const { userId } = await auth();
@@ -16,10 +18,11 @@ export default async function OrganizerReviewersPage() {
       title="Scanner access"
     >
       <p className="staff-summary">
-        Find a volunteer by email to grant or revoke scanner access. Scanners can
+        Approve volunteer requests to grant scanner access. Scanners can
         check attendee passes without access to applications or review notes.
       </p>
-      <ScannerRoleForm />
+      <VolunteerApprovalQueue />
+      <details><summary>Manage access by email</summary><ScannerRoleForm /></details>
     </StaffPageFrame>
   );
 }

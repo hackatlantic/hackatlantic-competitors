@@ -67,6 +67,7 @@ type Dependencies struct {
 	Verifier         auth.Verifier
 	Users            UserResolver
 	StaffRoles       staffRoleService
+	Volunteers       volunteerService
 	Applications     applicationIntakeService
 	Reviews          reviewWorkflowService
 	Decisions        decisionLifecycleService
@@ -191,6 +192,10 @@ func NewHandlerWithDependencies(version string, dependencies Dependencies) http.
 	mux.HandleFunc("POST /v1/admin/applications/{applicationId}/assignments", assignReviewerHandler(dependencies))
 	mux.HandleFunc("PUT /v1/admin/users/{userId}/roles/reviewer", grantReviewerRoleHandler(dependencies))
 	mux.HandleFunc("POST /v1/admin/users/scanner-access/lookup", lookupScannerUserHandler(dependencies))
+	mux.HandleFunc("GET /v1/volunteer/request", volunteerRequestHandler(dependencies))
+	mux.HandleFunc("POST /v1/volunteer/request", volunteerRequestHandler(dependencies))
+	mux.HandleFunc("GET /v1/admin/volunteer-requests", volunteerQueueHandler(dependencies))
+	mux.HandleFunc("PUT /v1/admin/volunteer-requests/{userId}", volunteerReviewHandler(dependencies))
 	mux.HandleFunc("PUT /v1/admin/users/{userId}/roles/scanner", grantScannerRoleHandler(dependencies))
 	mux.HandleFunc("DELETE /v1/admin/users/{userId}/roles/scanner", revokeScannerRoleHandler(dependencies))
 	mux.HandleFunc("POST /v1/admin/applications/{applicationId}/decisions", recordDecisionHandler(dependencies))
