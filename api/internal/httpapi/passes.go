@@ -26,6 +26,7 @@ type passLifecycleService interface {
 	Reissue(context.Context, users.User, string) (passes.Issuance, error)
 	Revoke(context.Context, users.User, string) (passes.Pass, error)
 	WebPass(context.Context, users.User) (passes.WebPass, error)
+	WalletPass(context.Context, users.User, string) (passes.WebPass, error)
 	ResolveClaim(context.Context, string) (passes.ClaimPass, error)
 	SummaryForApplication(context.Context, users.User, string) (passes.OrganizerSummary, error)
 }
@@ -218,7 +219,10 @@ func webPassHandler(dependencies Dependencies) http.HandlerFunc {
 			writePassError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, pass)
+		writeJSON(w, http.StatusOK, struct {
+			passes.WebPass
+			GoogleWalletAvailable bool `json:"googleWalletAvailable"`
+		}{pass, dependencies.GoogleWallet != nil})
 	}
 }
 

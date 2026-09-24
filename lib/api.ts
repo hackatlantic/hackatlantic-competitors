@@ -192,6 +192,7 @@ export type AuthenticatedAttendeePass = Omit<
 > & {
   status: "active";
   qrToken: string;
+  googleWalletAvailable?: boolean;
 };
 
 export type PassIssuance = AttendeePass & {
@@ -507,6 +508,7 @@ export type ApiClient = {
   ): Promise<OrganizerApplicationListResponse>;
   getOrganizerApplication(applicationId: string): Promise<OrganizerApplication>;
   getAttendeePass(): Promise<AuthenticatedAttendeePass>;
+  createGoogleWalletPass(): Promise<{ saveUrl: string }>;
   issueAttendeePass(attendeeId: string): Promise<PassIssuance>;
   revokeAttendeePass(passId: string): Promise<AttendeePass>;
   reissueAttendeePass(passId: string): Promise<PassIssuance>;
@@ -772,6 +774,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request<OrganizerApplication>(`/v1/admin/applications/${applicationId}`),
     getAttendeePass: () =>
       request<AuthenticatedAttendeePass>("/v1/attendee/pass"),
+    createGoogleWalletPass: () =>
+      request<{ saveUrl: string }>("/v1/attendee/pass/google-wallet", { method: "POST", cache: "no-store" }),
     issueAttendeePass: (attendeeId) =>
       request<PassIssuance>(`/v1/admin/attendees/${attendeeId}/passes`, {
         method: "POST",
