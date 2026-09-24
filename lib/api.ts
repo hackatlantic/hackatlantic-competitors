@@ -37,6 +37,17 @@ export type CurrentUser = {
   roles: CurrentUserRole[];
 };
 
+export type VolunteerRequest = {
+  userId: string;
+  realName: string;
+  status: "pending" | "approved" | "rejected" | "revoked";
+  createdAt: string;
+  reviewedAt: string | null;
+  scannerAccess: boolean;
+  email?: string;
+};
+export type VolunteerAccess = { request: VolunteerRequest | null; scannerAccess: boolean };
+
 export type ScannerAccessUser = {
   id: string;
   email: string;
@@ -554,6 +565,10 @@ export type ApiClient = {
   releaseOrganizerDecision(decisionId: string): Promise<OrganizerDecision>;
   grantReviewerRole(userId: string): Promise<void>;
   lookupScannerUser(email: string): Promise<ScannerAccessUser>;
+  getVolunteerAccess(): Promise<VolunteerAccess>;
+  requestVolunteerAccess(realName: string): Promise<VolunteerAccess>;
+  listVolunteerRequests(offset?: number): Promise<{ items: VolunteerRequest[] }>;
+  reviewVolunteerRequest(userId: string, status: "approved" | "rejected" | "revoked", expectedStatus: VolunteerRequest["status"]): Promise<void>;
   grantScannerRole(userId: string): Promise<void>;
   revokeScannerRole(userId: string): Promise<void>;
   assignReviewer(
@@ -866,6 +881,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         method: "POST",
         body: JSON.stringify({ email }),
       }),
+    getVolunteerAccess: () => request<VolunteerAccess>("/v1/volunteer/request"),
+    requestVolunteerAccess: (realName) => request<VolunteerAccess>("/v1/volunteer/request", { method: "POST", body: JSON.stringify({ realName }) }),
+    listVolunteerRequests: (offset = 0) => request<{ items: VolunteerRequest[] }>(`/v1/admin/volunteer-requests?offset=${offset}`),
+    reviewVolunteerRequest: (userId, status, expectedStatus) => request<void>(`/v1/admin/volunteer-requests/${encodeURIComponent(userId)}`, { method: "PUT", body: JSON.stringify({ status, expectedStatus }) }),
     grantScannerRole: (userId) =>
       request<void>(`/v1/admin/users/${userId}/roles/scanner`, {
         method: "PUT",
