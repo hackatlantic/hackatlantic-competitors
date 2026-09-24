@@ -6,6 +6,31 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { createApiClient, type VolunteerAccess, type VolunteerRequest } from "@/lib/api";
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Something went wrong. Please try again.";
+const invitationUrl = "https://apply.hackatlantic.ca/volunteer";
+
+function VolunteerInvitation() {
+  const [copyStatus, setCopyStatus] = useState("");
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(invitationUrl);
+      setCopyStatus("Link copied. Ready to share in Discord.");
+    } catch {
+      setCopyStatus("Couldn’t copy automatically. Select and copy the link above.");
+    }
+  }
+  return <section className="volunteer-invitation" aria-labelledby="volunteer-invitation-title">
+    <div>
+      <h2 id="volunteer-invitation-title">Invite your volunteers</h2>
+      <p>Share this link in Discord. Volunteers sign in and request access using their real name.</p>
+    </div>
+    <div className="volunteer-link-row">
+      <a href={invitationUrl} className="volunteer-share">apply.hackatlantic.ca/volunteer</a>
+      <button type="button" className="button primary" onClick={() => void copyLink()}>Copy invitation link</button>
+    </div>
+    <p className="volunteer-link-note">Only your approval grants scanner access.</p>
+    {copyStatus && <p role="status" className="volunteer-feedback">{copyStatus}</p>}
+  </section>;
+}
 
 export function VolunteerSignup() {
   const { getToken } = useAuth();
@@ -93,16 +118,21 @@ export function VolunteerApprovalQueue() {
     } catch (e) { setError(errorMessage(e)); setLoaded(false); setVerified({}); }
     finally { locked.current = false; setBusy(false); }
   }
-  return <section className="volunteer-queue" aria-labelledby="volunteer-queue-title">
-    <h2 id="volunteer-queue-title">Volunteer requests</h2>
-    <p className="volunteer-share">Share <Link href="/volunteer">apply.hackatlantic.ca/volunteer</Link> in the volunteer Discord. The link requests access; it never grants it.</p>
-    <p>Match each person to your schedule. Names are self-reported: confirm in Discord if a name is duplicated or anything looks unfamiliar. Account emails are shown only to help you distinguish requests.</p>
-    <button className="button secondary" disabled={busy} onClick={() => void load(offset)}>{busy ? "Loading…" : "Refresh requests"}</button>
+  return <div className="volunteer-queue">
+    <VolunteerInvitation />
+    <section className="volunteer-requests" aria-labelledby="volunteer-queue-title">
+    <div className="volunteer-queue-header">
+      <div><h2 id="volunteer-queue-title">Volunteer requests</h2><p>Approve people you recognize from the schedule.</p></div>
+      <button className="button secondary" disabled={busy} onClick={() => void load(offset)}>{busy ? "Loading…" : "Refresh requests"}</button>
+    </div>
+    <details className="volunteer-review-help"><summary>Before you approve</summary><p>Names are self-reported. Verify unfamiliar or duplicate names in Discord; use the account email to distinguish requests. Scanners can check passes, but cannot access applications or review notes.</p></details>
     {error && <p className="error-message" role="alert">{error}</p>}
-    {message && <p role="status">{message}</p>}
-    {loaded && items.length === 0 && <p>No volunteer requests on this page.</p>}
+    {message && <p className="volunteer-feedback" role="status">{message}</p>}
+    {busy && !loaded && <p role="status" className="volunteer-empty">Loading volunteer requests…</p>}
+    {loaded && items.length === 0 && <div className="volunteer-empty"><h3>{offset === 0 ? "No requests yet" : "No more requests"}</h3><p>{offset === 0 ? "Once volunteers use your invitation link, their requests will appear here." : "Go back to see earlier requests."}</p></div>}
     {loaded && items.map((item) => <article key={item.userId} className="volunteer-request" aria-label={`Request from ${item.realName}`}>
-      <h3>{item.realName}</h3><p>{item.email}</p><p>Request: {item.status} · Scanner access: {item.scannerAccess ? "active" : "not active"}</p>
+      <div className="volunteer-request-header"><div><h3>{item.realName}</h3><p>{item.email}</p></div><span className="volunteer-status" data-active={item.scannerAccess}>{item.scannerAccess ? "Scanner active" : item.status === "pending" ? "Awaiting approval" : "No scanner access"}</span></div>
+      <p className="volunteer-request-status">Request: {item.status}</p>
       {item.status === "pending" && <label className="volunteer-confirm"><input type="checkbox" checked={!!verified[item.userId]} disabled={busy} onChange={(e) => setVerified({ ...verified, [item.userId]: e.target.checked })} />I recognize this volunteer and have verified this account belongs to them.</label>}
       <div className="volunteer-actions">
         {item.status === "pending" && <button className="button primary" disabled={busy || !verified[item.userId]} onClick={() => void review(item,"approved")}>Approve scanner access</button>}
@@ -111,9 +141,10 @@ export function VolunteerApprovalQueue() {
       </div>
       {(item.status === "rejected" || item.status === "revoked") && <p>To reconsider this account, verify the person again and use Manage access by email below.</p>}
     </article>)}
-    <div className="volunteer-actions">
+    {(offset > 0 || (loaded && items.length === 50)) && <nav className="volunteer-actions" aria-label="Request pages">
       {offset > 0 && <button className="button secondary" disabled={busy} onClick={() => void load(Math.max(0,offset-50))}>Previous requests</button>}
       {loaded && items.length === 50 && <button className="button secondary" disabled={busy} onClick={() => void load(offset+50)}>Next requests</button>}
-    </div>
-  </section>;
+    </nav>}
+    </section>
+  </div>;
 }
