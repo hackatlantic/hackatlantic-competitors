@@ -6,7 +6,7 @@
 .volunteer-step { border-top: 1px solid #c4d5d3; padding-top: 1.5rem; margin-top: 1.5rem; }
 .volunteer-actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
 .volunteer-panel input { width: 100%; min-height: 3rem; padding: .75rem; margin: .5rem 0; border: 1px solid #8da6a4; border-radius: 10px; background: white; color: #142936; }
-.volunteer-queue { margin: 1.5rem 0 2rem; }
+.volunteer-queue { margin: 0; }
 .volunteer-request { padding: 1.25rem; border: 1px solid #c4d5d3; border-radius: 14px; margin-top: 1rem; overflow-wrap: anywhere; }
 .volunteer-request h3 { margin: 0 0 .5rem; font-size: 1.4rem; }
 .volunteer-request p { margin: .4rem 0; }
@@ -15,3 +15,43 @@
 .volunteer-share { overflow-wrap: anywhere; }
 .volunteer-panel .button.secondary, .volunteer-queue .button.secondary { color: #142936; background: #fff; border: 1px solid #a8bfbc; }
 .volunteer-panel .button.secondary:not(:disabled):hover, .volunteer-queue .button.secondary:not(:disabled):hover { color: #142936; background: #e2f2ef; }
+
+.volunteer-admin { padding: clamp(1.25rem, 3vw, 2.5rem); color: #142936; }
+.volunteer-queue h2 { margin: 0; font-family: var(--font-display, Georgia), serif; font-size: clamp(1.5rem, 2.5vw, 1.85rem); font-weight: 700; line-height: 1.2; letter-spacing: -.025em; text-transform: none; }
+.volunteer-queue p { line-height: 1.55; }
+.volunteer-invitation { display: grid; gap: 1rem; padding: clamp(1.25rem, 2.5vw, 1.75rem); border: 1px solid #b6cfca; border-radius: 16px; background: #e2f2ef; }
+.volunteer-invitation p { margin: .5rem 0 0; max-width: 65ch; }
+.volunteer-link-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.volunteer-share { flex: 1 1 16rem; min-width: 0; padding: .9rem 1rem; border: 1px solid #b6cfca; border-radius: 10px; background: #fff; color: #155b57; font-size: .95rem; text-underline-offset: .2em; }
+.volunteer-invitation .volunteer-link-note { margin: 0; font-size: .875rem; color: #365c58; }
+.volunteer-requests { margin-top: 2rem; }
+.volunteer-queue-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.volunteer-queue-header p { margin: .5rem 0 0; }
+.volunteer-queue .button { min-height: 2.8rem; font-size: .8rem; letter-spacing: .02em; text-transform: none; }
+.volunteer-queue .button:focus-visible, .volunteer-admin summary:focus-visible, .volunteer-share:focus-visible { outline: 3px solid #087c73; outline-offset: 4px; }
+.volunteer-review-help { margin: 1rem 0; color: #455e65; font-size: .9rem; }
+.volunteer-review-help summary { cursor: pointer; width: fit-content; padding: .4rem 0; text-underline-offset: .2em; }
+.volunteer-review-help p { max-width: 75ch; margin: .5rem 0 1rem; }
+.volunteer-empty { padding: 2.5rem 1.25rem; margin: 1rem 0 0; border: 1px dashed #b6c9c7; border-radius: 14px; background: #f6faf9; text-align: center; }
+.volunteer-empty h3 { font-family: inherit; font-size: 1.1rem; margin: 0 0 .5rem; }
+.volunteer-empty p { max-width: 48ch; margin: 0 auto; font-size: .95rem; }
+.volunteer-request { background: #fff; }
+.volunteer-request-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.volunteer-request-header h3 { font-family: inherit; font-size: 1.15rem; margin: 0; }
+.volunteer-request-header p { font-size: .9rem; }
+.volunteer-status { padding: .35rem .65rem; border-radius: 8px; background: #edf2f3; color: #3c5059; font-size: .8rem; font-weight: 700; }
+.volunteer-status[data-active="true"] { color: #12604e; background: #dff3e9; }
+.volunteer-request .volunteer-request-status { font-size: .8rem; color: #526970; }
+.volunteer-confirm { padding: 1rem; border-radius: 10px; background: #f0f6f5; font-size: .95rem; line-height: 1.5; }
+.volunteer-confirm input { accent-color: #007f75; }
+.volunteer-feedback { padding: .75rem 1rem; border-left: 3px solid #008f7f; background: #e2f2ef; font-size: .9rem; }
+.volunteer-email-manager { margin-top: 2rem; border-top: 1px solid #bfd0ce; padding-top: 1.25rem; }
+.volunteer-email-manager > summary { width: fit-content; padding: .5rem 0; font-size: .95rem; font-weight: 600; cursor: pointer; }
+.volunteer-email-manager .reviewer-role-form { padding: 1.25rem 0; }
+@media (max-width: 600px) {
+  .volunteer-link-row { flex-direction: column; align-items: stretch; }
+  .volunteer-share { flex-basis: auto; font-size: .85rem; }
+  .volunteer-queue-header { align-items: flex-start; }
+  .volunteer-queue-header .button { width: 100%; }
+  .volunteer-request .volunteer-actions { flex-direction: column; }
+}
