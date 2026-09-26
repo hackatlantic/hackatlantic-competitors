@@ -4,7 +4,7 @@ import { ScannerWorkflow } from "@/components/scanner-workflow";
 import { ApiError } from "@/lib/api";
 
 const auth = vi.hoisted(() => ({ getToken: vi.fn(), isLoaded: true, userId: "scanner" as string | null }));
-const api = vi.hoisted(() => ({ listScannerCheckpoints: vi.fn(), lookupScannerPass: vi.fn(), redeemScannerPass: vi.fn() }));
+const api = vi.hoisted(() => ({ getCurrentUser: vi.fn(), listScannerCheckpoints: vi.fn(), lookupScannerPass: vi.fn(), redeemScannerPass: vi.fn() }));
 const camera = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn(), capture: null as null | ((result: { getText: () => string }) => void) }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", async (original) => ({ ...(await original<typeof import("@/lib/api")>()), createApiClient: () => api }));
@@ -22,6 +22,7 @@ describe("Volunteer check-in", () => {
   afterEach(cleanup);
   beforeEach(() => {
     vi.resetAllMocks(); auth.userId = "scanner"; camera.capture = null;
+    api.getCurrentUser.mockResolvedValue({ roles: ["scanner"] });
     api.listScannerCheckpoints.mockResolvedValue({ items: [point], nextCursor: null });
     api.lookupScannerPass.mockResolvedValue({ attendee: { displayName: "Alex Morgan" }, pass: { status: "active" } });
     api.redeemScannerPass.mockResolvedValue({ outcome: "redeemed", attendee: { displayName: "Alex Morgan" } });
@@ -52,6 +53,16 @@ describe("Volunteer check-in", () => {
     expect((button as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("What are you scanning for?"), { target: { value: "lunch" } });
     expect((button as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("provides direct crew navigation and contextual instructions", async () => {
+    render(<ScannerWorkflow />);
+    await screen.findByRole("button", { name: "Scan ticket" });
+    expect(screen.getByRole("link", { name: "My pass" }).getAttribute("href")).toBe("/event-pass");
+    expect(screen.queryByRole("link", { name: /dashboard/i })).toBeNull();
+    expect(screen.getByText("Scan the ticket, check the name, then confirm to record this selection.")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("What are you scanning for?"), { target: { value: "verify" } });
+    expect(screen.getByText("Checks pass validity only. No check-in or meal is recorded.")).toBeTruthy();
   });
 
   it("verifies re-entry without offering or recording a redemption", async () => {

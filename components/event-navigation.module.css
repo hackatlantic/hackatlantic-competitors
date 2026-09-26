@@ -1,0 +1,30 @@
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 20px;
+  padding: 6px;
+  border: 1px solid #b5dedc40;
+  border-radius: 14px;
+  background: #102a38;
+}
+.link, .retry {
+  display: flex;
+  flex: 1 1 100px;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 9px;
+  color: #e7f5f3;
+  background: transparent;
+  font: 650 15px/1.4 var(--font-body);
+  text-decoration: none;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.link:hover, .retry:hover { background: #214453; }
+.link[aria-current="page"] { color: #102a32; background: #7ae4d7; }
+.link:focus-visible, .retry:focus-visible { outline: 3px solid #fcfdfb; outline-offset: -3px; }
+.retry { flex-basis: 100%; font-size: 13px; cursor: pointer; }

@@ -3,7 +3,8 @@
 import { useAuth } from "@clerk/nextjs";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { EventNavigation } from "@/components/event-navigation";
 import {
   ApiError,
   createApiClient,
@@ -152,6 +153,13 @@ export function ScannerWorkflow() {
   if (!isLoaded) return <main className="scanner-page"><section className="scanner-panel"><p role="status">Preparing scanner…</p></section></main>;
   if (!userId) return <main className="scanner-page"><section className="scanner-panel"><h1>Sign in to scan</h1><Link href="/">Return to sign in</Link></section></main>;
   return <ScannerSession key={userId} />;
+}
+
+function ScannerFrame({ children }: { children: ReactNode }) {
+  return <main className="scanner-page"><div className="scanner-shell">
+    <EventNavigation current="scanner" />
+    {children}
+  </div></main>;
 }
 
 function ScannerSession() {
@@ -456,19 +464,19 @@ function ScannerSession() {
 
   if (!isLoaded) {
     return (
-      <main className="scanner-page">
+      <ScannerFrame>
         <section className="scanner-panel scanner-state" aria-busy="true" aria-live="polite">
           <p className="eyebrow">Scanner</p>
           <h1>Preparing scanner</h1>
           <p>Checking your secure session…</p>
         </section>
-      </main>
+      </ScannerFrame>
     );
   }
 
   if (sessionExpired) {
     return (
-      <main className="scanner-page">
+      <ScannerFrame>
         <section className="scanner-panel scanner-state scanner-error-state" aria-live="assertive">
           <p className="eyebrow">Scanner</p>
           <h1>Session ended</h1>
@@ -477,37 +485,37 @@ function ScannerSession() {
             Sign in again
           </Link>
         </section>
-      </main>
+      </ScannerFrame>
     );
   }
 
   if (accessDenied) {
     return (
-      <main className="scanner-page">
+      <ScannerFrame>
         <section className="scanner-panel scanner-state scanner-error-state" aria-live="assertive">
           <p className="eyebrow">Scanner</p>
           <h1>Scanner access required</h1>
           <p role="alert">Your account is not authorized to scan entry passes.</p>
         </section>
-      </main>
+      </ScannerFrame>
     );
   }
 
   if (checkpointLoadState === "loading") {
     return (
-      <main className="scanner-page">
+      <ScannerFrame>
         <section className="scanner-panel scanner-state" aria-busy="true" aria-live="polite">
           <p className="eyebrow">Scanner</p>
           <h1>Loading scanner</h1>
           <p>Getting your scanning options…</p>
         </section>
-      </main>
+      </ScannerFrame>
     );
   }
 
   if (checkpointLoadState === "error") {
     return (
-      <main className="scanner-page">
+      <ScannerFrame>
         <section className="scanner-panel scanner-state scanner-error-state" aria-live="assertive">
           <p className="eyebrow">Scanner</p>
           <h1>Scanner unavailable</h1>
@@ -520,21 +528,18 @@ function ScannerSession() {
             Try again
           </button>
         </section>
-      </main>
+      </ScannerFrame>
     );
   }
 
   return (
-    <main className="scanner-page">
+    <ScannerFrame>
       <section className="scanner-panel" aria-labelledby="scanner-heading">
-        <Link className="staff-link" href="/">
-          ← Back to dashboard
-        </Link>
-        <h1 id="scanner-heading">Scan tickets</h1>
-        <Link className="staff-link" href="/event-pass">My event pass</Link>
-        <p className="scanner-summary">
-          Choose check-in or a meal to record attendance. For returning guests, choose Verify pass / re-entry; it only checks validity.
-        </p>
+        <header className="scanner-intro">
+          <p className="scanner-eyebrow">Hack Atlantic · Event crew</p>
+          <h1 id="scanner-heading">Scan tickets</h1>
+          <p className="scanner-summary">Choose what you’re scanning for, then scan the attendee’s QR code.</p>
+        </header>
 
         <form className="scanner-form" hidden={Boolean(lookup) || Boolean(result)} onSubmit={handleLookup}>
           <div className="scanner-field">
@@ -542,10 +547,11 @@ function ScannerSession() {
             <select
               disabled={busy}
               id="scanner-checkpoint"
+              aria-describedby="scanner-selection-help"
               onChange={(event) => handleCheckpointChange(event.target.value)}
               value={checkpointId}
             >
-              <option value="">Choose entrance or a meal</option>
+              <option value="">Select a scan type</option>
               <option value="verify">Verify pass / re-entry</option>
               {checkpoints.map((checkpoint) => (
                 <option key={checkpoint.id} value={checkpoint.id}>
@@ -553,6 +559,13 @@ function ScannerSession() {
                 </option>
               ))}
             </select>
+            <p id="scanner-selection-help" className="scanner-selection-help">
+              {checkpointId === "verify"
+                ? "Checks pass validity only. No check-in or meal is recorded."
+                : canScan
+                  ? "Scan the ticket, check the name, then confirm to record this selection."
+                  : "For returning guests, select Verify pass / re-entry."}
+            </p>
           </div>
 
           <div className="scanner-field">
@@ -696,7 +709,7 @@ function ScannerSession() {
           </section>
         ) : null}
       </section>
-    </main>
+    </ScannerFrame>
   );
 }
 

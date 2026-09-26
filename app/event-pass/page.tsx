@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { EventNavigation } from "@/components/event-navigation";
 import { EventPass } from "@/components/event-pass";
 import "./ticket.css";
 
@@ -16,7 +16,7 @@ export default async function EventPassPage() {
   return (
     <main className="ticket-page">
       <div className="ticket-page-inner">
-        <Link className="ticket-back" href="/">← Back to dashboard</Link>
+        <EventNavigation current="pass" />
         <EventPass />
       </div>
     </main>
