@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { UserButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { createApiClient, type CurrentUser } from "@/lib/api";
@@ -38,6 +38,7 @@ export function EventNavigation({ current }: { current: "scanner" | "pass" }) {
   const admin = user?.roles.includes("admin");
   const scanner = admin || user?.roles.includes("scanner");
   return (
+    <div className={styles.toolbar}>
     <nav className={styles.navigation} aria-label="Event navigation">
       {user && (admin || !scanner) ? (
         <Link className={styles.link} href={admin ? "/organizer/operations" : "/"}>
@@ -52,5 +53,13 @@ export function EventNavigation({ current }: { current: "scanner" | "pass" }) {
         <button className={styles.retry} type="button" onClick={() => { setFailedAccount(null); setAttempt((value) => value + 1); }}>Reload navigation</button>
       ) : null}
     </nav>
+    <div className={styles.account}>
+      <UserButton userProfileMode="modal" appearance={{ elements: {
+        userButtonTrigger: styles.accountTrigger,
+        avatarBox: styles.avatar,
+      } }} />
+      <span className={styles.accountLabel} aria-hidden="true">Account</span>
+    </div>
+    </div>
   );
 }

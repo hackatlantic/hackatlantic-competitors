@@ -1,8 +1,16 @@
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 20px;
+}
 .navigation {
   display: flex;
+  flex: 1;
+  min-width: 0;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 0 0 20px;
+  margin: 0;
   padding: 6px;
   border: 1px solid #b5dedc40;
   border-radius: 14px;
@@ -10,11 +18,11 @@
 }
 .link, .retry {
   display: flex;
-  flex: 1 1 100px;
+  flex: 1 1 80px;
   align-items: center;
   justify-content: center;
   min-height: 48px;
-  padding: 10px 16px;
+  padding: 10px;
   border: 0;
   border-radius: 9px;
   color: #e7f5f3;
@@ -28,3 +36,8 @@
 .link[aria-current="page"] { color: #102a32; background: #7ae4d7; }
 .link:focus-visible, .retry:focus-visible { outline: 3px solid #fcfdfb; outline-offset: -3px; }
 .retry { flex-basis: 100%; font-size: 13px; cursor: pointer; }
+.account { display: flex; flex: 0 0 48px; flex-direction: column; align-items: center; gap: 2px; }
+.accountTrigger { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-width: 44px; min-height: 44px; border-radius: 50%; }
+.accountTrigger:focus-visible { outline: 3px solid #7ae4d7; outline-offset: 2px; }
+.avatar { width: 32px; height: 32px; }
+.accountLabel { color: #e7f5f3; font: 550 11px/1.4 var(--font-body); }

@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api";
 const auth = vi.hoisted(() => ({ getToken: vi.fn(), isLoaded: true, userId: "scanner" as string | null }));
 const api = vi.hoisted(() => ({ getCurrentUser: vi.fn(), listScannerCheckpoints: vi.fn(), lookupScannerPass: vi.fn(), redeemScannerPass: vi.fn() }));
 const camera = vi.hoisted(() => ({ start: vi.fn(), stop: vi.fn(), capture: null as null | ((result: { getText: () => string }) => void) }));
-vi.mock("@clerk/nextjs", () => ({ useAuth: () => auth }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => auth, UserButton: () => <button aria-label="Open user menu" /> }));
 vi.mock("@/lib/api", async (original) => ({ ...(await original<typeof import("@/lib/api")>()), createApiClient: () => api }));
 vi.mock("@zxing/browser", () => ({ BrowserQRCodeReader: class { decodeFromConstraints = camera.start; } }));
 const point = { id: "entrance", name: "Main entrance" };
