@@ -41,9 +41,11 @@ const (
 // Config contains the server-only credential hashing material. The peppers are
 // never returned, stored in PostgreSQL, or included in errors.
 type Config struct {
-	QRTokenPepper    string
-	ClaimTokenPepper string
-	AppBaseURL       string
+	// Optional server-owned event end; defaults to Sep 27, 2026, 3 PM ADT.
+	StaffPassExpiresAt time.Time
+	QRTokenPepper      string
+	ClaimTokenPepper   string
+	AppBaseURL         string
 }
 
 // Pass is the safe pass projection. It intentionally has no bearer credential
@@ -92,6 +94,7 @@ type OrganizerSummary struct {
 }
 
 type Service struct {
+	staffPassExpiresAt time.Time
 	pool               *pgxpool.Pool
 	queryTimeout       time.Duration
 	transactionTimeout time.Duration
@@ -127,7 +130,12 @@ func NewService(pool *pgxpool.Pool, queryTimeout, transactionTimeout time.Durati
 		}
 		baseURL = parsed
 	}
+	staffExpiry := config.StaffPassExpiresAt
+	if staffExpiry.IsZero() {
+		staffExpiry = time.Date(2026, 9, 27, 18, 0, 0, 0, time.UTC)
+	}
 	return &Service{
+		staffPassExpiresAt: staffExpiry,
 		pool:               pool,
 		queryTimeout:       queryTimeout,
 		transactionTimeout: transactionTimeout,

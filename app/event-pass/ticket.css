@@ -21,6 +21,7 @@
 .ticket-logo { width: 72px; height: 72px; object-fit: cover; border-radius: 50%; }
 .ticket-attendee { display: grid; gap: 7px; padding-bottom: 22px; border-bottom: 1px solid #ffffff25; }
 .ticket-label, .ticket-details dt { color: #9fc2c4; font: 10px/1.5 var(--font-mono); text-transform: uppercase; letter-spacing: .11em; }
+.ticket-staff-badge { justify-self: start; margin-bottom: 7px; padding: 6px 12px; border-radius: 6px; background: #7ae4d7; color: #102b32; font: 750 16px/1.4 var(--font-body); text-transform: uppercase; letter-spacing: .07em; }
 .ticket-attendee strong { font: 600 22px/1.3 var(--font-body); overflow-wrap: anywhere; }
 .ticket-details { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 16px; margin: 22px 0 0; }
 .ticket-details dd { margin: 6px 0 0; color: #f4f5f1; font-size: 16px; line-height: 1.4; font-weight: 550; }

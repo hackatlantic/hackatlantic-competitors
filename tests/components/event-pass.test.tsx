@@ -5,7 +5,7 @@ import { ApplicantPass } from "@/components/applicant-pass";
 import { ApiError } from "@/lib/api";
 
 const auth = vi.hoisted(() => ({ getToken: vi.fn(), isLoaded: true, userId: "user-one" as string | null }));
-const api = vi.hoisted(() => ({ getAttendeePass: vi.fn() }));
+const api = vi.hoisted(() => ({ getAttendeePass: vi.fn(), ensureStaffPass: vi.fn() }));
 vi.mock("@clerk/nextjs", () => ({ useAuth: () => auth }));
 vi.mock("@/lib/api", async (original) => ({ ...(await original<typeof import("@/lib/api")>()), createApiClient: () => api }));
 const pass = { id: "pass-one", attendeeId: "attendee", displayName: "Test Attendee", status: "active", issuedAt: "2026-09-17T12:00:00Z", qrToken: "ha_qr_v1_test-ticket-not-a-real-credential" };
@@ -17,6 +17,7 @@ describe("Event pass", () => {
     auth.userId = "user-one";
     auth.isLoaded = true;
     api.getAttendeePass.mockResolvedValue(pass);
+    api.ensureStaffPass.mockRejectedValue(new ApiError(404, { code: "pass_not_found" }));
   });
 
   it("only links from the dashboard after confirming availability, without embedding a QR", async () => {
@@ -53,6 +54,22 @@ describe("Event pass", () => {
     expect(screen.getByText("Sat, Sep 26")).toBeTruthy();
     expect(screen.getByRole("img", { name: /QR code/ })).toBeTruthy();
     expect(screen.queryByText(pass.qrToken)).toBeNull();
+  });
+
+  it("automatically loads a named volunteer pass without an application", async () => {
+    api.ensureStaffPass.mockResolvedValue({ ...pass, kind: "volunteer", expiresAt: "2026-09-27T18:00:00Z" });
+    render(<EventPass />);
+    await screen.findByText("Volunteer");
+    expect(screen.getByText("Staff entry & overnight re-entry")).toBeTruthy();
+    expect(screen.getByText("Sun, Sep 27 · 3 PM ADT")).toBeTruthy();
+    expect(api.getAttendeePass).not.toHaveBeenCalled();
+  });
+
+  it("does not fall back to an attendee ticket when staff verification fails", async () => {
+    api.ensureStaffPass.mockRejectedValue(new ApiError(503, { code: "unavailable" }));
+    render(<EventPass />);
+    await screen.findByText("Let’s try that again.");
+    expect(api.getAttendeePass).not.toHaveBeenCalled();
   });
 
   it("shows no ticket for an unissued pass and supports checking again", async () => {

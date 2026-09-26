@@ -54,6 +54,36 @@ describe("Volunteer check-in", () => {
     expect((button as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("verifies re-entry without offering or recording a redemption", async () => {
+    render(<ScannerWorkflow />);
+    await screen.findByRole("button", { name: "Scan ticket" });
+    fireEvent.change(screen.getByLabelText("What are you scanning for?"), { target: { value: "verify" } });
+    await scan();
+    await screen.findByRole("heading", { name: "Valid entry pass" });
+    expect(screen.queryByRole("button", { name: /Confirm Main entrance/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Scan next pass" }));
+    await waitFor(() => expect(camera.start).toHaveBeenCalledTimes(2));
+    await act(async () => camera.capture!({ getText: () => token }));
+    await screen.findByRole("heading", { name: "Valid entry pass" });
+    expect(api.lookupScannerPass).toHaveBeenCalledTimes(2);
+    expect(api.redeemScannerPass).not.toHaveBeenCalled();
+  });
+
+  it.each(["volunteer", "organizer"])("never consumes check-in or meals for a %s staff pass", async (kind) => {
+    api.lookupScannerPass.mockResolvedValue({ attendee: { displayName: "Test Staff" }, pass: { status: "active", kind } });
+    render(<ScannerWorkflow />); await scan();
+    await screen.findByRole("heading", { name: "Valid entry pass" });
+    expect(screen.queryByRole("button", { name: "Confirm Main entrance" })).toBeNull();
+    expect(api.redeemScannerPass).not.toHaveBeenCalled();
+  });
+
+  it("supports verification even before check-in or meals are configured", async () => {
+    api.listScannerCheckpoints.mockResolvedValue({ items: [], nextCursor: null });
+    render(<ScannerWorkflow />); await scan();
+    await screen.findByRole("heading", { name: "Valid entry pass" });
+    expect(api.redeemScannerPass).not.toHaveBeenCalled();
+  });
+
   it("allows manual verification and prevents repeat clicks while recording", async () => {
     let complete!: (value: unknown) => void;
     api.redeemScannerPass.mockReturnValue(new Promise((resolve) => { complete = resolve; }));

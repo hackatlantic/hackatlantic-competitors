@@ -136,7 +136,7 @@ func disposableDatabase(t *testing.T, ctx context.Context) (*pgxpool.Pool, func(
 func assertSchemaBoundary(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
 	tables := []string{"users", "user_roles", "admin_email_allowlist", "application_cycles", "application_forms", "applications", "application_answers", "application_resumes", "review_assignments", "reviews", "decisions", "attendance_responses", "attendees", "attendee_roles", "passes", "activities", "checkpoints", "attendee_entitlements", "redemption_requests", "redemptions", "audit_events", "email_outbox"}
-	tables = append(tables, "volunteer_requests")
+	tables = append(tables, "volunteer_requests", "staff_passes")
 	var atsCount, publicCount, ledgerCount int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.tables WHERE table_schema = 'ats' AND table_name = ANY($1)`, tables).Scan(&atsCount); err != nil {
 		t.Fatalf("count ATS tables: %v", err)
@@ -147,7 +147,7 @@ func assertSchemaBoundary(t *testing.T, ctx context.Context, pool *pgxpool.Pool)
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM ats.schema_migrations WHERE checksum IS NOT NULL`).Scan(&ledgerCount); err != nil {
 		t.Fatalf("inspect migration ledger: %v", err)
 	}
-	if atsCount != len(tables) || publicCount != 0 || ledgerCount != 15 {
+	if atsCount != len(tables) || publicCount != 0 || ledgerCount != 16 {
 		t.Fatalf("unexpected schema boundary: ats=%d public=%d checksummed=%d", atsCount, publicCount, ledgerCount)
 	}
 

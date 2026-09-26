@@ -159,6 +159,7 @@ func main() {
 			durationEnv("DATABASE_TRANSACTION_TIMEOUT", 15*time.Second),
 		),
 		Passes:           passService,
+		StaffPasses:      passService,
 		RSVPs:            rsvps.NewService(pool.Pool, durationEnv("DATABASE_QUERY_TIMEOUT", 5*time.Second), durationEnv("DATABASE_TRANSACTION_TIMEOUT", 15*time.Second)),
 		Checkpoints:      checkpointService,
 		Redemptions:      redemptionService,

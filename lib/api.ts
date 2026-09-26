@@ -200,6 +200,11 @@ export type PassIssuance = AttendeePass & {
   claimUrl: string;
 };
 
+export type StaffEventPass = Omit<AuthenticatedAttendeePass, "attendeeId"> & {
+  kind: "organizer" | "volunteer";
+  expiresAt: string;
+};
+
 export type OrganizerAttendeePass = {
   attendeeId: string;
   pass: AttendeePass | null;
@@ -221,6 +226,7 @@ export type ScannerAttendee = {
 
 export type ScannerPassVerification = {
   status: "active" | "revoked";
+  kind?: "organizer" | "volunteer";
 };
 
 export type ScannerLookupRequest = {
@@ -507,6 +513,7 @@ export type ApiClient = {
   ): Promise<OrganizerApplicationListResponse>;
   getOrganizerApplication(applicationId: string): Promise<OrganizerApplication>;
   getAttendeePass(): Promise<AuthenticatedAttendeePass>;
+  ensureStaffPass(): Promise<StaffEventPass>;
   issueAttendeePass(attendeeId: string): Promise<PassIssuance>;
   revokeAttendeePass(passId: string): Promise<AttendeePass>;
   reissueAttendeePass(passId: string): Promise<PassIssuance>;
@@ -772,6 +779,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request<OrganizerApplication>(`/v1/admin/applications/${applicationId}`),
     getAttendeePass: () =>
       request<AuthenticatedAttendeePass>("/v1/attendee/pass"),
+    ensureStaffPass: () => request<StaffEventPass>("/v1/staff/pass", { method: "POST" }),
     issueAttendeePass: (attendeeId) =>
       request<PassIssuance>(`/v1/admin/attendees/${attendeeId}/passes`, {
         method: "POST",

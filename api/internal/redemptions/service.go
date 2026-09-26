@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/entitlements"
+	"github.com/hackatlantic/hackatlantic-competitors/api/internal/passes"
 	"github.com/hackatlantic/hackatlantic-competitors/api/internal/users"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -52,6 +53,7 @@ type Attendee struct {
 
 type Pass struct {
 	Status string `json:"status"`
+	Kind   string `json:"kind,omitempty"`
 }
 
 type Checkpoint struct {
@@ -123,6 +125,17 @@ func (s *Service) Lookup(ctx context.Context, actor users.User, qrToken string) 
 		  AND application.status = 'accepted'
 		  AND application.decision_released_at IS NOT NULL`, qrHash).Scan(&displayName, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
+		if staff, ok := s.qrTokenHasher.(interface {
+			VerifyStaffPass(context.Context, []byte) (string, string, error)
+		}); ok {
+			name, kind, staffErr := staff.VerifyStaffPass(ctx, qrHash)
+			if staffErr == nil {
+				return Lookup{Attendee: Attendee{DisplayName: name}, Pass: Pass{Status: "active", Kind: kind}}, nil
+			}
+			if !errors.Is(staffErr, passes.ErrNotFound) {
+				return Lookup{}, fmt.Errorf("resolve staff pass: %w", staffErr)
+			}
+		}
 		return Lookup{}, ErrNotFound
 	}
 	if err != nil {
