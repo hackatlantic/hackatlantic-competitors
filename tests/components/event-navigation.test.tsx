@@ -4,7 +4,8 @@ import { EventNavigation } from "@/components/event-navigation";
 
 const auth = vi.hoisted(() => ({ getToken: vi.fn(), userId: "volunteer" as string | null, isLoaded: true }));
 const api = vi.hoisted(() => ({ getCurrentUser: vi.fn() }));
-vi.mock("@clerk/nextjs", () => ({ useAuth: () => auth }));
+const account = vi.hoisted(() => ({ render: vi.fn() }));
+vi.mock("@clerk/nextjs", () => ({ useAuth: () => auth, UserButton: (props: unknown) => { account.render(props); return <button aria-label="Open user menu" />; } }));
 vi.mock("@/lib/api", () => ({ createApiClient: () => api }));
 
 describe("Event navigation", () => {
@@ -22,6 +23,8 @@ describe("Event navigation", () => {
     expect(screen.getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/scanner", "/event-pass"]);
     expect(screen.getByRole("link", { name: current === "scanner" ? "Scanner" : "My pass" }).getAttribute("aria-current")).toBe("page");
     expect(screen.queryByRole("link", { name: /dashboard/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open user menu" })).toBeTruthy();
+    expect(account.render).toHaveBeenCalledWith(expect.objectContaining({ userProfileMode: "modal" }));
   });
 
   it("does not flash a dashboard link before roles resolve", async () => {
@@ -29,6 +32,7 @@ describe("Event navigation", () => {
     api.getCurrentUser.mockReturnValue(new Promise((done) => { resolve = done; }));
     render(<EventNavigation current="pass" />);
     expect(screen.queryByRole("link", { name: /dashboard/i })).toBeNull();
+    expect(screen.getByRole("button", { name: "Open user menu" })).toBeTruthy();
     await act(async () => resolve({ roles: ["scanner"] }));
     expect(screen.getByRole("link", { name: "Scanner" }).getAttribute("href")).toBe("/scanner");
     expect(screen.queryByRole("link", { name: /dashboard/i })).toBeNull();
@@ -51,7 +55,9 @@ describe("Event navigation", () => {
   it("offers recovery when role lookup fails, without guessing a dashboard destination", async () => {
     api.getCurrentUser.mockRejectedValueOnce(new Error("Offline"));
     render(<EventNavigation current="pass" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Reload navigation" }));
+    const retry = await screen.findByRole("button", { name: "Reload navigation" });
+    expect(screen.getByRole("button", { name: "Open user menu" })).toBeTruthy();
+    fireEvent.click(retry);
     await screen.findByRole("link", { name: "Scanner" });
     expect(screen.queryByRole("link", { name: /dashboard/i })).toBeNull();
     expect(api.getCurrentUser).toHaveBeenCalledTimes(2);
@@ -72,6 +78,7 @@ describe("Event navigation", () => {
     auth.userId = null;
     render(<EventNavigation current="pass" />);
     expect(screen.queryByRole("navigation")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open user menu" })).toBeNull();
     expect(api.getCurrentUser).not.toHaveBeenCalled();
   });
 });
