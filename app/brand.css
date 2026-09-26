@@ -132,6 +132,7 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
   margin: 0;
   padding: 0 clamp(16px, 4vw, 56px) 28px;
@@ -142,6 +143,12 @@ textarea:focus-visible {
     linear-gradient(100deg, rgb(3 14 25 / 62%) 0%, rgb(4 21 32 / 35%) 54%, rgb(3 14 25 / 58%) 100%),
     url("/hackatlantic-underwater.png") center / cover fixed;
   box-shadow: none;
+}
+
+/* Fill spare viewport space without pinning the footer over longer content. */
+.page.portal-page > .legal-footer {
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .portal-page::before,
@@ -976,6 +983,7 @@ input[type="checkbox"] {
   .page.portal-page {
     width: 100%;
     min-height: 100vh;
+    min-height: 100dvh;
     margin: 0;
     padding: 0 12px 18px;
     border: 0;
