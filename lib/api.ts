@@ -558,7 +558,7 @@ export type ApiClient = {
   listOrganizerRedemptionCounts(): Promise<OrganizerRedemptionCountsResponse>;
   getOrganizerAttendanceSummary(): Promise<OrganizerAttendanceSummary>;
   enableOrganizerEntrance(cycleId: string): Promise<OrganizerCheckpoint>;
-  listOrganizerRedemptions(): Promise<OrganizerRedemptionListResponse>;
+  listOrganizerRedemptions(filters?: { checkpointId?: string; limit?: number }): Promise<OrganizerRedemptionListResponse>;
   downloadOrganizerAttendanceCsv(
     filters?: OrganizerExportFilters,
   ): Promise<OrganizerCsvDownload>;
@@ -865,8 +865,12 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       request<OrganizerRedemptionCountsResponse>("/v1/admin/redemptions/counts"),
     getOrganizerAttendanceSummary: () => request<OrganizerAttendanceSummary>("/v1/admin/attendance-summary"),
     enableOrganizerEntrance: (cycleId) => request<OrganizerCheckpoint>("/v1/admin/check-in/entrance", { method: "POST", body: JSON.stringify({ cycleId }) }),
-    listOrganizerRedemptions: () =>
-      request<OrganizerRedemptionListResponse>("/v1/admin/redemptions"),
+    listOrganizerRedemptions: (filters = {}) => {
+      const query = new URLSearchParams();
+      if (filters.checkpointId) query.set("checkpointId", filters.checkpointId);
+      if (filters.limit !== undefined) query.set("limit", String(filters.limit));
+      return request<OrganizerRedemptionListResponse>(`/v1/admin/redemptions${query.size ? `?${query}` : ""}`);
+    },
     downloadOrganizerAttendanceCsv: (filters) =>
       downloadCsv(organizerExportPath("attendance.csv", filters)),
     downloadOrganizerReconciliationCsv: (filters) =>

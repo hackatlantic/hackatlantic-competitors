@@ -19,7 +19,7 @@ describe("Simple check-in dashboard", () => {
   beforeEach(() => { vi.resetAllMocks(); api.listOrganizerRedemptions.mockResolvedValue({ items: [] }); api.getOrganizerAttendanceSummary.mockResolvedValue({ cycleId: "cycle", cycleName: "Hack Atlantic", confirmedRsvps: 30 }); api.enableOrganizerEntrance.mockResolvedValue(checkpoint); });
 
   it("shows attendance, scanner, volunteers and search without setup or exports", async () => {
-    show(); await screen.findByText(/No recent check-ins for Main entrance/);
+    show(); await screen.findByText(/No check-ins recorded for Main entrance/);
     expect(screen.getByRole("link", { name: "Open scanner" }).getAttribute("href")).toBe("/scanner");
     expect(screen.getByRole("link", { name: "Manage volunteers" }).getAttribute("href")).toBe("/organizer/reviewers");
     expect(screen.getByRole("heading", { name: "Find an attendee" })).toBeTruthy();
@@ -43,7 +43,7 @@ describe("Simple check-in dashboard", () => {
     show(); await screen.findByRole("alert");
     expect(screen.getByRole("link", { name: "Open scanner" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
-    await screen.findByText(/No recent check-ins/);
+    await screen.findByText(/No check-ins recorded/);
     expect(router.refresh).toHaveBeenCalledOnce();
     expect(api.listOrganizerRedemptions).toHaveBeenCalledTimes(2);
   });
@@ -103,7 +103,7 @@ describe("Simple check-in dashboard", () => {
     render(<OrganizerEventOperations initialCheckpoints={[]} initialCounts={[]} />);
     const button = await screen.findByRole("button", { name: "Enable entrance check-in" });
     fireEvent.click(button); fireEvent.click(button);
-    await screen.findByText(/No recent check-ins for Main entrance/);
+    await screen.findByText(/No check-ins recorded for Main entrance/);
     expect(api.enableOrganizerEntrance).toHaveBeenCalledExactlyOnceWith("cycle");
     expect(router.refresh).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: "Enable entrance check-in" })).toBeNull();

@@ -1412,7 +1412,7 @@ input[type="checkbox"] {
 .check-in-setup { display: grid; justify-items: start; gap: 16px; padding: 24px; border: 1px solid var(--brand-line); border-radius: 16px; background: white; }
 .check-in-setup p { margin: 0; }
 .check-in-setup .button { min-height: 48px; max-width: 100%; white-space: normal; }
-.check-in-selection select, .check-in-search input { width: 100%; min-width: 0; min-height: 48px; padding: 12px 14px; background: white; color: var(--brand-navy); border: 1px solid var(--brand-line); border-radius: 10px; font: inherit; }
+.check-in-selection select, .check-in-selection input, .check-in-search input { width: 100%; min-width: 0; min-height: 48px; padding: 12px 14px; background: white; color: var(--brand-navy); border: 1px solid var(--brand-line); border-radius: 10px; font: inherit; }
 .check-in-count-note { margin: -12px 0 0; font-size: 0.88rem; }
 .check-in-search, .check-in-recent { display: grid; gap: 16px; border-top: 1px solid var(--brand-line); padding-top: 24px; min-width: 0; }
 .check-in-search form { display: grid; gap: 8px; }
@@ -1477,6 +1477,8 @@ input[type="checkbox"] {
 }
 .operations-advanced summary:focus-visible, .scanner-manual summary:focus-visible { outline: 3px solid var(--brand-teal-dark); outline-offset: 4px; }
 @media (max-width: 600px) {
+  .check-in-recent .operations-section-heading { flex-wrap: wrap; gap: 12px; }
+  .event-day-recent li { align-items: flex-start; flex-direction: column; gap: 6px; }
   .event-day-stats { gap: 10px; }
   .event-day-stats > div { padding: 16px; }
   .check-in-actions { gap: 12px; }
