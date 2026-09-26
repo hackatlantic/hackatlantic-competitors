@@ -34,6 +34,7 @@ export function StaffPageFrame({
           <Link href="/organizer/reviewers"><span>03</span>Access</Link>
           <Link href="/organizer/operations"><span>04</span>Check-in</Link>
           <Link href="/scanner"><span>05</span>Scanner</Link>
+          <Link href="/event-pass"><span>06</span>My event pass</Link>
         </nav>
         <Link className="staff-home-link" href="/">← Applicant view</Link>
       </aside>

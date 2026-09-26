@@ -77,6 +77,7 @@ POST   /v1/admin/passes/{passId}/revoke
 POST   /v1/admin/passes/{passId}/reissue
 
 GET    /v1/attendee/pass
+POST   /v1/staff/pass
 GET    /v1/claim/{claimToken}
 GET    /v1/claim/{claimToken}/apple-wallet
 POST   /v1/claim/{claimToken}/google-wallet

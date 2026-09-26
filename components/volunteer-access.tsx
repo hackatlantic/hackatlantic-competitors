@@ -40,7 +40,7 @@ export function VolunteerSignup() {
   return <div className="volunteer-step">
     {error && <p className="error-message" role="alert">{error}</p>}
     {!access ? <><p role="status">{busy ? "Checking your account…" : "We couldn’t load your access status."}</p><button className="button secondary" disabled={busy} onClick={() => void load()}>Try again</button></> :
-      access.scannerAccess ? <><h2>You’re ready to scan</h2><p>Choose check-in or a meal in the scanner, then scan and confirm each attendee.</p><Link className="button primary" href="/scanner">Open scanner</Link></> :
+      access.scannerAccess ? <><h2>You’re ready to scan</h2><p>Choose check-in or a meal in the scanner, then scan and confirm each attendee. Approved volunteers also have a named staff pass for entry and overnight re-entry.</p><div className="actions"><Link className="button primary" href="/scanner">Open scanner</Link><Link className="button secondary" href="/event-pass">My event pass</Link></div></> :
       request ? <>
         <h2>{request.status === "pending" ? "Request sent" : "Contact your volunteer lead"}</h2>
         <p role="status">{request.status === "pending" ? `Thanks, ${request.realName}. An admin needs to approve your scanner access.` : "Scanner access is not active for this account. Ask your lead in Discord if you need help."}</p>

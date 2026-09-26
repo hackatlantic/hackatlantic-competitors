@@ -221,7 +221,7 @@ function ScannerSession() {
         if (!cancelled) {
           setCheckpoints(nextCheckpoints);
           setCheckpointId((current) => nextCheckpoints.some((point) => point.id === current)
-            ? current : nextCheckpoints.length === 1 ? nextCheckpoints[0].id : "");
+            ? current : nextCheckpoints.length === 0 ? "verify" : nextCheckpoints.length === 1 ? nextCheckpoints[0].id : "");
           setCheckpointLoadState(nextCheckpoints.length === 0 ? "empty" : "ready");
         }
       } catch (nextError) {
@@ -246,6 +246,8 @@ function ScannerSession() {
 
   const activeCheckpoint =
     checkpoints.find((checkpoint) => checkpoint.id === checkpointId) ?? null;
+  const verificationOnly = checkpointId === "verify" || Boolean(lookup?.response.pass.kind);
+  const canScan = checkpointId === "verify" || Boolean(activeCheckpoint);
   const busy = pendingAction !== null;
 
   const clearTransientState = () => {
@@ -305,6 +307,8 @@ function ScannerSession() {
   };
 
   const handleCheckpointChange = (value: string) => {
+    stopCamera();
+    clearCredentialState();
     setCheckpointId(value);
     setRetryableRedemption(null);
     clearTransientState();
@@ -410,7 +414,7 @@ function ScannerSession() {
       return;
     }
 
-    if (!activeCheckpoint) {
+    if (!activeCheckpoint || verificationOnly) {
       setError({ message: "Choose what you’re scanning for first.", retryable: false });
       return;
     }
@@ -520,18 +524,6 @@ function ScannerSession() {
     );
   }
 
-  if (checkpointLoadState === "empty") {
-    return (
-      <main className="scanner-page">
-        <section className="scanner-panel scanner-state" aria-live="polite">
-          <p className="eyebrow">Scanner</p>
-          <h1>Scanning isn’t available yet</h1>
-          <p>Ask the event lead to enable scanning, then reload this page.</p>
-        </section>
-      </main>
-    );
-  }
-
   return (
     <main className="scanner-page">
       <section className="scanner-panel" aria-labelledby="scanner-heading">
@@ -539,8 +531,9 @@ function ScannerSession() {
           ← Back to dashboard
         </Link>
         <h1 id="scanner-heading">Scan tickets</h1>
+        <Link className="staff-link" href="/event-pass">My event pass</Link>
         <p className="scanner-summary">
-          Choose once. Scan a ticket, check the name, and confirm.
+          Choose check-in or a meal to record attendance. For returning guests, choose Verify pass / re-entry; it only checks validity.
         </p>
 
         <form className="scanner-form" hidden={Boolean(lookup) || Boolean(result)} onSubmit={handleLookup}>
@@ -553,6 +546,7 @@ function ScannerSession() {
               value={checkpointId}
             >
               <option value="">Choose entrance or a meal</option>
+              <option value="verify">Verify pass / re-entry</option>
               {checkpoints.map((checkpoint) => (
                 <option key={checkpoint.id} value={checkpoint.id}>
                   {checkpoint.name}
@@ -578,7 +572,7 @@ function ScannerSession() {
               ) : (
                 <button
                   className="button primary"
-                  disabled={busy || Boolean(lookup) || Boolean(result) || !activeCheckpoint}
+                  disabled={busy || Boolean(lookup) || Boolean(result) || !canScan}
                   onClick={() => void handleStartCamera()}
                   type="button"
                 >
@@ -608,7 +602,7 @@ function ScannerSession() {
             <p id="scanner-qr-help" className="scanner-help">
               Paste the code from a QR reader. This is not the attendee’s email.
             </p>
-            <button className="button secondary" disabled={busy || !activeCheckpoint} type="submit">
+            <button className="button secondary" disabled={busy || !canScan} type="submit">
               {pendingAction === "lookup" ? "Verifying…" : "Verify code"}
             </button>
             </details>
@@ -640,15 +634,16 @@ function ScannerSession() {
               key={`lookup-${lookup.qrToken}`}
               aria-live="polite"
             >
-              <h2>Ready to confirm</h2>
+              <h2>{verificationOnly ? "Valid entry pass" : "Ready to confirm"}</h2>
+              {verificationOnly ? <p><strong>{lookup.response.attendee.displayName}</strong> · {lookup.response.pass.kind === "organizer" ? "Organizer" : lookup.response.pass.kind === "volunteer" ? "Volunteer" : "Attendee"}. Check the name before admitting. No check-in or meal has been recorded.</p> :
               <p>
                 <strong>{lookup.response.attendee.displayName}</strong> · {activeCheckpoint?.name || "Choose what to scan for"}.
                 {activeCheckpoint
                   ? " Check the name, then confirm. This scan hasn’t been recorded yet."
                   : " Choose what you’re scanning for to continue."}
-              </p>
+              </p>}
               <div className="scanner-actions">
-              <button
+              {!verificationOnly && <button
                 ref={confirmRef}
                 className="button primary"
                 disabled={busy || !activeCheckpoint}
@@ -660,8 +655,8 @@ function ScannerSession() {
                   : activeCheckpoint
                     ? `Confirm ${activeCheckpoint.name}`
                     : "Choose what to scan for"}
-              </button>
-                <button className="button secondary" type="button" disabled={busy} onClick={handleScanAnother}>Cancel and scan another</button>
+              </button>}
+                <button className="button secondary" type="button" disabled={busy} onClick={handleScanAnother}>{verificationOnly ? "Scan next pass" : "Cancel and scan another"}</button>
               </div>
             </motion.section>
           ) : null}
