@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ApiError, createApiClient, type OrganizerAttendanceSummary, type OrganizerCheckpoint, type OrganizerRedemption, type OrganizerRedemptionCount } from "@/lib/api";
+import { ApiError, createApiClient, type OrganizerAttendanceSummary, type OrganizerCheckpoint, type OrganizerRedemptionCount } from "@/lib/api";
+import { CheckpointAttendance } from "@/components/checkpoint-attendance";
 
 export function CheckInOverview({ checkpoints: initialCheckpoints, counts, onRefresh, children }: {
   checkpoints: OrganizerCheckpoint[];
@@ -21,11 +22,9 @@ export function CheckInOverview({ checkpoints: initialCheckpoints, counts, onRef
   const setupBusy = useRef(false);
   const checkpoints = summary ? [...initialCheckpoints, ...(added && !initialCheckpoints.some((point) => point.id === added.id) ? [added] : [])].filter((point) => point.cycleId === summary.cycleId) : [];
   const [selection, setSelection] = useState("");
-  // Never guess which configured activity represents entrance attendance.
-  const selected = checkpoints.find((point) => point.id === selection) ?? (checkpoints.length === 1 ? checkpoints[0] : null);
+  // Only the explicit entrance slug is a safe default when meals also exist.
+  const selected = checkpoints.find((point) => point.id === selection) ?? checkpoints.find((point) => point.slug === "main-entrance") ?? (checkpoints.length === 1 ? checkpoints[0] : null);
   const count = counts.find((item) => item.checkpointId === selected?.id);
-  const [recent, setRecent] = useState<OrganizerRedemption[] | null>(null);
-  const [error, setError] = useState(false);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
@@ -60,15 +59,6 @@ export function CheckInOverview({ checkpoints: initialCheckpoints, counts, onRef
     } finally { setupBusy.current = false; setEnabling(false); }
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    void client.listOrganizerRedemptions().then((data) => {
-      if (!cancelled) { setRecent(data.items); setError(false); }
-    }).catch(() => { if (!cancelled) setError(true); });
-    return () => { cancelled = true; };
-  }, [client, reload, counts]);
-
-  const rows = selected ? (recent ?? []).filter((row) => row.checkpoint.id === selected.id).slice(0, 5) : [];
   return (
     <div className="check-in-overview">
       <div className="check-in-actions">
@@ -104,20 +94,8 @@ export function CheckInOverview({ checkpoints: initialCheckpoints, counts, onRef
 
       {children}
 
-      <section className="check-in-recent" aria-labelledby="recent-check-ins-heading">
-        <div className="operations-section-heading">
-          <h2 id="recent-check-ins-heading">Recent check-ins</h2>
-          <button type="button" className="button secondary" onClick={() => { setRecent(null); setError(false); setReload((value) => value + 1); onRefresh(); }}>Refresh</button>
-        </div>
-        {error ? <p role="alert">We couldn’t load recent check-ins. Please refresh.</p>
-          : !selected ? <p className="staff-muted">{checkpoints.length ? "Choose what to view above." : "Recent check-ins will appear here."}</p>
-            : recent === null ? <p role="status">Loading check-ins…</p>
-              : rows.length === 0 ? <p className="staff-muted">No recent check-ins for {selected.name}.</p>
-                : <ul className="event-day-recent">{rows.map((row) => (
-                  <li key={row.id}><strong>{row.attendee.displayName}</strong><time dateTime={row.redeemedAt}>{new Date(row.redeemedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time></li>
-                ))}</ul>}
-        {rows.length > 0 && !error ? <p className="staff-muted check-in-count-note">Recent activity, not a complete attendance list.</p> : null}
-      </section>
+      <CheckpointAttendance key={selected?.id ?? "none"} checkpoint={selected} refreshKey={reload}
+        onRefresh={() => { setReload((value) => value + 1); onRefresh(); }} />
     </div>
   );
 }

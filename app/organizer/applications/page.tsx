@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { formatRSVPTime, isLateRSVP } from "@/lib/rsvp-deadline";
 import {
   ApiError,
   createApiClient,
@@ -30,8 +31,9 @@ export default async function OrganizerApplicationsPage({
   }
 
   const query = await searchParams;
+  const lateRSVPOnly = query.rsvp === "confirmed-late";
   const filters: OrganizerApplicationFilters = {
-    ...(query.rsvp === "pending" || query.rsvp === "confirmed" || query.rsvp === "declined"
+    ...(lateRSVPOnly ? { rsvp: "confirmed" as const } : query.rsvp === "pending" || query.rsvp === "confirmed" || query.rsvp === "declined"
       ? { rsvp: query.rsvp } : {}),
     ...(query.q ? { q: query.q } : {}),
     ...(query.status === "submitted" ||
@@ -70,6 +72,12 @@ export default async function OrganizerApplicationsPage({
     );
   }
 
+  // The organizer endpoint returns the full authorized result set (no pagination).
+  // Filter on the server, before computing counts or rendering applicant data.
+  const visibleApplications = lateRSVPOnly
+    ? applications.items.filter((item) => item.status === "accepted" && isLateRSVP(item.rsvp))
+    : applications.items;
+
   return (
     <StaffPageFrame
       eyebrow="Admin workspace"
@@ -82,15 +90,15 @@ export default async function OrganizerApplicationsPage({
       </p>
 
       <div className="staff-metrics" aria-label="Application queue summary">
-        <div><span>Visible records</span><strong>{applications.items.length.toString().padStart(2, "0")}</strong></div>
-        <div><span>Awaiting decision</span><strong>{applications.items.filter((item) => item.status === "submitted").length.toString().padStart(2, "0")}</strong></div>
+        <div><span>Visible records</span><strong>{visibleApplications.length.toString().padStart(2, "0")}</strong></div>
+        <div><span>Awaiting decision</span><strong>{visibleApplications.filter((item) => item.status === "submitted").length.toString().padStart(2, "0")}</strong></div>
         <div><span>Current scope</span><strong className="metric-word">{filters.status ?? "All"}</strong></div>
       </div>
 
       <div className="rsvp-summary" aria-label="RSVP counts in the displayed results">
-        <span><strong>{applications.items.filter((item) => item.rsvp?.status === "confirmed").length}</strong> confirmed</span>
-        <span><strong>{applications.items.filter((item) => item.rsvp?.status === "pending").length}</strong> awaiting RSVP</span>
-        <span><strong>{applications.items.filter((item) => item.rsvp?.status === "declined").length}</strong> not attending</span>
+        <span><strong>{visibleApplications.filter((item) => item.rsvp?.status === "confirmed").length}</strong> confirmed</span>
+        <span><strong>{visibleApplications.filter((item) => item.rsvp?.status === "pending").length}</strong> awaiting RSVP</span>
+        <span><strong>{visibleApplications.filter((item) => item.rsvp?.status === "declined").length}</strong> not attending</span>
         <small>Released acceptances in the displayed results; not check-in totals.</small>
       </div>
 
@@ -121,10 +129,11 @@ export default async function OrganizerApplicationsPage({
         </div>
         <div className="staff-filter">
           <label htmlFor="application-rsvp">RSVP</label>
-          <select defaultValue={filters.rsvp ?? ""} id="application-rsvp" name="rsvp">
+          <select defaultValue={lateRSVPOnly ? "confirmed-late" : filters.rsvp ?? ""} id="application-rsvp" name="rsvp" aria-describedby={lateRSVPOnly ? "rsvp-deadline-help" : undefined}>
             <option value="">All responses</option>
             <option value="pending">Awaiting RSVP</option>
             <option value="confirmed">Confirmed</option>
+            <option value="confirmed-late">Confirmed after Sep 22</option>
             <option value="declined">Not attending</option>
           </select>
         </div>
@@ -133,13 +142,21 @@ export default async function OrganizerApplicationsPage({
         </button>
       </form>
 
-      {applications.items.length === 0 ? (
+      {lateRSVPOnly ? (
+        <p className="staff-summary" id="rsvp-deadline-help">
+          Showing confirmed RSVPs from September 23, 2026 at 12:00 AM ADT onward,
+          after the Tuesday, September 22 deadline. Uses the latest RSVP response;
+          late reconfirmations are included. This filter does not change attendance or passes.
+        </p>
+      ) : null}
+
+      {visibleApplications.length === 0 ? (
         <StaffEmptyState title="No applications found">
-          Try a different search or status filter.
+          Try a different search, status, or RSVP filter.
         </StaffEmptyState>
       ) : (
         <ul className="staff-list">
-          {applications.items.map((application) => (
+          {visibleApplications.map((application) => (
             <li key={application.id}>
               <span className="staff-row-index" aria-hidden="true">{application.id.slice(0, 4)}</span>
               <div className="staff-row-primary">
@@ -155,6 +172,12 @@ export default async function OrganizerApplicationsPage({
                 {application.rsvp ? (
                   <p className={`rsvp-status rsvp-${application.rsvp.status}`}>
                     RSVP: <strong>{application.rsvp.status === "confirmed" ? "Confirmed" : application.rsvp.status === "declined" ? "Not attending" : "Awaiting response"}</strong>
+                  </p>
+                ) : null}
+                {application.rsvp?.status !== "pending" && formatRSVPTime(application.rsvp?.respondedAt) ? (
+                  <p className="staff-row-meta">
+                    Latest RSVP: <time dateTime={application.rsvp?.respondedAt}>{formatRSVPTime(application.rsvp?.respondedAt)}</time>
+                    {isLateRSVP(application.rsvp) ? " · After Sep 22 deadline" : ""}
                   </p>
                 ) : null}
               </div>
