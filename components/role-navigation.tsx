@@ -1,12 +1,9 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
 import {
-  createApiClient,
   type CurrentUser,
   type CurrentUserRole,
 } from "@/lib/api";
@@ -24,35 +21,8 @@ const workspaceLinks: WorkspaceLink[] = [
   { code: "SCN", href: "/scanner", label: "Scanner", role: "scanner" },
 ];
 
-export function RoleNavigation() {
+export function RoleNavigation({ currentUser, hasApplication }: { currentUser: CurrentUser; hasApplication: boolean }) {
   const pathname = usePathname();
-  const { getToken } = useAuth();
-  const client = useMemo(() => createApiClient({ getToken }), [getToken]);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadCurrentUser = async () => {
-      try {
-        const user = await client.getCurrentUser();
-        if (!cancelled) {
-          setCurrentUser(user);
-        }
-      } catch {
-        // ApplicantDashboard surfaces API errors; keep navigation unobtrusive.
-      }
-    };
-
-    void loadCurrentUser();
-    return () => {
-      cancelled = true;
-    };
-  }, [client]);
-
-  if (!currentUser) {
-    return null;
-  }
 
   const roles = new Set(currentUser.roles);
   const availableLinks = workspaceLinks.filter(
@@ -64,8 +34,11 @@ export function RoleNavigation() {
   }
 
   const visibleLinks = [
-    { code: "APL", href: "/", label: "My application" },
+    ...(hasApplication || roles.has("admin") || !roles.has("scanner")
+      ? [{ code: "APL", href: "/", label: "My application" }]
+      : []),
     ...availableLinks,
+    { code: "PASS", href: "/event-pass", label: "My event pass" },
   ];
   const activeLink = visibleLinks.find(({ href }) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href),
@@ -94,7 +67,7 @@ export function RoleNavigation() {
                   transition={{ type: "spring", stiffness: 420, damping: 34 }}
                 />
               ) : null}
-              <small>{code}</small>
+              <small aria-hidden="true">{code}</small>
               <span>{label}</span>
             </Link>
           );

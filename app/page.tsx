@@ -5,8 +5,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import Image from "next/image";
-import { ApplicantDashboard } from "@/components/applicant-dashboard";
-import { RoleNavigation } from "@/components/role-navigation";
+import { SignedInHome } from "@/components/signed-in-home";
 import { BrandMark } from "@/components/brand-mark";
 import { LegalFooter } from "@/components/legal-footer";
 
@@ -70,8 +69,7 @@ export default function Home() {
 
       <Show when="signed-in">
         <div className="signed-in-home portal-workspace">
-          <RoleNavigation />
-          <ApplicantDashboard />
+          <SignedInHome />
         </div>
       </Show>
 
