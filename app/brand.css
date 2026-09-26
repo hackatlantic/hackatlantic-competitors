@@ -314,6 +314,8 @@ textarea:focus-visible {
 
 .signed-in-home.portal-workspace {
   display: grid;
+  align-content: start;
+  min-width: 0;
   flex: 1;
   gap: 1.25rem;
   width: min(1180px, 100%);
@@ -323,6 +325,8 @@ textarea:focus-visible {
 }
 
 .workspace-switcher {
+  margin-bottom: 0;
+  align-self: start;
   overflow: hidden;
   border: 1px solid rgb(219 249 245 / 28%);
   border-radius: 14px;
@@ -333,6 +337,7 @@ textarea:focus-visible {
 }
 
 .workspace-switcher-heading {
+  min-height: 64px;
   color: #f4fffe;
   background: rgb(5 22 34 / 72%);
 }
@@ -343,10 +348,13 @@ textarea:focus-visible {
 }
 
 .workspace-switcher-links {
+  grid-auto-columns: minmax(0, 1fr);
   background: transparent;
 }
 
 .workspace-switcher-link {
+  min-height: 64px;
+  border-color: rgb(219 249 245 / 18%);
   color: #d9efed;
   background: transparent;
 }
@@ -363,6 +371,46 @@ textarea:focus-visible {
 
 .workspace-switcher-active {
   background: var(--brand-teal);
+}
+
+.workspace-switcher-link[aria-current="page"],
+.workspace-switcher-link[aria-current="page"] small {
+  color: var(--brand-navy);
+}
+
+.workspace-switcher-link:focus-visible {
+  outline: 3px solid #f4fffe;
+  outline-offset: -4px;
+}
+
+.workspace-switcher-link > span:not(.workspace-switcher-active) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.workspace-state {
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border-radius: 18px;
+  color: var(--brand-navy);
+  background: var(--brand-white);
+}
+
+.workspace-state h2 { font-size: clamp(1.6rem, 5vw, 2.2rem); line-height: 1.15; }
+.workspace-state p { margin: 0 0 1rem; }
+.workspace-state .actions { flex-wrap: wrap; gap: 12px; }
+.workspace-state .button.secondary { color: var(--brand-navy); border-color: var(--brand-line); }
+
+.application-panel.application-error-panel h1 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  line-height: 1.1;
+  margin-bottom: 1rem;
+}
+
+.application-error-panel .error-message {
+  font-family: var(--font-body);
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
 }
 
 .application-panel {
@@ -1051,11 +1099,47 @@ input[type="checkbox"] {
   }
 
   .workspace-switcher {
-    overflow-x: auto;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .workspace-switcher-heading {
+    min-height: 44px;
+    padding: 10px 14px;
+    gap: 12px;
+    border-color: rgb(219 249 245 / 18%);
+  }
+
+  .workspace-switcher-heading strong {
+    font-size: 0.9rem;
   }
 
   .workspace-switcher-links {
-    min-width: max-content;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    overflow: visible;
+  }
+
+  .workspace-switcher-link,
+  .workspace-switcher-link:last-child {
+    flex: 1 1 125px;
+    min-height: 48px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 8px;
+  }
+
+  .workspace-switcher-link small { display: none; }
+  .workspace-switcher-link > span:not(.workspace-switcher-active) {
+    font-size: 0.875rem;
+    text-transform: none;
+  }
+
+  .workspace-state .actions > .button {
+    width: 100%;
   }
 
   .application-panel,
@@ -1070,6 +1154,10 @@ input[type="checkbox"] {
 
   .application-panel h1 {
     font-size: clamp(2.7rem, 14vw, 4.4rem);
+  }
+
+  .application-panel.application-error-panel h1 {
+    font-size: clamp(2rem, 8vw, 2.75rem);
   }
 
   .application-progress {
