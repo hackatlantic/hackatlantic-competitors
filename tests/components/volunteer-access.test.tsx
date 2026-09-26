@@ -17,6 +17,24 @@ describe("volunteer requests", () => {
     mocks.listVolunteerRequests.mockResolvedValue({ items: [volunteer] });
     mocks.reviewVolunteerRequest.mockResolvedValue(undefined);
   });
+  it("shows a clear empty state and copies the public invitation link", async () => {
+    mocks.listVolunteerRequests.mockResolvedValue({ items: [] });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    render(<VolunteerApprovalQueue />);
+    await screen.findByRole("heading", { name: "No requests yet" });
+    fireEvent.click(screen.getByRole("button", { name: "Copy invitation link" }));
+    await screen.findByText("Link copied. Ready to share in Discord.");
+    expect(writeText).toHaveBeenCalledWith("https://apply.hackatlantic.ca/volunteer");
+    expect(mocks.reviewVolunteerRequest).not.toHaveBeenCalled();
+  });
+  it("keeps the invitation visible when clipboard permission is denied", async () => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error("Denied")) } });
+    render(<VolunteerApprovalQueue />);
+    fireEvent.click(screen.getByRole("button", { name: "Copy invitation link" }));
+    await screen.findByText("Couldn’t copy automatically. Select and copy the link above.");
+    expect(screen.getByRole("link", { name: "apply.hackatlantic.ca/volunteer" }).getAttribute("href")).toBe("https://apply.hackatlantic.ca/volunteer");
+  });
   it("requests by name without an application, email entry or automatic access", async () => {
     render(<VolunteerSignup />);
     fireEvent.change(await screen.findByLabelText("Your name on the volunteer schedule"), { target: { value: "Alex Morgan" } });

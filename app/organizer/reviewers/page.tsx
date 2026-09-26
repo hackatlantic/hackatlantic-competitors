@@ -16,13 +16,15 @@ export default async function OrganizerReviewersPage() {
       eyebrow="Admin workspace"
       role="admin"
       title="Scanner access"
+      compactHeader
     >
-      <p className="staff-summary">
-        Approve volunteer requests to grant scanner access. Scanners can
-        check attendee passes without access to applications or review notes.
-      </p>
-      <VolunteerApprovalQueue />
-      <details><summary>Manage access by email</summary><ScannerRoleForm /></details>
+      <div className="volunteer-admin">
+        <VolunteerApprovalQueue />
+        <details className="volunteer-email-manager">
+          <summary>Manage access by email</summary>
+          <ScannerRoleForm />
+        </details>
+      </div>
     </StaffPageFrame>
   );
 }
